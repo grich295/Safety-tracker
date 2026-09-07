@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#17324d" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v104.css" />
+  <link rel="stylesheet" href="styles-v110.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 </head>
@@ -32,7 +32,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.0.4</span>
+        <span class="version">v1.1</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -46,6 +46,7 @@
       <button data-view="documents">Documents</button>
       <button data-view="training">Training</button>
       <button data-view="people" class="manager-only" style="display:none">People</button>
+      <button data-view="compliance" class="manager-only" style="display:none">Compliance</button>
       <button data-view="reports" class="manager-only" style="display:none">Reports</button>
       <button data-view="admin" class="admin-only" style="display:none">Admin</button>
     </nav>
@@ -99,6 +100,31 @@
         <div id="peopleList" class="card-list"></div>
       </section>
 
+
+      <section id="complianceView" class="view">
+        <div class="page-heading">
+          <div><h2>Compliance</h2><p class="muted">Who needs what, instructor confirmation, due dates and completion status.</p></div>
+        </div>
+        <div id="complianceStats" class="stats-grid"></div>
+        <div class="filters">
+          <select id="compliancePersonFilter"><option value="">All people</option></select>
+          <select id="complianceKindFilter">
+            <option value="">All items</option>
+            <option value="DOCUMENT">Documents / RAs / SSW</option>
+            <option value="TRAINING">Training sessions</option>
+          </select>
+          <select id="complianceStatusFilter">
+            <option value="">All statuses</option>
+            <option value="AWAITING_INSTRUCTOR">Awaiting instructor confirmation</option>
+            <option value="READY_TO_SIGN">Ready for trainee sign-off</option>
+            <option value="OUTSTANDING">Outstanding self-training</option>
+            <option value="OVERDUE">Overdue</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+        </div>
+        <div id="complianceList" class="card-list"></div>
+      </section>
+
       <section id="reportsView" class="view">
         <div class="page-heading"><div><h2>Reports</h2><p class="muted">Evidence, outstanding actions and renewal tracking.</p></div></div>
         <div id="reportStats" class="stats-grid"></div>
@@ -129,6 +155,6 @@
     </form>
   </dialog>
 
-  <script src="app-v104.js"></script>
+  <script src="app-v110.js"></script>
 </body>
 </html>
