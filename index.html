@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#17324d" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles-v104.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 </head>
@@ -32,7 +32,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.0.3</span>
+        <span class="version">v1.0.4</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -45,9 +45,9 @@
       <button data-view="mySafety" class="active">My Safety</button>
       <button data-view="documents">Documents</button>
       <button data-view="training">Training</button>
-      <button data-view="people" class="manager-only" hidden>People</button>
-      <button data-view="reports" class="manager-only" hidden>Reports</button>
-      <button data-view="admin" class="admin-only" hidden>Admin</button>
+      <button data-view="people" class="manager-only" style="display:none">People</button>
+      <button data-view="reports" class="manager-only" style="display:none">Reports</button>
+      <button data-view="admin" class="admin-only" style="display:none">Admin</button>
     </nav>
 
     <main class="page-shell">
@@ -69,7 +69,7 @@
       <section id="documentsView" class="view">
         <div class="page-heading">
           <div><h2>Documents</h2><p class="muted">Risk Assessments, COSHH, SSW, policies and procedures.</p></div>
-          <button id="newDocumentBtn" class="primary manager-only" hidden>New document</button>
+          <button id="newDocumentBtn" class="primary manager-only" style="display:none">New document</button>
         </div>
         <div class="filters">
           <input id="documentSearch" placeholder="Search title or reference" />
@@ -82,7 +82,7 @@
       <section id="trainingView" class="view">
         <div class="page-heading">
           <div><h2>Training</h2><p class="muted">Ad-hoc sessions, toolbox talks, inductions and refreshers.</p></div>
-          <button id="newTrainingBtn" class="primary manager-only" hidden>New training</button>
+          <button id="newTrainingBtn" class="primary manager-only" style="display:none">New training</button>
         </div>
         <div class="filters">
           <input id="trainingSearch" placeholder="Search training" />
@@ -94,7 +94,7 @@
       <section id="peopleView" class="view">
         <div class="page-heading">
           <div><h2>People</h2><p class="muted">Assign documents and training to active users.</p></div>
-          <button id="inviteUserBtn" class="primary admin-only" hidden>Invite user</button>
+          <button id="inviteUserBtn" class="primary admin-only" style="display:none">Invite user</button>
         </div>
         <div id="peopleList" class="card-list"></div>
       </section>
@@ -129,6 +129,6 @@
     </form>
   </dialog>
 
-  <script src="app.js"></script>
+  <script src="app-v104.js"></script>
 </body>
 </html>
