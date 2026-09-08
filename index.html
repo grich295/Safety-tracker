@@ -6,7 +6,24 @@
   <meta name="theme-color" content="#17324d" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v12final.css" />
+  <style>
+[hidden]{display:none!important}
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17212b;background:#f4f6f8;--ink:#17324d;--soft:#e8eef4;--border:#d7dee6;--danger:#a52a2a;--ok:#206a42;--warn:#9a6200}
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8}button,input,select,textarea{font:inherit}button{cursor:pointer}.auth-shell{min-height:100vh;display:grid;place-items:center;padding:24px}.auth-card{width:min(420px,100%);background:white;padding:28px;border-radius:18px;box-shadow:0 12px 35px rgba(18,42,66,.12)}.brand-mark{width:54px;height:54px;border-radius:14px;background:var(--ink);color:white;display:grid;place-items:center;font-weight:800;font-size:20px}.stack{display:grid;gap:14px;margin-top:22px}label{display:grid;gap:7px;font-weight:650}input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:white;color:#17212b}textarea{min-height:90px;resize:vertical}.primary,.secondary,.ghost,.danger{border:0;border-radius:10px;padding:11px 15px;font-weight:700}.primary{background:var(--ink);color:white}.secondary{background:var(--soft);color:var(--ink)}.ghost{background:transparent;border:1px solid var(--border)}.danger{background:#fde9e9;color:var(--danger)}.small{padding:7px 10px;font-size:13px}.link-button{border:0;background:none;color:var(--ink);padding:14px 0 0}.muted{color:#667585}.message{margin-top:14px;padding:10px;border-radius:10px;background:#fff4d8}.topbar{position:sticky;top:0;z-index:10;background:var(--ink);color:white;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:14px}.version{opacity:.65;margin-left:7px;font-size:12px}.user-chip{display:flex;align-items:center;gap:8px}.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#e8eef4;color:#17324d;font-size:12px;font-weight:800;text-transform:capitalize}.topbar .pill{background:rgba(255,255,255,.16);color:white}.nav-tabs{background:white;border-bottom:1px solid var(--border);display:flex;overflow:auto;padding:0 12px}.nav-tabs button{border:0;background:none;padding:14px 12px;white-space:nowrap;color:#596879;font-weight:700}.nav-tabs button.active{color:var(--ink);border-bottom:3px solid var(--ink)}.page-shell{max-width:1100px;margin:0 auto;padding:22px}.view{display:none}.active-view{display:block}.page-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.page-heading h2{margin:0 0 4px}.filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:16px}.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}.stat{background:white;border:1px solid var(--border);border-radius:14px;padding:16px}.stat strong{display:block;font-size:26px;color:var(--ink)}.stat span{font-size:13px;color:#667585}.section-card{background:white;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px}.section-title{display:flex;justify-content:space-between;align-items:center}.section-title h3,.section-card h3{margin-top:0}.card-list{display:grid;gap:10px}.item-card{background:white;border:1px solid var(--border);border-radius:13px;padding:14px;display:grid;gap:8px}.item-card h3,.item-card h4{margin:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row-between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.meta{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:#667585}.badge{padding:4px 8px;border-radius:999px;background:#edf1f4;font-size:12px;font-weight:750}.badge.due{background:#fff0ce;color:var(--warn)}.badge.overdue{background:#fde4e4;color:var(--danger)}.badge.complete{background:#e3f3ea;color:var(--ok)}.button-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.empty{padding:22px;text-align:center;color:#758392;border:1px dashed var(--border);border-radius:12px;background:white}.modal{width:min(720px,calc(100% - 24px));border:0;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)}.modal::backdrop{background:rgba(10,20,30,.45)}.modal form{padding:18px}.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.modal-head h3{margin:0}.icon-button{border:0;background:none;font-size:28px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.checkbox-list{border:1px solid var(--border);border-radius:10px;max-height:220px;overflow:auto;padding:8px}.check-row{display:flex;align-items:center;gap:9px;padding:7px}.check-row input{width:auto}.toast{position:fixed;right:16px;bottom:16px;z-index:100;background:#17212b;color:white;padding:12px 14px;border-radius:10px;max-width:360px}
+@media(max-width:760px){.page-shell{padding:14px}.stats-grid{grid-template-columns:repeat(2,1fr)}.filters,.form-grid,.button-grid{grid-template-columns:1fr}.user-chip #currentUserName{display:none}.page-heading{align-items:flex-start}.row-between{flex-direction:column}.topbar{padding:10px 12px}}
+
+.hint-box{padding:12px;border:1px solid #d8dee6;border-radius:10px;background:rgba(23,50,77,.04);font-size:.92rem}
+.item-card.compact{padding:10px}
+
+#passwordSetupArea{margin-top:10px}
+.checkbox-list{max-height:320px;overflow:auto}
+.stats-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+
+
+.message{padding:12px;border:1px solid #d8dee6;border-radius:10px;background:rgba(23,50,77,.04)}
+.section-card .card-list{margin-top:8px}
+
+</style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -42,7 +59,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.2 Final</span>
+        <span class="version">v1.2.1</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
