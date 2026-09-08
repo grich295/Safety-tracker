@@ -1,0 +1,88 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+function json(body: unknown,status=200){return new Response(JSON.stringify(body),{status,headers:{...corsHeaders,"Content-Type":"application/json"}})}
+function env(primary:string,fallback:string){return Deno.env.get(primary)||Deno.env.get(fallback)||""}
+
+Deno.serve(async req=>{
+  if(req.method==="OPTIONS") return new Response("ok",{headers:corsHeaders});
+  try{
+    const auth=req.headers.get("Authorization"); if(!auth) return json({error:"Not signed in"},401);
+    const url=Deno.env.get("SUPABASE_URL")||"";
+    const anon=env("SUPABASE_PUBLISHABLE_KEY","SUPABASE_ANON_KEY");
+    const secret=env("SUPABASE_SECRET_KEY","SUPABASE_SERVICE_ROLE_KEY");
+    if(!url||!anon||!secret) return json({error:"Supabase function secrets unavailable"},500);
+
+    const caller=createClient(url,anon,{global:{headers:{Authorization:auth}},auth:{persistSession:false}});
+    const admin=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
+    const {data:{user}}=await caller.auth.getUser(); if(!user) return json({error:"Invalid login"},401);
+    const {data:me}=await admin.from("profiles").select("role,active").eq("id",user.id).single();
+    if(me?.role!=="admin"||me?.active===false) return json({error:"Admin access required"},403);
+
+    const body=await req.json(); const action=String(body.action||"invite");
+    if(action==="invite"){
+      const email=String(body.email||"").trim().toLowerCase();
+      const name=String(body.display_name||"").trim();
+      const role=String(body.role||"user");
+      const redirectTo=String(body.redirect_to||"").trim()||undefined;
+      if(!email||!name) return json({error:"Name and email are required"},400);
+      if(!["user","manager","admin"].includes(role)) return json({error:"Invalid role"},400);
+
+      const {data,error}=await admin.auth.admin.inviteUserByEmail(email,{
+        data:{display_name:name,must_set_password:true,invited_by:user.id},
+        redirectTo
+      });
+      if(error) return json({error:error.message},400);
+
+      if(data.user?.id){
+        const {error:profileError}=await admin.from("profiles").update({
+          email,display_name:name,role,active:true,disabled_at:null,disabled_by:null
+        }).eq("id",data.user.id);
+        if(profileError) return json({error:profileError.message},400);
+      }
+      return json({success:true});
+    }
+
+    const targetId=String(body.user_id||""); if(!targetId) return json({error:"User required"},400);
+    if(targetId===user.id&&["disable","set_role"].includes(action)) return json({error:"You cannot disable or demote your own account here"},400);
+    const {data:target}=await admin.from("profiles").select("role,active").eq("id",targetId).single();
+    if(!target) return json({error:"User not found"},404);
+
+    if(action==="set_role"){
+      const role=String(body.role||"user"); if(!["user","manager","admin"].includes(role)) return json({error:"Invalid role"},400);
+      if(target.role==="admin"&&role!=="admin"){
+        const {count}=await admin.from("profiles").select("id",{count:"exact",head:true}).eq("role","admin").eq("active",true);
+        if((count||0)<=1)return json({error:"At least one active admin must remain"},400)
+      }
+      const {error}=await admin.from("profiles").update({role}).eq("id",targetId);
+      if(error)return json({error:error.message},400);
+      return json({success:true});
+    }
+
+    if(action==="disable"){
+      if(target.role==="admin"){
+        const {count}=await admin.from("profiles").select("id",{count:"exact",head:true}).eq("role","admin").eq("active",true);
+        if((count||0)<=1)return json({error:"The last active admin cannot be disabled"},400)
+      }
+      const {error:e1}=await admin.auth.admin.updateUserById(targetId,{ban_duration:"876000h"});
+      if(e1)return json({error:e1.message},400);
+      const {error:e2}=await admin.from("profiles").update({active:false,disabled_at:new Date().toISOString(),disabled_by:user.id}).eq("id",targetId);
+      if(e2)return json({error:e2.message},400);
+      return json({success:true});
+    }
+
+    if(action==="enable"){
+      const {error:e1}=await admin.auth.admin.updateUserById(targetId,{ban_duration:"none"});
+      if(e1)return json({error:e1.message},400);
+      const {error:e2}=await admin.from("profiles").update({active:true,disabled_at:null,disabled_by:null}).eq("id",targetId);
+      if(e2)return json({error:e2.message},400);
+      return json({success:true});
+    }
+
+    return json({error:"Unknown action"},400);
+  }catch(e){return json({error:e instanceof Error?e.message:"Unknown error"},500)}
+});

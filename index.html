@@ -6,8 +6,11 @@
   <meta name="theme-color" content="#17324d" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v110.css" />
+  <link rel="stylesheet" href="styles-v12final.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="config.js"></script>
 </head>
 <body>
@@ -24,6 +27,13 @@
         <button class="primary" type="submit">Sign in</button>
       </form>
       <button id="forgotPasswordBtn" class="link-button" type="button">Forgot password?</button>
+      <div id="passwordSetupArea" class="stack" hidden>
+        <h2>Set your password</h2>
+        <p class="muted">For security, invited users must choose their own password before entering Safety Tracker.</p>
+        <label>New password<input id="invitePassword" type="password" minlength="8" autocomplete="new-password" /></label>
+        <label>Confirm password<input id="invitePasswordConfirm" type="password" minlength="8" autocomplete="new-password" /></label>
+        <button id="completePasswordSetupBtn" class="primary" type="button">Set password and continue</button>
+      </div>
       <div id="authMessage" class="message" hidden></div>
     </section>
   </main>
@@ -32,7 +42,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.1</span>
+        <span class="version">v1.2 Final</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -119,6 +129,8 @@
             <option value="READY_TO_SIGN">Ready for trainee sign-off</option>
             <option value="OUTSTANDING">Outstanding self-training</option>
             <option value="OVERDUE">Overdue</option>
+            <option value="DUE_SOON">Due within 30 days</option>
+            <option value="ABSENT">Absent / not attended</option>
             <option value="COMPLETED">Completed</option>
           </select>
         </div>
@@ -129,20 +141,25 @@
         <div class="page-heading"><div><h2>Reports</h2><p class="muted">Evidence, outstanding actions and renewal tracking.</p></div></div>
         <div id="reportStats" class="stats-grid"></div>
         <div class="button-grid">
-          <button data-report="outstanding" class="secondary">Outstanding sign-offs CSV</button>
-          <button data-report="document-signoffs" class="secondary">Document sign-offs CSV</button>
-          <button data-report="training-signoffs" class="secondary">Training sign-offs CSV</button>
-          <button data-report="training-matrix" class="secondary">Training matrix CSV</button>
-          <button data-report="reviews" class="secondary">Review dates CSV</button>
+          <button data-report="outstanding" class="secondary">Outstanding actions PDF</button>
+          <button data-report="document-signoffs" class="secondary">Document sign-offs PDF</button>
+          <button data-report="training-signoffs" class="secondary">Training sign-offs PDF</button>
+          <button data-report="training-matrix" class="secondary">Training matrix PDF</button>
+          <button data-report="reviews" class="secondary">Review dates PDF</button>
+          <button id="fullEvidencePdfBtn" class="primary">Full evidence PDF</button>
         </div>
+        <p class="muted">PDF reports are generated as dated evidence copies. They reduce casual editing compared with spreadsheets, although no ordinary PDF is completely tamper-proof.</p>
       </section>
 
       <section id="adminView" class="view">
         <div class="page-heading"><div><h2>Admin</h2><p class="muted">System controls and backup.</p></div></div>
         <div class="section-card">
           <h3>Backup</h3>
-          <p class="muted">Downloads database records as JSON. Uploaded files remain in Supabase Storage.</p>
-          <button id="backupBtn" class="secondary">Download JSON backup</button>
+          <p class="muted">Create a database-only JSON backup or a full ZIP containing the database export plus all uploaded safety/training files.</p>
+          <div class="row">
+            <button id="backupBtn" class="secondary">Download JSON backup</button>
+            <button id="fullBackupBtn" class="primary">Full backup ZIP</button>
+          </div>
         </div>
       </section>
     </main>
@@ -155,6 +172,6 @@
     </form>
   </dialog>
 
-  <script src="app-v110.js"></script>
+  <script src="app-v12final.js"></script>
 </body>
 </html>
