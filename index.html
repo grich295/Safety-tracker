@@ -65,7 +65,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.4.8</span>
+        <span class="version">v1.5.0</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -80,6 +80,7 @@
       <button data-view="training">Training</button>
       <button data-view="people" class="manager-only" style="display:none">People</button>
       <button data-view="compliance" class="manager-only" style="display:none">Compliance</button>
+        <button data-view="instructor">Instructor</button>
       <button data-view="reports" class="manager-only" style="display:none">Reports</button>
       <button data-view="admin" class="admin-only" style="display:none">Admin</button>
     </nav>
@@ -160,7 +161,50 @@
         <div id="complianceList" class="card-list"></div>
       </section>
 
-      <section id="reportsView" class="view">
+      
+      <section id="instructorView" class="view">
+        <div class="page-heading">
+          <div>
+            <h2>Instructor Sign-off / Attendance</h2>
+            <p class="muted">See everyone waiting for instructor-led delivery confirmation in one place.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="instructorStats"></div>
+
+        <div class="filters">
+          <label>Person<select id="instructorPersonFilter"><option value="">All people</option></select></label>
+          <label>Type<select id="instructorKindFilter"><option value="">Documents and training</option><option value="DOCUMENT">Documents</option><option value="TRAINING">Training</option></select></label>
+          <label>Status<select id="instructorStatusFilter"><option value="">Awaiting / ready / absent</option><option value="AWAITING_INSTRUCTOR">Awaiting instructor</option><option value="READY_TO_SIGN">Ready for trainee sign-off</option><option value="ABSENT">Absent / not attended</option></select></label>
+        </div>
+
+        <div class="section-card">
+          <h3>Group training attendance</h3>
+          <p class="muted">Choose the training session, then tick the people who actually attended. People you leave unticked stay outstanding and can be trained later.</p>
+          <div class="form-grid">
+            <label>Training session
+              <select id="groupTrainingSelect">
+                <option value="">Select training</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="openGroupAttendanceBtn">Select attendees</button>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="row-between">
+            <div>
+              <h3>Instructor-led assignments</h3>
+              <p class="muted">Record attendance here. After you confirm attendance, the trainee must still log in and complete their own digital signature.</p>
+            </div>
+          </div>
+          <div id="instructorList" class="card-list"></div>
+        </div>
+      </section>
+
+<section id="reportsView" class="view">
         <div class="page-heading"><div><h2>Reports</h2><p class="muted">Evidence, outstanding actions and renewal tracking.</p></div></div>
         <div id="reportStats" class="stats-grid"></div>
         <div class="button-grid">
@@ -195,6 +239,6 @@
     </form>
   </dialog>
 
-  <script src="app-v148.js"></script>
+  <script src="app-v150.js"></script>
 </body>
 </html>
