@@ -1,5 +1,5 @@
 {
-  "version": "2.0.4",
-  "build": "authoritative-link-rebuild-20260910",
+  "version": "2.0.5",
+  "build": "live-document-register-20260910",
   "service_worker": false
 }

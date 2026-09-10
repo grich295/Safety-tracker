@@ -1,4 +1,4 @@
-/* Safety Tracker v2.0.4 - bulk PDF importer with COSHH/SDS separation */
+/* Safety Tracker v2.0.5 - bulk PDF importer with COSHH/SDS separation */
 'use strict';
 (() => {
 const api=window.SafetyTrackerV2;if(!api)return;
