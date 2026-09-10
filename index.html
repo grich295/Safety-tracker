@@ -42,11 +42,30 @@
 .help-warning{padding:10px 12px;border-left:4px solid #b36b1e;background:rgba(179,107,30,.08);border-radius:8px;margin-top:10px}
 .help-section-title{margin:20px 0 10px}
 
+
+.review-signature-evidence{margin-top:10px;padding:10px;background:#fff;border:1px solid #d5d9df;border-radius:10px}
+.review-signature-evidence img{display:block;max-width:360px;width:100%;height:auto;background:#fff}
+
+
+.bulk-drop{margin:14px 0;padding:14px;border:1px dashed var(--border);border-radius:12px;background:#fbfcfd}
+.bulk-preview-card{border-left:4px solid #7e91a4}
+.bulk-preview-card[data-kind="TOOLBOX_TALK"]{border-left-color:#855eaa}
+.bulk-preview-card[data-kind="SDS"]{border-left-color:#2c7a5a}
+.bulk-preview-card[data-kind="SSW"]{border-left-color:#9a6200}
+.bulk-preview-card .bulk-grid{display:grid;grid-template-columns:140px minmax(180px,1fr) 180px 130px;gap:8px;margin-top:9px}
+.bulk-preview-card .bulk-grid label{font-size:12px}
+.bulk-preview-card .bulk-grid input,.bulk-preview-card .bulk-grid select{font-size:13px;padding:8px}
+.bulk-ref-list{font-size:12px;color:#667585;margin-top:5px}
+.bulk-progress{height:8px;border-radius:999px;background:#e4e9ee;overflow:hidden;margin-top:8px}.bulk-progress>span{display:block;height:100%;background:#17324d;width:0%}
+@media(max-width:760px){.bulk-preview-card .bulk-grid{grid-template-columns:1fr 1fr}.bulk-preview-card .bulk-grid .wide{grid-column:1/-1}}
+
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="config.js"></script>
 </head>
 <body>
@@ -78,7 +97,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.5.2</span>
+        <span class="version">v1.6.0</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -227,6 +246,7 @@
           <button data-report="training-signoffs" class="secondary">Training sign-offs PDF</button>
           <button data-report="training-matrix" class="secondary">Training matrix PDF</button>
           <button data-report="reviews" class="secondary">Review dates PDF</button>
+          <button data-report="document-reviews" class="secondary">Signed document reviews PDF</button>
           <button id="fullEvidencePdfBtn" class="primary">Full evidence PDF</button>
         </div>
         <p class="muted">PDF reports are generated as dated evidence copies. They reduce casual editing compared with spreadsheets, although no ordinary PDF is completely tamper-proof.</p>
@@ -244,7 +264,26 @@
       </section>
 
 <section id="adminView" class="view">
-        <div class="page-heading"><div><h2>Admin</h2><p class="muted">System controls and backup.</p></div></div>
+        <div class="page-heading"><div><h2>Admin</h2><p class="muted">Bulk import, system controls and backup.</p></div></div>
+        <div class="section-card">
+          <h3>Bulk Import</h3>
+          <p class="muted">Upload complete section PDFs. Safety Tracker analyses them locally, splits clearly referenced documents, organises them into the correct section, and shows a preview before anything is saved.</p>
+          <div class="hint-box"><strong>Built-in rules:</strong> RA and COSHH → Documents / self-training; SSW → Documents / instructor-led; SDS/MSDS → reference-only with no assignment or signature; Toolbox Talks → Training / instructor-led. Directory/index files are stored as control records.</div>
+          <div class="bulk-drop" id="bulkDropZone">
+            <label>Section PDF files<input id="bulkImportFiles" type="file" accept="application/pdf,.pdf" multiple></label>
+            <p class="muted">You can select several packs at once. Maximum 45 MB per PDF.</p>
+          </div>
+          <div class="row">
+            <button id="bulkAnalyzeBtn" class="secondary" type="button">Analyse PDFs</button>
+            <button id="bulkClearBtn" class="ghost" type="button">Clear preview</button>
+          </div>
+          <div id="bulkImportStatus" class="muted" style="margin-top:10px" aria-live="polite"></div>
+          <div id="bulkImportSummary" class="stats-grid" style="margin-top:14px"></div>
+          <div id="bulkImportPreview" class="card-list" style="margin-top:12px"></div>
+          <div id="bulkImportActions" class="actions" hidden>
+            <button id="bulkImportBtn" class="primary" type="button">Import selected</button>
+          </div>
+        </div>
         <div class="section-card">
           <h3>Backup</h3>
           <p class="muted">Create a database-only JSON backup or a full ZIP containing the database export plus all uploaded safety/training files.</p>
@@ -264,6 +303,7 @@
     </form>
   </dialog>
 
-  <script src="app-v152.js"></script>
+  <script src="app-v160.js"></script>
+  <script src="bulk-import-v160.js"></script>
 </body>
 </html>
