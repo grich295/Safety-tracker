@@ -1,0 +1,44 @@
+SAFETY TRACKER v1.8.1 INSTALL
+
+Purpose
+- Fix the live New Training form shown in the v1.8.0 screenshot.
+- Show v1.8.1 in the header so deployment can be verified immediately.
+- Add Risk Assessment, COSHH Assessment and Safe System of Work training types.
+- Link RA/COSHH/SSW training to the current controlled document and version.
+- Keep Force Sync & Review untouched.
+
+1. SUPABASE
+Run 001-safety-tracker-v181.sql once in Supabase SQL Editor.
+The earlier v1.8.0 SQL does NOT need to be repeated.
+
+2. GITHUB PAGES / WEB FILES
+Upload/replace:
+- app-v181.js   (new)
+- sw.js         (replace existing)
+
+Edit index.html using INDEX-CHANGE-v181.txt so app-v181.js loads after the existing app scripts.
+
+3. DEPLOYMENT CHECK
+After GitHub Pages finishes publishing:
+- Fully close the installed Safety Tracker/PWA.
+- Reopen it.
+- Header MUST show v1.8.1.
+- Training > New training MUST show:
+  Risk Assessment
+  COSHH Assessment
+  Safe System of Work
+  Toolbox Talk
+  Induction
+  Refresher
+  Ad-hoc training
+  Other
+
+For Risk Assessment/COSHH/SSW, a Controlled document selector must appear and display reference + full title + current version.
+
+4. IF THE HEADER STILL SHOWS AN OLD VERSION
+The old service worker is still controlling the page or index.html was not updated. In Chrome/Android, close the app completely and reopen after the GitHub Pages deploy has completed. If needed, remove/reinstall the PWA once; v1.8.1 uses a new cache name and network-first fetching to prevent this recurring.
+
+IMPORTANT
+- Force Sync & Review is not modified by app-v181.js.
+- Historic document sign-offs are not deleted.
+- v1.8.0 database architecture lock remains in force.

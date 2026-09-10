@@ -1,0 +1,15 @@
+Safety Tracker v1.8.1 - REQUIRED index.html change
+
+At the very bottom of index.html you currently have:
+
+  <script src="app-v161.js"></script>
+  <script src="bulk-import-v161.js"></script>
+
+Change it to:
+
+  <script src="app-v161.js"></script>
+  <script src="bulk-import-v161.js"></script>
+  <script src="app-v181.js"></script>
+
+Do not remove app-v161.js or bulk-import-v161.js in this release.
+app-v181.js replaces the New Training front-end route at runtime and leaves Force Sync & Review alone.
