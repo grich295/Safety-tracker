@@ -1,0 +1,13 @@
+SAFETY TRACKER v1.8.0 - INDEX CHANGE
+
+Keep the existing scripts, including the working Force Sync & Review implementation.
+Load the new architecture file AFTER v1.7.1:
+
+  <script src="app-v161.js"></script>
+  <script src="bulk-import-v161.js"></script>
+  <script src="app-v171-patch.js"></script>
+  <script src="app-v180-architecture.js"></script>
+
+Change the visible version label to v1.8.0 if your index contains a hard-coded version.
+
+Do NOT remove/replace the existing Force Sync & Review script/button/function.

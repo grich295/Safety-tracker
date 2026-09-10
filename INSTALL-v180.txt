@@ -1,0 +1,34 @@
+Safety Tracker v1.8.0 - architecture build
+
+PURPOSE
+- Documents are controlled source files only.
+- ALL active assignments/sign-offs live in Training.
+- Existing document assignments/sign-offs remain in the database as historical evidence but are inactive.
+- The old Assign Document route is blocked in both the browser and Supabase.
+- Force Sync & Review is NOT changed.
+- Bulk-import changed-content detection remains in place.
+- New versions supersede the prior current version; numeric versions default to the next number.
+- New RA/COSHH/SSW versions are picked up by the existing v1.7.1 training sync and create/refresh the corresponding Training record while preserving history.
+- SDS/MSDS remains reference-only; a changed SDS can flag linked COSHH for review via the existing link/review logic.
+
+INSTALL
+1. Make a backup first.
+2. Confirm v1.7.1 SQL has already been run.
+3. Run 001-safety-tracker-v180.sql in Supabase SQL Editor.
+4. Upload app-v180-architecture.js beside the existing app files.
+5. Update index.html as shown in INDEX-CHANGE-v180.txt.
+6. Replace sw.js with the included v1.8.0 service worker.
+7. Publish/deploy and hard refresh once (or close/reopen the installed PWA) so the old cache is removed.
+8. Sign in as Manager/Admin and use your EXISTING Force Sync & Review once. v1.8.0 does not replace it.
+
+EXPECTED CHECKS
+A. Documents page: no Assign Document button.
+B. Training page: RA/COSHH/SSW records appear as training entries after sync.
+C. My Safety: only active Training assignments appear; old document assignments are historical/inactive.
+D. Upload new version manually: version defaults to next number, issue date today, review date +1 year (except SDS), old version becomes SUPERSEDED.
+E. Bulk import a changed RA/COSHH/SSW with the same reference: importer recognises existing controlled record/content change and publishes a new version; no direct document assignment is created.
+F. Bulk import unchanged content: existing fingerprint logic should skip it as unchanged.
+
+ROLLBACK
+- Remove app-v180-architecture.js from index.html and restore previous sw.js.
+- If you intentionally need to restore legacy document assignments, first drop trg_block_active_document_assignments_v180. Historical rows have not been deleted.
