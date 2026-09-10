@@ -1,4 +1,4 @@
-/* Safety Tracker v2.1.6 - multi-document PDF pack importer.
+/* Safety Tracker v2.1.7 - multi-document PDF pack importer.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';

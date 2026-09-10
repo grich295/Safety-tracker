@@ -1,5 +1,6 @@
 {
-  "version": "2.1.6",
-  "build": "ra-renewal-instructor-v216-20260910",
-  "service_worker": false
+  "version": "2.1.7",
+  "build": "CLEAN",
+  "service_worker": false,
+  "notes": "Documents Register type dropdown fixed; includes all v2.1.6 RA/training default changes."
 }
