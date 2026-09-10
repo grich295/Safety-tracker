@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
-  "build": "multi-document-pack-import",
+  "version": "2.1.1",
+  "build": "sds-pack-split",
   "service_worker": false
 }

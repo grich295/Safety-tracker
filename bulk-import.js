@@ -1,5 +1,6 @@
-/* Safety Tracker v2.1.0 - multi-document PDF pack importer.
-   Splits combined RA / COSHH / SSW / TBT packs into individual records before import. */
+/* Safety Tracker v2.1.1 - multi-document PDF pack importer.
+   Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
+   into individual records before import. */
 'use strict';
 (() => {
 const api=window.SafetyTrackerV2;if(!api)return;
@@ -19,10 +20,39 @@ function titleAfter(lines,heading,stop){let i=lines.findIndex(x=>x.toUpperCase()
 function titleBeforeSds(lines){const i=lines.findIndex(x=>/SAFETY DATA SHEET/i.test(x));if(i<0)return '';for(let j=i-1;j>=Math.max(0,i-6);j--){const l=clean(lines[j]);if(!l||/SHIELD SAFETY|SECTION 3\.4|MAINTENANCE/i.test(l))continue;return l}return ''}
 function sdsProductName(text,lines,fileName){
   const fromApi=api.extractSdsProductName?.(text)||'';if(fromApi)return fromApi;
-  const labels=[/^(?:1\.1\s*)?(?:Product identifier|Product name)\s*:?\s*(.+)$/i,/^Trade name\s*:?\s*(.+)$/i];
-  for(let i=0;i<lines.length;i++)for(const rx of labels){const m=clean(lines[i]).match(rx);if(m?.[1]){const c=clean(m[1]);if(c.length>2&&!/^\d+\s*\/\s*\d+$/.test(c))return c}if(rx.test(clean(lines[i]))&&i+1<lines.length){const c=clean(lines[i+1]);if(c.length>2&&!/^(?:1\.2|Product code|SECTION|Page\b)/i.test(c)&&!/^\d+\s*\/\s*\d+$/.test(c))return c}}
+  const labels=[
+    /^(?:1\.1[.\s]*)?(?:GHS\s+)?Product\s+(?:identifier|name)\s*:?\s*(.+)$/i,
+    /^Trade\s+name\s*:?\s*(.+)$/i
+  ];
+  for(let i=0;i<lines.length;i++)for(const rx of labels){
+    const line=clean(lines[i]),m=line.match(rx);
+    if(m?.[1]){const c=clean(m[1]);if(c.length>2&&!/^\d+\s*\/\s*\d+$/.test(c)&&!/^Page\b/i.test(c))return c}
+    if(rx.test(line)&&i+1<lines.length){
+      const c=clean(lines[i+1]);
+      if(c.length>2&&!/^(?:1\.2|Product code|Article No|SECTION|Page\b|Contains\b)/i.test(c)&&!/^\d+\s*\/\s*\d+$/.test(c))return c;
+      // Some SDS layouts put a label such as "Product Name" on one line and the
+      // actual product after an intervening "Contains" or blank-like text line.
+      for(let j=i+1;j<Math.min(lines.length,i+5);j++){const v=clean(lines[j]);if(!v||/^(?:Contains|Product code|Article No|CAS No|EC No|SECTION|Page\b)/i.test(v))continue;if(v.length>2&&!/^\d+\s*\/\s*\d+$/.test(v))return v}
+    }
+  }
   const before=titleBeforeSds(lines);if(before&&!/^\d+\s*\/\s*\d+$/.test(before)&&!(before.length<24&&/\)$/.test(before)&&!before.includes('(')))return before;
   return api.safeFileName(fileName.replace(/\.pdf$/i,''));
+}
+function isSdsStartPage(text,lines){
+  const t=String(text||''),u=t.toUpperCase();
+  const saysSds=/\b(?:MATERIAL\s+)?SAFETY\s+DATA\s+SHEET\b|\bMSDS\b/.test(u);
+  if(!saysSds)return false;
+  const hasSection1=/\bSECTION\s*1\s*[:.-]?\s*(?:IDENTIFICATION|IDENTIFICATION OF THE SUBSTANCE|IDENTIFICATION OF THE SUBSTANCE\/MIXTURE)/i.test(t);
+  const hasIdentifier=/\b1\.1\.?\s*(?:PRODUCT\s+IDENTIFIER|IDENTIFICATION|PRODUCT\s+NAME|TRADE\s+NAME)/i.test(t)||/\bGHS\s+PRODUCT\s+IDENTIFIER\b/i.test(t);
+  const firstPageMarker=/(?:^|\s)(?:Page\s*:?\s*)?1\s*(?:\/|-|of)\s*\d{1,3}(?:\s|$)/i.test(t);
+  // Many manufacturers repeat "SAFETY DATA SHEET" on every page. A true boundary
+  // therefore needs Section 1 / 1.1 product identification, or an explicit page-1 marker.
+  return (hasSection1&&hasIdentifier)||(firstPageMarker&&hasIdentifier);
+}
+function sdsStartRecord(text,lines,fileName){
+  if(!isSdsStartPage(text,lines))return null;
+  const title=sdsProductName(text,lines,fileName)||'Manufacturer Safety Data Sheet';
+  return {kind:'SDS',ref:'',title,pageNo:1,sdsStart:true};
 }
 function titleFromRef(lines,ref){const i=lines.findIndex(x=>x.toUpperCase().includes(ref));for(let j=Math.max(0,i-5);j<i;j++){const l=clean(lines[j]);if(!l||/SHIELD SAFETY|MAINTENANCE|RISK ASSESSMENT|COSHH ASSESSMENT/i.test(l))continue;if(l.length>3)return l}return ref}
 function uniqueRefs(text,prefix){const rx=new RegExp(`\\b${prefix}-\\d{3}\\b`,'gi');return uniq((text.match(rx)||[]).map(x=>x.toUpperCase()))}
@@ -77,13 +107,15 @@ function detectPageRecord(text,lines){
     if(ref)return {kind:'RISK_ASSESSMENT',ref,title:titleForDetected('RISK_ASSESSMENT',text,lines,ref),pageNo:pageFormNumber(text,'RISK_ASSESSMENT')};
   }
 
-  if(api.classifySafetyPdfText?.(text)==='SDS')return {kind:'SDS',ref:'',title:sdsProductName(text,lines,'SDS.pdf')||'Manufacturer Safety Data Sheet',pageNo:null};
+  const sds=sdsStartRecord(text,lines,'SDS.pdf');
+  if(sds)return sds;
   return null;
 }
 function itemTitleFromSegment(kind,ref,segment,fallback){
   const text=clean(segment.map(x=>x.text).join(' '));
   if(kind==='COSHH')return coshhSubstanceTitle(text)||fallback||ref;
   const first=segment[0]||{};
+  if(kind==='SDS')return sdsProductName(first.text||text,first.lines||[],fallback||'SDS.pdf')||fallback||'Manufacturer Safety Data Sheet';
   return titleForDetected(kind,first.text||text,first.lines||[],ref)||fallback||ref;
 }
 function inferSingle(text,lines,fileName){const upper=text.toUpperCase();if(/TOOLBOX TALK DIRECTORY/.test(upper))return {kind:'OTHER',ref:'SECTION 5.1',title:'Toolbox Talk Directory'};if(/RISK ASSESSMENT DIRECTORY/.test(upper))return {kind:'OTHER',ref:'RA DIRECTORY',title:'Risk Assessment Directory'};if(/COSHH DIRECTORY/.test(upper))return {kind:'OTHER',ref:'COSHH DIRECTORY',title:'COSHH Directory'};if(/SAFE SYSTEM(?:S)? OF WORK DIRECTORY|SSW DIRECTORY/.test(upper))return {kind:'OTHER',ref:'SSW DIRECTORY',title:'Safe Systems of Work Directory'};const detected=api.classifySafetyPdfText?.(text);if(detected==='COSHH'){const m=text.match(/\bCOSHH\s+(?:Reference|Ref)\s*:?\s*(COSHH-\d{3})\b/i);return {kind:'COSHH',ref:m?.[1]?.toUpperCase()||'',title:titleAfter(lines,'COSHH RISK ASSESSMENT',/\bCOSHH\s+(Reference|Ref)\b/i)||titleAfter(lines,'COSHH ASSESSMENT',/\bCOSHH\s+(Reference|Ref)\b/i)||api.safeFileName(fileName.replace(/\.pdf$/i,''))}}if(detected==='SDS')return {kind:'SDS',ref:'',title:sdsProductName(text,lines,fileName)};return {kind:'OTHER',ref:'',title:api.safeFileName(fileName.replace(/\.pdf$/i,''))}}
@@ -97,11 +129,18 @@ async function analyseOne(file,sourceIndex){
   }
   B.sources[sourceIndex]={file,arrayBuffer:ab,pageCount:pdf.numPages};
 
-  // Build boundaries by controlled reference, not merely by file. This is what
-  // lets one 80-page PDF become 16 five-page COSHH records, for example.
+  // Build boundaries by controlled reference for RA/COSHH/SSW/TBT, and by a
+  // manufacturer SDS first page for ref-less SDS/MSDS packs. This lets one pack
+  // contain many unrelated manufacturer data sheets without importing as one record.
   const starts=[];let lastKey='';
   pages.forEach((pg,i)=>{
-    const r=pg.record;if(!r?.ref)return;
+    const r=pg.record;if(!r)return;
+    if(r.kind==='SDS'&&r.sdsStart){
+      starts.push({...r,index:i});
+      lastKey='';
+      return;
+    }
+    if(!r.ref)return;
     const key=`${r.kind}|${r.ref}`;
     if(key!==lastKey){starts.push({...r,index:i});lastKey=key}
     else if(starts.length&&(!starts[starts.length-1].title||starts[starts.length-1].title===starts[starts.length-1].ref)&&r.title&&r.title!==r.ref){starts[starts.length-1].title=r.title}
@@ -131,7 +170,7 @@ async function compareItem(item){if(item.kind==='TOOLBOX_TALK'){const x=existing
 async function storedHash(v){if(!v)return null;if(v.content_text_sha256)return v.content_text_sha256;if(!v.storage_path)return null;try{const r=await sb.storage.from('safety-files').download(v.storage_path);if(r.error||!r.data)return null;const h=await api.hashPdf(r.data);if(h){await sb.from('document_versions').update({content_text_sha256:h}).eq('id',v.id);v.content_text_sha256=h}return h}catch{return null}}
 function modeOptions(i){if(i.kind==='TOOLBOX_TALK'){if(i.existingId)return `<option value="SKIP" ${i.mode==='SKIP'?'selected':''}>Skip</option><option value="REPLACE_TRAINING" ${i.mode==='REPLACE_TRAINING'?'selected':''}>Create revised training</option>`;return `<option value="CREATE" selected>Create training</option><option value="SKIP">Skip</option>`}if(i.existingId)return `<option value="SKIP" ${i.mode==='SKIP'?'selected':''}>Skip existing</option><option value="NEW_VERSION" ${i.mode==='NEW_VERSION'?'selected':''}>Publish new version</option>`;return `<option value="CREATE" selected>Create</option><option value="SKIP">Skip</option>`}
 function renderPreview(){const box=$('bulkImportPreview'),sum=$('bulkImportSummary');if(!box)return;const counts={};B.items.forEach(i=>counts[i.kind]=(counts[i.kind]||0)+1);const changed=B.items.filter(i=>i.compareStatus==='CHANGED').length,unchanged=B.items.filter(i=>i.compareStatus==='UNCHANGED').length,fresh=B.items.filter(i=>i.compareStatus==='NEW').length;sum.innerHTML=Object.entries(counts).map(([k,n])=>`<div class="stat"><strong>${n}</strong><span>${esc(kindLabel(k))}${n===1?'':'s'}</span></div>`).join('')+`<div class="stat"><strong>${changed}</strong><span>Changed</span></div><div class="stat"><strong>${unchanged}</strong><span>Unchanged</span></div><div class="stat"><strong>${fresh}</strong><span>New</span></div>`;box.innerHTML=B.items.map((i,idx)=>`<div class="item-card bulk-preview-card" data-kind="${i.kind}" data-index="${idx}"><div class="row-between"><label class="check-row"><input class="bulk-select" type="checkbox" ${i.selected?'checked':''}> <span><strong>${esc(i.reference||kindLabel(i.kind))}</strong> · ${esc(i.title)}</span></label><span class="badge ${i.compareStatus==='CHANGED'?'due':i.compareStatus==='UNCHANGED'?'complete':''}">${esc(i.compareStatus)}</span></div><div class="meta"><span>${esc(i.sourceName)} · pages ${i.startPage}-${i.endPage}</span><span>${esc(kindLabel(i.kind))}</span>${i.relatedRefs.length?`<span>References: ${esc(i.relatedRefs.join(', '))}</span>`:''}</div><div class="bulk-grid"><label>Action<select class="bulk-mode">${modeOptions(i)}</select></label><label class="wide">Title<input class="bulk-title" value="${esc(i.title)}"></label><label>Reference<input class="bulk-ref" value="${esc(i.reference)}"></label><label>Version<input class="bulk-version" value="${esc(i.version)}"></label><label>Issue date<input type="date" class="bulk-issue" value="${esc(i.issueDate||today())}"></label><label>Review date<input type="date" class="bulk-review" value="${esc(i.reviewDate||'')}" ${i.kind==='SDS'?'disabled':''}></label></div></div>`).join('');box.querySelectorAll('[data-index]').forEach(card=>{const i=B.items[Number(card.dataset.index)];card.querySelector('.bulk-select').onchange=e=>i.selected=e.target.checked;card.querySelector('.bulk-mode').onchange=e=>{i.mode=e.target.value;i.selected=i.mode!=='SKIP';renderPreview()};card.querySelector('.bulk-title').onchange=e=>i.title=clean(e.target.value)||i.title;card.querySelector('.bulk-ref').onchange=e=>i.reference=clean(e.target.value).toUpperCase();card.querySelector('.bulk-version').onchange=e=>i.version=clean(e.target.value)||'1';card.querySelector('.bulk-issue').onchange=e=>{i.issueDate=e.target.value||today();if(i.kind!=='SDS')i.reviewDate=plusYear(i.issueDate)};card.querySelector('.bulk-review')?.addEventListener('change',e=>i.reviewDate=e.target.value||null)});$('bulkImportBtn').disabled=!B.items.some(i=>i.selected&&i.mode!=='SKIP')}
-async function analyse(){if(B.busy)return;if(!navigator.onLine)return api.toast('Bulk Import requires an internet connection.');if(!window.pdfjsLib||!window.PDFLib)return api.toast('PDF libraries did not load.');const files=[...($('bulkImportFiles')?.files||[])];if(!files.length)return api.toast('Choose one or more PDF files first.');if(files.some(f=>f.size>45*1024*1024))return api.toast('One or more PDFs exceed 45 MB.');B.busy=true;B.sources=[];B.items=[];$('bulkAnalyzeBtn').disabled=true;try{await api.loadAll();for(let i=0;i<files.length;i++){const items=await analyseOne(files[i],i);B.items.push(...items)}let n=0;for(const item of B.items){setStatus(`Comparing existing records: ${++n} of ${B.items.length}…`);await compareItem(item)}renderPreview();setStatus(`Analysis complete: ${B.items.length} record${B.items.length===1?'':'s'} detected from ${files.length} PDF pack${files.length===1?'':'s'}. Review the page ranges below before importing. Filenames are not used to decide whether content changed.`)}catch(e){console.error(e);setStatus(`Analysis failed: ${e.message||e}`);api.toast('Could not analyse the PDF.')}finally{B.busy=false;$('bulkAnalyzeBtn').disabled=false}}
+async function analyse(){if(B.busy)return;if(!navigator.onLine)return api.toast('Bulk Import requires an internet connection.');if(!window.pdfjsLib||!window.PDFLib)return api.toast('PDF libraries did not load.');const files=[...($('bulkImportFiles')?.files||[])];if(!files.length)return api.toast('Choose one or more PDF files first.');if(files.some(f=>f.size>45*1024*1024))return api.toast('One or more PDFs exceed 45 MB.');B.busy=true;B.sources=[];B.items=[];$('bulkAnalyzeBtn').disabled=true;try{await api.loadAll();for(let i=0;i<files.length;i++){const items=await analyseOne(files[i],i);B.items.push(...items)}let n=0;for(const item of B.items){setStatus(`Comparing existing records: ${++n} of ${B.items.length}…`);await compareItem(item)}renderPreview();const sdsCount=B.items.filter(x=>x.kind==='SDS').length;setStatus(`Analysis complete: ${B.items.length} record${B.items.length===1?'':'s'} detected from ${files.length} PDF pack${files.length===1?'':'s'}${sdsCount?` (${sdsCount} SDS/MSDS)`:''}. Review the page ranges below before importing. Filenames are not used to decide whether content changed.`)}catch(e){console.error(e);setStatus(`Analysis failed: ${e.message||e}`);api.toast('Could not analyse the PDF.')}finally{B.busy=false;$('bulkAnalyzeBtn').disabled=false}}
 async function createDoc(item,blob){const type=item.kind,renewal={value:null,unit:null};const ins=await sb.from('documents').insert({title:item.title,reference:item.reference||null,doc_type:type,delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',status:'ACTIVE',default_renewal_value:renewal.value,default_renewal_unit:renewal.unit,resign_on_new_version:false,created_by:state.user.id}).select().single();if(ins.error)throw ins.error;const d=ins.data,name=`${api.safeFileName(item.reference||item.title)}-v${api.safeFileName(item.version||'1')}.pdf`,path=`documents/${d.id}/${crypto.randomUUID()}-${name}`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf'});if(up.error){await sb.from('documents').delete().eq('id',d.id);throw up.error}const vr=await sb.from('document_versions').insert({document_id:d.id,version_label:item.version||'1',issue_date:item.issueDate||today(),review_date:type==='SDS'?null:(item.reviewDate||plusYear(today())),delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',storage_path:path,file_name:name,notes:`Bulk imported from ${item.sourceName}, pages ${item.startPage}-${item.endPage}.`,status:'CURRENT',content_text_sha256:item.contentHash||await api.hashPdf(blob),created_by:state.user.id}).select().single();if(vr.error){await sb.storage.from('safety-files').remove([path]);await sb.from('documents').delete().eq('id',d.id);throw vr.error}item.dbDocId=d.id}
 async function replaceTraining(item,blob){const old=state.training.find(t=>t.id===item.existingId),oldAssignments=state.trainingAssignments.filter(a=>a.training_session_id===old?.id&&a.active!==false);if(old){const ar=await sb.from('training_sessions').update({status:'ARCHIVED'}).eq('id',old.id);if(ar.error)throw ar.error;for(const a of oldAssignments){const off=await sb.from('training_assignments').update({active:false}).eq('id',a.id);if(off.error)throw off.error}}const t=await createToolbox(item,blob);for(const a of oldAssignments){const add=await sb.from('training_assignments').insert({training_session_id:t.id,user_id:a.user_id,due_date:new Date(Date.now()+14*864e5).toISOString().slice(0,10),renewal_value:a.renewal_value,renewal_unit:a.renewal_unit,assigned_by:state.user.id,active:true});if(add.error)throw add.error}}
 async function createToolbox(item,blob){const name=item.reference?`${item.reference} - ${item.title}`:item.title,ins=await sb.from('training_sessions').insert({name,session_type:'TOOLBOX_TALK',delivery_method:'INSTRUCTOR_LED',description:`Bulk imported Toolbox Talk. Relevant documents: ${item.relatedRefs.join(', ')||'none detected'}.`,delivered_date:null,trainer_name:null,trainer_user_id:state.user.id,review_date:item.reviewDate||plusYear(today()),default_due_date:new Date(Date.now()+14*864e5).toISOString().slice(0,10),renewal_value:null,renewal_unit:null,status:'ACTIVE',created_by:state.user.id,reference:item.reference||null,source_kind:'TOOLBOX_TALK',auto_managed:false,review_required:false,review_reason:null}).select().single();if(ins.error)throw ins.error;const t=ins.data,path=`training/${t.id}/${crypto.randomUUID()}-${api.safeFileName(item.reference||item.title)}.pdf`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf'});if(up.error)throw up.error;const fi=await sb.from('training_files').insert({training_session_id:t.id,file_name:`${api.safeFileName(item.reference||item.title)}.pdf`,storage_path:path,uploaded_by:state.user.id,content_text_sha256:item.contentHash||await api.hashPdf(blob)});if(fi.error)throw fi.error;await api.loadAll();for(const ref of item.relatedRefs){const d=state.documents.find(x=>clean(x.reference).toUpperCase()===ref.toUpperCase());if(d)await api.ensureTrainingDocLink(t.id,d.id,'RELATED')}return t}
