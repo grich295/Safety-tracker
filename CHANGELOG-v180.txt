@@ -1,0 +1,10 @@
+Safety Tracker v1.8.0
+- Architecture lock: Documents = controlled library; Training = all active learning/sign-off.
+- Deactivates legacy active document assignments without deleting history.
+- Database trigger blocks future active document assignments.
+- Removes/intercepts legacy document assignment/sign-off controls in the UI.
+- Prevents old bulk-import new-version flow from reassigning documents directly.
+- Replaces manual new-version modal with automatic next numeric version and default date handling.
+- Keeps content-fingerprint changed/unchanged detection from the existing bulk importer.
+- Keeps v1.7.1 source-training/version sync and document-link review propagation.
+- Force Sync & Review is deliberately untouched.
