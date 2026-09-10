@@ -1,5 +1,5 @@
 {
-  "version": "2.0.8",
-  "build": "traffic-light-my-safety",
+  "version": "2.0.9",
+  "build": "sds-name-alignment-and-coshh-matching",
   "service_worker": false
 }

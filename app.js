@@ -1,8 +1,8 @@
-/* Safety Tracker v2.0.8 - My Safety traffic-light status tiles. */
+/* Safety Tracker v2.0.9 - SDS name alignment and COSHH/SDS matching. */
 'use strict';
 
-const APP_VERSION='2.0.8';
-const BUILD_ID='tbt-ssw-linking-20260910';
+const APP_VERSION='2.0.9';
+const BUILD_ID='sds-name-alignment-20260910';
 const CFG=window.SAFETY_TRACKER_CONFIG||{};
 const configured=!!(CFG.supabaseUrl&&CFG.supabaseKey&&!String(CFG.supabaseUrl).includes('PASTE_')&&!String(CFG.supabaseKey).includes('PASTE_'));
 const sb=configured?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey):null;
@@ -78,6 +78,52 @@ function canonicalRef(raw){
 function normalisedPhrase(s){
   return clean(s).toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 }
+function normalisedProductName(s){
+  return normalisedPhrase(s)
+    .replace(/\b(?:safety|data|sheet|sds|msds|coshh|risk|assessment|current|official|manufacturer|supplier|product|name|identifier|trade|brand|version|revision|date|gb|uk|en|eu|as|used)\b/g,' ')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:ml|millilitres?|l|litres?|g|grams?|kg|kilograms?)\b/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+function productMatchTokens(s){
+  const stop=new Set(['safety','data','sheet','sds','msds','coshh','risk','assessment','current','official','manufacturer','supplier','product','name','identifier','trade','brand','version','revision','date','the','and','for','with','from','this','that','use','using','of','to','in','on','a','an','gb','uk','en','eu','as','used']);
+  return normalisedPhrase(s).split(' ').filter(w=>w.length>1&&!stop.has(w)&&!/^(?:ml|kg|mg|litre|litres|gram|grams)$/.test(w));
+}
+function productNameMatchScore(a,b){
+  const A=productMatchTokens(a),B=productMatchTokens(b);
+  if(!A.length||!B.length)return 0;
+  const na=normalisedProductName(a),nb=normalisedProductName(b);
+  if(na&&nb&&(na===nb||na.includes(nb)||nb.includes(na)))return 1;
+  const bs=new Set(B),common=[...new Set(A.filter(x=>bs.has(x)))];
+  const coverage=common.length/Math.max(1,Math.min(new Set(A).size,new Set(B).size));
+  const union=new Set([...A,...B]).size;
+  const jaccard=common.length/Math.max(1,union);
+  const distinctive=common.some(x=>x.length>=5||/\d/.test(x));
+  if(!distinctive)return 0;
+  return Math.min(0.99,coverage*0.78+jaccard*0.22);
+}
+function extractCoshhProductCandidates(text,owner=null){
+  const raw=clean(text),out=[];
+  if(owner?.title)out.push(owner.title);
+  const patterns=[
+    /\bName of Substance\s*:?\s*([\s\S]{3,140}?)(?=\s+Brand\s*:|\s+Where is SDS|\s+Substance Details|\s+Form\s*:)/ig,
+    /\bCurrent\s+(?:[A-Za-z0-9&./'() -]+?\s+)?(?:GB(?:-en)?|UK|EU)?\s*SDS\s*:\s*([\s\S]{3,120}?)(?=\s+(?:product codes?|UFI|revision|version|classification|signal word|precautions|\bH\d{3}\b)|[.;])/ig,
+    /\b(?:SDS|MSDS|Safety Data Sheet)\s+(?:for|covering)\s+([\s\S]{3,100}?)(?=[.;]|\s+(?:version|revision|dated|date)\b)/ig
+  ];
+  for(const rx of patterns){let m;while((m=rx.exec(raw))!==null){const c=cleanSdsCandidate(m[1]);if(c&&!isBadSdsTitle(c))out.push(c);if(out.length>=12)break}}
+  return [...new Set(out.map(clean).filter(Boolean))];
+}
+function coshhMatchesSds(text,owner,sdsDoc){
+  const aliases=[sdsDoc?.title,documentDisplayTitle(sdsDoc),stripPdfName(originalBulkSourceName(currentVersion(sdsDoc?.id)))].map(clean).filter(Boolean);
+  const hay=normalisedProductName(text);
+  let best=0;
+  for(const alias of aliases){
+    const na=normalisedProductName(alias);
+    if(na&&na.length>=4&&hay.includes(na))best=Math.max(best,1);
+  }
+  const candidates=extractCoshhProductCandidates(text,owner);
+  for(const c of candidates)for(const alias of aliases)best=Math.max(best,productNameMatchScore(c,alias));
+  return best;
+}
 function significantLinkWords(s){
   const stop=new Set(['risk','assessment','coshh','safe','system','work','safety','data','sheet','msds','sds','document','documents','procedure','policy','version','the','and','for','with','from','this','that','use','using','of','to','in','on','a','an']);
   return normalisedPhrase(s).split(' ').filter(w=>w.length>2&&!stop.has(w));
@@ -129,7 +175,10 @@ function declaredDocumentMatches(text,owner=null){
     let reason='';
     if(cref&&refs.has(cref))reason='reference stated in linked/reference section';
     else if(textMentionsDocumentTitle(contexts,documentDisplayTitle(d)||d.title))reason='title stated in linked/reference section';
-    else if(owner?.doc_type==='COSHH'&&d.doc_type==='SDS'&&hasSdsCue&&textMentionsDocumentTitle(text,documentDisplayTitle(d)||d.title))reason='SDS/product stated in COSHH assessment';
+    else if(owner?.doc_type==='COSHH'&&d.doc_type==='SDS'&&hasSdsCue){
+      const score=coshhMatchesSds(text,owner,d);
+      if(score>=0.74)reason=`SDS/product name aligned with COSHH assessment (${Math.round(score*100)}% match)`;
+    }
     if(reason)out.push({doc:d,reason});
   }
   return out;
@@ -170,27 +219,33 @@ function stripPdfName(name){return clean(String(name||'').replace(/\.pdf$/i,'').
 function isBadSdsTitle(title){
   const t=clean(title);
   if(!t)return true;
-  if(/^(?:manufacturer\s+)?safety data sheet$/i.test(t))return true;
+  if(/^(?:manufacturer\s+)?(?:material\s+)?safety data sheet$/i.test(t))return true;
   if(/^\d+\s*\/\s*\d+$/.test(t))return true;
   if(/^page\s+\d+(?:\s+of\s+\d+)?$/i.test(t))return true;
+  if(/^(?:version|revision|revision date|print date|date of issue|section\s+\d+)\b/i.test(t))return true;
   if(/^[\W_\d]+$/.test(t))return true;
   if(t.length<3)return true;
-  if(t.length<24&&/\)$/.test(t)&&!t.includes('('))return true;
+  if(t.length<60&&/\)$/.test(t)&&!t.includes('('))return true;
+  if(/^(?:product name|product identifier|trade name)$/i.test(t))return true;
   return false;
 }
 function cleanSdsCandidate(s){
   let t=clean(s).replace(/^[\s:;\-–—]+/,'').replace(/[\s|]+$/,'');
-  t=t.replace(/\s+(?:Product code|UFI|REACH registration|Relevant identified uses|Details of the supplier|1\.2\b|SECTION\s+1\b).*$/i,'');
+  t=t.replace(/^(?:Product name|Product identifier|Trade name|Name of product)\s*:?\s*/i,'');
+  t=t.replace(/\s+\d+\s*\/\s*\d+\s*$/,'');
+  t=t.replace(/\s+(?:Product code|UFI|REACH registration|Relevant identified uses|Details of the supplier|1\.2\.?\b|SECTION\s+1\b|Revision(?: date)?|Version|Print date).*$/i,'');
   if(t.length>140)t=t.slice(0,140).trim();
   return t;
 }
 function extractSdsProductName(text){
   const t=clean(text);
   const patterns=[
-    /\b1\.1\s+(?:Product identifier|Product name)\s*:?[\s-]*([\s\S]{3,160}?)(?=\s+(?:1\.2\b|Product code\b|UFI\b|REACH\b|Relevant identified uses\b|SECTION\s+1\b|Details of the supplier\b))/i,
-    /\bProduct identifier\s*:?[\s-]*([\s\S]{3,160}?)(?=\s+(?:Product code\b|UFI\b|1\.2\b|Relevant identified uses\b|SECTION\b|Details of the supplier\b))/i,
-    /\bProduct name\s*:?[\s-]*([\s\S]{3,160}?)(?=\s+(?:Product code\b|Product identifier\b|UFI\b|1\.2\b|Relevant identified uses\b|SECTION\b|Details of the supplier\b))/i,
-    /\bTrade name\s*:?[\s-]*([\s\S]{3,160}?)(?=\s+(?:Product code\b|1\.2\b|SECTION\b|Relevant identified uses\b))/i
+    /\b1\.1\.?\s*Product identifier\s*(?:Product name\s*)?:?\s*([\s\S]{3,180}?)(?=\s+(?:1\.2\.?\b|Product code\b|UFI\b|REACH\b|Relevant identified uses\b|SECTION\s+1\b|Details of the supplier\b))/i,
+    /\b1\.1\.?\s*Product name\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:1\.2\.?\b|Product code\b|UFI\b|REACH\b|Relevant identified uses\b|SECTION\b|Details of the supplier\b))/i,
+    /\bProduct name\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:Product code\b|Product identifier\b|UFI\b|1\.2\.?\b|Relevant identified uses\b|SECTION\b|Details of the supplier\b))/i,
+    /\bProduct identifier\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:Product code\b|UFI\b|1\.2\.?\b|Relevant identified uses\b|SECTION\b|Details of the supplier\b))/i,
+    /\bTrade name\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:Product code\b|1\.2\.?\b|SECTION\b|Relevant identified uses\b))/i,
+    /\bSAFETY DATA SHEET\s+([\s\S]{3,110}?)(?=\s+\d+\s*\/\s*\d+\b)/i
   ];
   for(const rx of patterns){const m=t.match(rx);if(m){const c=cleanSdsCandidate(m[1]);if(c&&!isBadSdsTitle(c))return c}}
   return '';
@@ -201,28 +256,31 @@ function documentDisplayTitle(d){
   const v=currentVersion(d.id),src=stripPdfName(originalBulkSourceName(v));
   return src||d.title||'SDS / MSDS';
 }
-async function repairSdsTitles(){
-  if(!isAdmin())return toast('Admin access required.');
+async function repairSdsTitles(options={}){
+  const {silent=false,refreshAfter=true,progress=null}=options&&typeof options==='object'?options:{};
+  if(!isAdmin()&&!state.user){if(!silent)toast('Admin access required.');return {changed:0,failed:0}}
   const docs=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type==='SDS');
-  if(!docs.length)return toast('No active SDS/MSDS documents found.');
-  const status=$('sdsRepairStatus');if(status){status.hidden=false;status.textContent=`Checking ${docs.length} SDS/MSDS title${docs.length===1?'':'s'}…`}
+  if(!docs.length){if(!silent)toast('No active SDS/MSDS documents found.');return {changed:0,failed:0}}
+  const status=$('sdsRepairStatus');if(!silent&&status){status.hidden=false;status.textContent=`Checking ${docs.length} SDS/MSDS title${docs.length===1?'':'s'}…`}
   let changed=0,failed=0;
   for(let i=0;i<docs.length;i++){
     const d=docs[i],v=currentVersion(d.id);if(!v?.storage_path)continue;
-    if(status)status.textContent=`Checking SDS/MSDS ${i+1} of ${docs.length}: ${documentDisplayTitle(d)}`;
+    const msg=`Checking SDS/MSDS ${i+1} of ${docs.length}: ${documentDisplayTitle(d)}`;
+    if(progress)progress(msg);if(!silent&&status)status.textContent=msg;
     try{
       const r=await sb.storage.from('safety-files').download(v.storage_path);if(r.error||!r.data){failed++;continue}
       const text=await pdfTextFromBlob(r.data);let title=extractSdsProductName(text);
       if(!title){const src=stripPdfName(originalBulkSourceName(v));if(src&&!isBadSdsTitle(src))title=src}
-      if(title&&clean(title)!==clean(d.title)){
+      if(title&&!isBadSdsTitle(title)&&clean(title)!==clean(d.title)){
         const u=await sb.from('documents').update({title}).eq('id',d.id);if(u.error){failed++;continue}
         d.title=title;changed++;
       }
     }catch(e){console.warn('repairSdsTitles',d.id,e);failed++}
   }
-  await refresh();
-  if(status){status.hidden=false;status.textContent=`SDS/MSDS title repair complete: ${changed} updated${failed?`, ${failed} could not be read`:''}.`}
-  toast(`${changed} SDS/MSDS title${changed===1?'':'s'} updated.`);
+  if(refreshAfter)await refresh();
+  if(!silent&&status){status.hidden=false;status.textContent=`SDS/MSDS title repair complete: ${changed} updated${failed?`, ${failed} could not be read`:''}.`}
+  if(!silent)toast(`${changed} SDS/MSDS title${changed===1?'':'s'} updated.`);
+  return {changed,failed};
 }
 
 async function loadTable(table,target,optional=false){
@@ -407,7 +465,7 @@ async function pdfTextFromBlob(blob){if(!blob||!window.pdfjsLib)return '';const 
 async function sha256Text(text){const bytes=new TextEncoder().encode(String(text||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase());const hash=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function hashPdf(blob){try{const text=await pdfTextFromBlob(blob);return text?await sha256Text(text):null}catch(e){console.warn('PDF hash',e);return null}}
 function nextVersionLabel(docId){const nums=state.versions.filter(v=>v.document_id===docId).map(v=>Number(v.version_label)).filter(Number.isFinite);return nums.length?String(Math.max(...nums)+1):'1'}
-function existingDocMatch(type,ref,title){if(clean(ref)){const r=clean(ref).toUpperCase();return state.documents.find(d=>d.status!=='ARCHIVED'&&clean(d.reference).toUpperCase()===r)||null}if(type==='SDS'){const key=productWords(title).join(' ');return state.documents.find(d=>d.status!=='ARCHIVED'&&d.doc_type==='SDS'&&productWords(documentDisplayTitle(d)).join(' ')===key)||null}return null}
+function existingDocMatch(type,ref,title){if(clean(ref)){const r=clean(ref).toUpperCase();return state.documents.find(d=>d.status!=='ARCHIVED'&&clean(d.reference).toUpperCase()===r)||null}if(type==='SDS'){const ranked=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type==='SDS').map(d=>({d,score:productNameMatchScore(title,documentDisplayTitle(d))})).filter(x=>x.score>=0.88).sort((a,b)=>b.score-a.score);if(ranked.length&&(!ranked[1]||ranked[0].score-ranked[1].score>=0.08||ranked[0].score===1))return ranked[0].d}return null}
 async function storedHashForVersion(v){if(!v)return null;if(v.content_text_sha256)return v.content_text_sha256;if(!v.storage_path)return null;try{const {data,error}=await sb.storage.from('safety-files').download(v.storage_path);if(error||!data)return null;const h=await hashPdf(data);if(h){const r=await sb.from('document_versions').update({content_text_sha256:h}).eq('id',v.id);if(!r.error)v.content_text_sha256=h}return h}catch{return null}}
 async function createDocumentRecord(){
   if(!isManager())return;const title=clean($('docTitle').value),ref=clean($('docRef').value).toUpperCase()||null,type=$('docType').value,file=$('docFile').files[0];if(!title)return toast('Title is required.');if(!file)return toast('Choose the PDF file.');
@@ -474,8 +532,8 @@ async function toggleUser(id){const p=state.people.find(x=>x.id===id);try{await 
 function showDocumentReview(id){const d=state.documents.find(x=>x.id===id),v=currentVersion(id);if(!v)return;openModal('Signed document review',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong> · v${esc(v.version_label)}</p><div class="form-grid"><label>Outcome<select id="reviewOutcome"><option value="NO_CHANGE">No change needed</option><option value="NEW_VERSION_REQUIRED">New version required</option><option value="OTHER_ACTION">Other action required</option></select></label><label id="nextReviewWrap">Next review date<input id="nextReviewDate" type="date" value="${plusYear(todayISO())}"></label><label class="full">Review note<textarea id="reviewNote"></textarea></label>${signatureBlock('review')}<label class="check-row full"><input id="reviewAck" type="checkbox"> I confirm this review and digital signature.</label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save review','primary',`data-save-doc-review="${id}"`)}</div>`);const sync=()=>{$('nextReviewWrap').hidden=$('reviewOutcome').value!=='NO_CHANGE'};$('reviewOutcome').addEventListener('change',sync);sync();setupSignaturePad('reviewSignaturePad','reviewClearSignature')}
 async function saveDocumentReview(id){if(!$('reviewAck').checked)return toast('Tick the confirmation first.');const d=state.documents.find(x=>x.id===id),v=currentVersion(id),outcome=$('reviewOutcome').value,note=clean($('reviewNote').value),next=$('nextReviewDate').value||null,sig=signatureData('reviewSignaturePad'),sigName=clean($('reviewSignatureName').value);if(!sig)return toast('Please sign in the box.');if(!sigName)return toast('Enter the signature name.');if(outcome==='NO_CHANGE'&&!next)return toast('Choose the next review date.');const r=await sb.rpc('record_document_review',{p_document_version_id:v.id,p_outcome:outcome,p_review_note:note||null,p_next_review_date:next,p_signature_data:sig,p_signature_name:sigName});if(r.error)return toast(r.error.message);if(outcome==='NO_CHANGE')await sb.from('documents').update({review_required:false,review_reason:null}).eq('id',d.id);closeModal();await refresh('Signed document review recorded.')}
 
-function productWords(s){const stop=new Set(['safety','data','sheet','sds','msds','coshh','assessment','risk','the','and','for','product','manufacturer','trade','uk','gb','pure','white']);return clean(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(x=>x.length>2&&!stop.has(x))}
-function similarity(a,b){const A=productWords(a),B=productWords(b);if(!A.length||!B.length)return 0;const set=new Set(B),common=A.filter(x=>set.has(x));return common.length/Math.max(2,Math.min(A.length,B.length))}
+function productWords(s){return productMatchTokens(s).filter(x=>x.length>2)}
+function similarity(a,b){return productNameMatchScore(a,b)}
 function refsInText(t){return [...new Set((String(t||'').match(refRx)||[]).map(canonicalRef))]}
 async function copyAssignment(a,newTrainingId,seen){if(seen.has(a.user_id))return 0;seen.add(a.user_id);const payload={training_session_id:newTrainingId,user_id:a.user_id,due_date:daysFromNow(14),renewal_value:a.renewal_value,renewal_unit:a.renewal_unit,assigned_by:state.user.id,active:true};if('delivery_method_override' in a)payload.delivery_method_override=a.delivery_method_override||null;const r=await sb.from('training_assignments').insert(payload);return r.error?0:1}
 async function createSourceTraining(d,v,prior=null){const payload={name:`${d.reference?d.reference+' - ':''}${d.title}`,session_type:d.doc_type,delivery_method:sourceDelivery(d.doc_type),description:`Controlled document training. Source: ${d.reference||''} - ${d.title}. Automatically managed by Safety Tracker v${APP_VERSION}.`,delivered_date:null,trainer_name:null,trainer_user_id:state.user.id,review_date:v.review_date||plusYear(v.issue_date||todayISO()),default_due_date:daysFromNow(14),renewal_value:d.default_renewal_value||null,renewal_unit:d.default_renewal_unit||null,status:'ACTIVE',created_by:state.user.id,reference:d.reference||null,source_kind:d.doc_type,source_document_id:d.id,source_document_version_id:v.id,auto_managed:true,review_required:false,review_reason:null};const ins=await sb.from('training_sessions').insert(payload).select().single();if(ins.error){console.warn('createSourceTraining',ins.error);return {changes:0,training:null}}const t=ins.data;state.training.push(t);let changes=1;changes+=await ensureTrainingDocLink(t.id,d.id,'SOURCE');const seen=new Set();if(prior){for(const a of state.trainingAssignments.filter(a=>a.training_session_id===prior.id&&a.active!==false)){changes+=await copyAssignment(a,t.id,seen);await sb.from('training_assignments').update({active:false}).eq('id',a.id);changes++}await sb.from('training_sessions').update({status:'ARCHIVED'}).eq('id',prior.id);prior.status='ARCHIVED';changes++}return {changes,training:t}}
@@ -491,8 +549,8 @@ async function scanTrainingRefs(t,f){if(!f?.storage_path)return {changes:0,missi
 async function scanFiles(mode='recent',progress=()=>{}){let changes=0,scanned=0,missing=0;const cutoff=Date.now()-20*60*1000;for(const d of state.documents.filter(d=>d.status!=='ARCHIVED')){const v=currentVersion(d.id);if(!v?.storage_path)continue;const recent=new Date(v.created_at||0).getTime()>=cutoff;if(mode!=='full'&&(!recent||v.links_scanned_at))continue;progress(`Reading links stated in ${d.reference||d.title}`);const r=await scanDocumentRefs(d,v);changes+=r.changes;missing+=r.missing;scanned++}const latest=new Map();for(const f of state.trainingFiles){const x=latest.get(f.training_session_id);if(!x||new Date(f.created_at||0)>new Date(x.created_at||0))latest.set(f.training_session_id,f)}for(const t of activeTraining()){const f=latest.get(t.id);if(!f?.storage_path)continue;const recent=new Date(f.created_at||0).getTime()>=cutoff;if(mode!=='full'&&(!recent||f.links_scanned_at))continue;progress(`Reading links stated in training file ${t.name}`);const r=await scanTrainingRefs(t,f);changes+=r.changes;missing+=r.missing;scanned++}return {changes,scanned,missing}}
 function latestReviewTime(docId){const ids=new Set(state.versions.filter(v=>v.document_id===docId).map(v=>v.id));return state.documentReviews.filter(r=>ids.has(r.document_version_id)).sort((a,b)=>new Date(b.reviewed_at||0)-new Date(a.reviewed_at||0))[0]?.reviewed_at||null}
 async function propagateReviewFlags(){let changes=0;for(const l of state.documentLinks.filter(l=>['SDS_TO_COSHH','COSHH_TO_SSW','RA_TO_SSW'].includes(l.link_type))){const source=state.documents.find(d=>d.id===l.source_document_id),target=state.documents.find(d=>d.id===l.target_document_id),sv=currentVersion(source?.id),tv=currentVersion(target?.id);if(!source||!target||!sv||!tv)continue;const base=Math.max(new Date(tv.created_at||0).getTime(),new Date(latestReviewTime(target.id)||0).getTime());if(new Date(sv.created_at||0).getTime()>base&&!target.review_required){const reason=`${source.reference||source.title} has a newer controlled version. Review ${target.reference||target.title} and linked training.`;const r=await sb.from('documents').update({review_required:true,review_reason:reason}).eq('id',target.id);if(!r.error){target.review_required=true;target.review_reason=reason;changes++}}}for(const t of activeTraining().filter(t=>!t.auto_managed)){const newer=linkedTrainingDocs(t.id).filter(x=>{const v=currentVersion(x.doc.id);return v&&new Date(v.created_at||0)>new Date(t.created_at||0)});if(newer.length&&!t.review_required){const reason=`Linked controlled document${newer.length===1?' has':'s have'} changed since this training was created: ${newer.slice(0,3).map(x=>x.doc.reference||x.doc.title).join(', ')}.`;const r=await sb.from('training_sessions').update({review_required:true,review_reason:reason}).eq('id',t.id);if(!r.error){t.review_required=true;t.review_reason=reason;changes++}}}return changes}
-async function runSafetySync({scan='recent',progress=()=>{},rebuildLinks=false}={}){if(state.syncBusy)return {changes:0,scanned:0,missing:0};state.syncBusy=true;let changes=0,scanned=0,missing=0;try{progress('Applying issue/review date defaults…');changes+=await normaliseDefaults();if(rebuildLinks){progress('Preparing a clean document-link rebuild…');changes+=await rebuildLinkTables(progress)}progress('Synchronising RA/COSHH/SSW Training records…');changes+=await syncSourceTrainings();if(scan){const r=await scanFiles(scan,progress);changes+=r.changes;scanned+=r.scanned;missing+=r.missing}progress('Applying rebuilt document relationships to Training…');changes+=await syncSourceTrainings();progress('Checking dependent review flags…');changes+=await propagateReviewFlags();return {changes,scanned,missing}}finally{state.syncBusy=false}}
-async function forceSyncFromUI(){if(!isAdmin())return;const b=$('forceSyncBtn'),s=$('forceSyncStatus');b.disabled=true;s.hidden=false;s.textContent='Starting Force Sync & Review…';try{await loadAll();const r=await runSafetySync({scan:'full',rebuildLinks:true,progress:m=>s.textContent=m});await loadAll();s.textContent=`Force Sync & Review complete. Existing links were cleared and rebuilt from the files. ${r.changes} database update${r.changes===1?'':'s'}; ${r.scanned} stored file${r.scanned===1?'':'s'} read${r.missing?`; ${r.missing} unresolved reference${r.missing===1?'':'s'} flagged`:''}.`;renderDocuments();renderTraining();renderAdmin();toast(r.missing?'Force Sync complete — check flagged missing references.':'Force Sync & Review complete.')}catch(e){console.error(e);s.textContent=`Force Sync failed: ${e.message||e}`;toast('Force Sync failed.')}finally{b.disabled=false}}
+async function runSafetySync({scan='recent',progress=()=>{},rebuildLinks=false}={}){if(state.syncBusy)return {changes:0,scanned:0,missing:0};state.syncBusy=true;let changes=0,scanned=0,missing=0;try{progress('Applying issue/review date defaults…');changes+=await normaliseDefaults();if(scan==='full'||rebuildLinks){progress('Aligning SDS/MSDS names from manufacturer Section 1.1…');const aligned=await repairSdsTitles({silent:true,refreshAfter:false,progress});changes+=aligned.changed}if(rebuildLinks){progress('Preparing a clean document-link rebuild…');changes+=await rebuildLinkTables(progress)}progress('Synchronising RA/COSHH/SSW Training records…');changes+=await syncSourceTrainings();if(scan){const r=await scanFiles(scan,progress);changes+=r.changes;scanned+=r.scanned;missing+=r.missing}progress('Applying rebuilt document relationships to Training…');changes+=await syncSourceTrainings();progress('Checking dependent review flags…');changes+=await propagateReviewFlags();return {changes,scanned,missing}}finally{state.syncBusy=false}}
+async function forceSyncFromUI(){if(!isAdmin())return;const b=$('forceSyncBtn'),s=$('forceSyncStatus');b.disabled=true;s.hidden=false;s.textContent='Starting Force Sync & Review…';try{await loadAll();const r=await runSafetySync({scan:'full',rebuildLinks:true,progress:m=>s.textContent=m});await loadAll();s.textContent=`Force Sync & Review complete. SDS names were aligned, then existing links were cleared and rebuilt from the files. ${r.changes} database update${r.changes===1?'':'s'}; ${r.scanned} stored file${r.scanned===1?'':'s'} read${r.missing?`; ${r.missing} unresolved reference${r.missing===1?'':'s'} flagged`:''}.`;renderDocuments();renderTraining();renderAdmin();toast(r.missing?'Force Sync complete — check flagged missing references.':'Force Sync & Review complete.')}catch(e){console.error(e);s.textContent=`Force Sync failed: ${e.message||e}`;toast('Force Sync failed.')}finally{b.disabled=false}}
 
 function renderReports(){const rows=complianceRows();$('reportStats').innerHTML=[['Assignments',rows.length],['Complete',rows.filter(r=>r.code==='COMPLETED').length],['Outstanding',rows.filter(r=>r.code!=='COMPLETED').length],['Sign-offs',state.trainingSignoffs.length]].map(([l,n])=>`<div class="stat"><strong>${n}</strong><span>${l}</span></div>`).join('')}
 function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
@@ -504,9 +562,9 @@ async function listStorageRecursive(prefix=''){const out=[];let offset=0;while(t
 async function downloadFullBackup(){if(!window.JSZip)return toast('ZIP library did not load.');try{toast('Building full backup…');const zip=new JSZip();zip.file('database/safety-tracker.json',JSON.stringify(backupPayload(),null,2));const files=await listStorageRecursive('');for(const path of files){const r=await sb.storage.from('safety-files').download(path);if(!r.error&&r.data)zip.file(`files/${path}`,r.data)}downloadBlob(await zip.generateAsync({type:'blob'}),`safety-tracker-v2-full-backup-${todayISO()}.zip`);toast(`Full backup created (${files.length} files).`)}catch(e){toast(e.message||'Full backup failed.')}}
 
 async function renderAdmin(){if(!$('buildDiagnostics'))return;let versionInfo=null;try{versionInfo=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json())}catch{}let regs=[];try{regs='serviceWorker' in navigator?await navigator.serviceWorker.getRegistrations():[]}catch{}const arch=state.settings.find(s=>s.setting_key==='architecture_version')?.setting_value||'not found',front=state.settings.find(s=>s.setting_key==='front_end_version')?.setting_value||'not found';$('buildDiagnostics').innerHTML=`<div class="card-list"><div class="item-card compact"><div class="row-between"><span>Loaded JavaScript build</span><strong class="diagnostic-ok">v${APP_VERSION}</strong></div></div><div class="item-card compact"><div class="row-between"><span>version.json</span><strong class="${versionInfo?.version===APP_VERSION?'diagnostic-ok':'diagnostic-warn'}">${esc(versionInfo?.version||'unavailable')}</strong></div></div><div class="item-card compact"><div class="row-between"><span>Service workers registered on this origin</span><strong class="${regs.length?'diagnostic-warn':'diagnostic-ok'}">${regs.length}</strong></div><div class="muted">v2 itself never registers a service worker.</div></div><div class="item-card compact"><div>Database architecture setting: <span class="codeish">${esc(arch)}</span></div><div>Previous front-end setting: <span class="codeish">${esc(front)}</span></div></div><div class="item-card compact"><div>Current URL: <span class="codeish">${esc(location.href)}</span></div><div>Build ID: <span class="codeish">${BUILD_ID}</span></div></div>${Object.keys(state.loadErrors).length?`<div class="danger-note"><strong>Schema/load warnings</strong><br>${Object.entries(state.loadErrors).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</div>`:'<div class="success-note">Core tables loaded with no reported schema errors.</div>'}</div>`}
-function renderHelp(){$('helpContent').innerHTML=`<div class="help-card"><h3>Documents</h3><p>Documents opens with a live Register first, followed by dedicated indexes for Risk Assessments, COSHH Risk Assessments, Safe Systems of Work, MSDS/Safety Data Sheets and Toolbox Talks. The Register lists every current item under its correct section and can be downloaded as a PDF. Toolbox Talk files are indexed here for access, while assignment and sign-off remain in Training.</p></div><div class="help-card"><h3>Training</h3><p>All completion/sign-off happens in Training. RA and COSHH default to self-training. SSW and Toolbox Talks default to instructor-led.</p></div><div class="help-card"><h3>New document versions</h3><p>If the same controlled reference is uploaded again, v2 compares the actual PDF text. Unchanged content is skipped; changed content becomes the next version and the old version is superseded.</p></div><div class="help-card"><h3>Force Sync & Review</h3><p>Force Sync first clears the existing link tables, then re-reads every current stored PDF and rebuilds relationships only from references/titles stated in linked, related, supporting or reference sections. COSHH can also link to the SDS/product it explicitly names. Missing references are flagged instead of guessed.</p></div><div class="help-card"><h3>Self-training support</h3><p>Users can ask for instructor help. That changes their active assignment to instructor-led without deleting any evidence.</p></div><div class="help-card"><h3>Version check</h3><p>The header must show <strong>v2.0.8 CLEAN</strong>. Admin → Build diagnostics also checks version.json and service-worker registrations.</p></div>`}
+function renderHelp(){$('helpContent').innerHTML=`<div class="help-card"><h3>Documents</h3><p>Documents opens with a live Register first, followed by dedicated indexes for Risk Assessments, COSHH Risk Assessments, Safe Systems of Work, MSDS/Safety Data Sheets and Toolbox Talks. The Register lists every current item under its correct section and can be downloaded as a PDF. Toolbox Talk files are indexed here for access, while assignment and sign-off remain in Training.</p></div><div class="help-card"><h3>Training</h3><p>All completion/sign-off happens in Training. RA and COSHH default to self-training. SSW and Toolbox Talks default to instructor-led.</p></div><div class="help-card"><h3>New document versions</h3><p>If the same controlled reference is uploaded again, v2 compares the actual PDF text. Unchanged content is skipped; changed content becomes the next version and the old version is superseded.</p></div><div class="help-card"><h3>Force Sync & Review</h3><p>Force Sync first clears the existing link tables, then re-reads every current stored PDF and rebuilds relationships only from references/titles stated in linked, related, supporting or reference sections. Before rebuilding links, v2 aligns SDS names from the manufacturer Section 1.1 Product identifier/name. COSHH then matches its stated substance/SDS wording against those aligned product names and aliases. Missing references are flagged instead of guessed.</p></div><div class="help-card"><h3>Self-training support</h3><p>Users can ask for instructor help. That changes their active assignment to instructor-led without deleting any evidence.</p></div><div class="help-card"><h3>Version check</h3><p>The header must show <strong>v2.0.9 CLEAN</strong>. Admin → Build diagnostics also checks version.json and service-worker registrations.</p></div>`}
 
 async function globalClick(e){const el=e.target.closest('button');if(!el)return;if(el.dataset.docIndex){state.documentIndex=el.dataset.docIndex;if($('documentTypeFilter'))$('documentTypeFilter').value=['TOOLBOX_TALK','REGISTER'].includes(state.documentIndex)?'':state.documentIndex;renderDocuments();return}if(el.dataset.downloadRegister!==undefined)return documentRegisterPdf();if(el.dataset.closeModal!==undefined)return closeModal();if(el.dataset.createDocument!==undefined)return createDocumentRecord();if(el.dataset.openDoc)return openDocument(el.dataset.openDoc);if(el.dataset.docDetails)return showDocDetails(el.dataset.docDetails);if(el.dataset.docLinks)return showDocumentLinks(el.dataset.docLinks);if(el.dataset.addDocLink)return addDocumentLink(el.dataset.addDocLink);if(el.dataset.removeDocLink)return removeDocumentLink(el.dataset.removeDocLink);if(el.dataset.newVersion)return showNewVersion(el.dataset.newVersion);if(el.dataset.publishVersion)return publishVersionFromModal(el.dataset.publishVersion);if(el.dataset.toggleDoc)return toggleDocument(el.dataset.toggleDoc);if(el.dataset.reviewDoc)return showDocumentReview(el.dataset.reviewDoc);if(el.dataset.saveDocReview)return saveDocumentReview(el.dataset.saveDocReview);if(el.dataset.saveTraining!==undefined)return saveTraining();if(el.dataset.viewTraining)return showTrainingDetails(el.dataset.viewTraining);if(el.dataset.openTrainingFile)return openTrainingFile(el.dataset.openTrainingFile);if(el.dataset.assignTraining)return showAssignTraining(el.dataset.assignTraining);if(el.dataset.saveTrainingAssignments)return saveTrainingAssignments(el.dataset.saveTrainingAssignments);if(el.dataset.editTraining)return showEditTraining(el.dataset.editTraining);if(el.dataset.saveTrainingEdit)return saveTrainingEdit(el.dataset.saveTrainingEdit);if(el.dataset.archiveTraining)return archiveTraining(el.dataset.archiveTraining);if(el.dataset.signTraining)return signTraining(el.dataset.signTraining);if(el.dataset.confirmTrainingSign)return confirmTrainingSign(el.dataset.confirmTrainingSign);if(el.dataset.requestInstructor)return requestInstructor(el.dataset.requestInstructor);if(el.dataset.saveGroupAttendance)return saveGroupAttendance(el.dataset.saveGroupAttendance);if(el.dataset.singleAttendance)return showSingleAttendance(el.dataset.singleAttendance);if(el.dataset.saveSingleAttendance)return saveSingleAttendance(el.dataset.saveSingleAttendance);if(el.dataset.sendInvite!==undefined)return sendInvite();if(el.dataset.setRole)return showSetRole(el.dataset.setRole);if(el.dataset.saveRole)return saveRole(el.dataset.saveRole);if(el.dataset.toggleUser)return toggleUser(el.dataset.toggleUser);if(el.id==='saveNewPassword'){const r=await sb.auth.updateUser({password:$('newPassword').value});if(r.error)return toast(r.error.message);closeModal();toast('Password updated.')}}
 
-window.SafetyTrackerV2={APP_VERSION,BUILD_ID,state,sb,loadAll,refresh,runSafetySync,hashPdf,sha256Text,pdfTextFromBlob,currentVersion,ensureTrainingDocLink,createSourceTraining,syncSourceTrainings,safeFileName,productWords,similarity,refsInText,canonicalRef,declaredDocumentMatches,nextVersionLabel,publishFileAsNewVersion,existingDocMatch,extractSdsProductName,documentDisplayTitle,repairSdsTitles,renderDocumentRegister,documentRegisterPdf,classifySafetyPdfText,looksLikeCoshhAssessment,looksLikeSafetyDataSheet,toast};
+window.SafetyTrackerV2={APP_VERSION,BUILD_ID,state,sb,loadAll,refresh,runSafetySync,hashPdf,sha256Text,pdfTextFromBlob,currentVersion,ensureTrainingDocLink,createSourceTraining,syncSourceTrainings,safeFileName,productWords,similarity,refsInText,canonicalRef,declaredDocumentMatches,nextVersionLabel,publishFileAsNewVersion,existingDocMatch,extractSdsProductName,extractCoshhProductCandidates,productNameMatchScore,documentDisplayTitle,repairSdsTitles,renderDocumentRegister,documentRegisterPdf,classifySafetyPdfText,looksLikeCoshhAssessment,looksLikeSafetyDataSheet,toast};
 init();
