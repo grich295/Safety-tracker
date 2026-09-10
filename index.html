@@ -271,7 +271,7 @@
           <div class="hint-box"><strong>Built-in rules:</strong> RA and COSHH → Documents / self-training; SSW → Documents / instructor-led; SDS/MSDS → reference-only with no assignment or signature; Toolbox Talks → Training / instructor-led. Directory/index files are stored as control records. Every newly uploaded controlled document and Toolbox Talk requires a Manager/Admin digital approval before assignment; SDS/MSDS is excluded.<br><br><strong>Automatic change detection:</strong> filenames are ignored. The actual PDF text is fingerprinted and compared with the current tracker copy. Unchanged records are skipped automatically; changed records are selected as a new version.</div>
           <div class="bulk-drop" id="bulkDropZone">
             <label>Section PDF files<input id="bulkImportFiles" type="file" accept="application/pdf,.pdf" multiple></label>
-            <p class="muted">You can select several packs at once. Maximum 45 MB per PDF. Where a controlled document does not contain its own dates, Issue date defaults to the upload date and Review date defaults to one year later. Shield Safety RA packs are split using each RA-xxx Page 1 marker.</p><label style="margin-top:10px">Default TBT refresher frequency<select id="bulkTbtDefault"><option value="">One-off only</option><option value="3|MONTHS">Every 3 months</option><option value="6|MONTHS">Every 6 months</option><option value="12|MONTHS">Every 12 months</option><option value="24|MONTHS">Every 24 months</option></select></label><p class="muted">This is applied to newly detected Toolbox Talks. You can override each TBT in the preview and edit the frequency later.</p>
+            <p class="muted">You can select several packs at once. Maximum 45 MB per PDF. Where a controlled document does not contain its own dates, Issue date defaults to the upload date and Review date defaults to one year later. SDS/MSDS product names are extracted from the manufacturer sheet where possible, and the document library is re-scanned for missing links after import. Shield Safety RA packs are split using each RA-xxx Page 1 marker.</p><label style="margin-top:10px">Default TBT refresher frequency<select id="bulkTbtDefault"><option value="">One-off only</option><option value="3|MONTHS">Every 3 months</option><option value="6|MONTHS">Every 6 months</option><option value="12|MONTHS">Every 12 months</option><option value="24|MONTHS">Every 24 months</option></select></label><p class="muted">This is applied to newly detected Toolbox Talks. You can override each TBT in the preview and edit the frequency later.</p>
           </div>
           <div class="row">
             <button id="bulkAnalyzeBtn" class="secondary" type="button">Analyse PDFs</button>
@@ -282,6 +282,14 @@
           <div id="bulkImportPreview" class="card-list" style="margin-top:12px"></div>
           <div id="bulkImportActions" class="actions" hidden>
             <button id="bulkImportBtn" class="primary" type="button">Import selected</button>
+          </div>
+          <div class="section-card" style="margin-top:14px">
+            <h4>Document link sync</h4>
+            <p class="muted">Rescan all stored document PDFs, repair generic SDS/MSDS names where possible, add missing standard links, then show anything that still needs manual review.</p>
+            <div class="row">
+              <button id="forceLinkSyncBtn" class="secondary" type="button">Force sync &amp; review links</button>
+            </div>
+            <div id="forceLinkSyncStatus" class="muted" style="margin-top:8px" aria-live="polite"></div>
           </div>
         </div>
         <div class="section-card">
@@ -303,7 +311,7 @@
     </form>
   </dialog>
 
-  <script src="app-v171.js"></script>
-  <script src="bulk-import-v171.js"></script>
+  <script src="app-v173.js"></script>
+  <script src="bulk-import-v173.js"></script>
 </body>
 </html>
