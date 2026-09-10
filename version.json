@@ -1,8 +1,5 @@
 {
-  "app": "Safety Tracker",
-  "version": "2.0.0",
-  "build": "clean-v2-20260910",
-  "legacyScripts": false,
-  "serviceWorker": false,
-  "built": "2026-09-10"
+  "version": "2.0.1",
+  "build": "clean-v2-sds-title-fix-20260910",
+  "serviceWorker": false
 }
