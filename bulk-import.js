@@ -1,4 +1,4 @@
-/* Safety Tracker v2.1.5 - multi-document PDF pack importer.
+/* Safety Tracker v2.1.6 - multi-document PDF pack importer.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
@@ -71,7 +71,10 @@ function coshhSubstanceTitle(text){
 }
 function cleanRaTitleCandidate(value,ref=''){
   let t=clean(value);if(!t)return '';
-  if(ref)t=t.replace(new RegExp(`\\b${ref.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')}\\b.*$`,'i'),'').trim();
+  const refEsc=String(ref||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  if(refEsc)t=t.replace(new RegExp(`^\\s*${refEsc}\\s*[-–—:]?\\s*`,'i'),'').trim();
+  t=t.replace(/^RISK\s+ASSESSMENT\s*/i,'').replace(/^TASK\s+RISK\s+ASSESSMENT\s*/i,'').trim();
+  t=t.replace(/\s+(?:Department|Location|Scope|Task|Frequency|Linked\s+(?:controls|documents|assessments)|Related\s+(?:document|documents|assessments)|Chemical\s+controls|Typical\s+location|Fuel\s+handling|Existing\s+features)\b.*$/i,'').trim();
   if(!t||t.length<4||t.length>180)return '';
   if(/SHIELD\s+SAFETY|CONTROL\s+MEASURES|\bHAZARDS?\b|RISK\s+RATING|SEVERITY|LIKELIHOOD|PEOPLE\s+EXPOSED|Page\s+\d+|Version\b/i.test(t))return '';
   if(/^(?:Surface and Work Area Checks|Dust Control and PPE|Sanding Equipment|Product and COSHH Checks|Fire and Ventilation|Application and Spill Control|Access and Surface Preparation|Housekeeping and Waste|Storage, Waste and Completion)$/i.test(t))return '';
@@ -80,30 +83,43 @@ function cleanRaTitleCandidate(value,ref=''){
   return t;
 }
 function riskAssessmentTitle(text,lines,ref){
+  if(ref){
+    const refEsc=String(ref).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    for(const l of lines.slice(0,18)){
+      const m=clean(l).match(new RegExp(`^\\s*${refEsc}\\s*[-–—:]\\s*(.+)$`,'i'));
+      if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+    }
+  }
+  for(const l of lines.slice(0,18)){
+    const m=clean(l).match(/^\s*RA-\d{3}\s*[-–—:]\s*(.+)$/i);
+    if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+  }
+  const idx=lines.findIndex(x=>/^(?:TASK\s+)?RISK\s+ASSESSMENT$/i.test(clean(x)));
+  if(idx>=0){
+    for(let i=idx+1;i<Math.min(lines.length,idx+6);i++){
+      const l=clean(lines[i]);if(!l)continue;
+      if(/^(?:Department|Location|Persons\s+at\s+risk|Task|Scope|Frequency|Linked\s+(?:controls|documents|assessments)|Related\s+(?:document|documents|assessments)|Chemical\s+controls|Typical\s+location|Fuel\s+handling|Existing\s+features)\b/i.test(l))break;
+      if(/SHIELD\s+SAFETY|Maintenance\s+RA|Page\s+\d+/i.test(l))continue;
+      const c=cleanRaTitleCandidate(l,ref);if(c)return c;
+    }
+  }
   const hotelIndex=lines.findIndex(x=>/^Marriott\s+Portsmouth$/i.test(clean(x)));
   if(hotelIndex>0){
     const parts=[];
     for(let i=hotelIndex-1;i>=0&&parts.length<3;i--){
       const l=clean(lines[i]);if(!l)continue;
-      if(/SHIELD\s+SAFETY|RISK\s+ASSESSMENT|Maintenance\s+RA|Page\s+\d+|SECTION\s+\d/i.test(l))break;
+      if(/SHIELD\s+SAFETY|(?:TASK\s+)?RISK\s+ASSESSMENT|Maintenance\s+RA|Page\s+\d+|SECTION\s+\d/i.test(l))break;
       if(/^Maintenance$/i.test(l))continue;
-      parts.unshift(l);if(clean(parts.join(' ')).length>=35)break;
+      parts.unshift(l);
     }
     const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
   }
-  const idx=lines.findIndex(x=>/^RISK\s+ASSESSMENT$/i.test(clean(x)));
-  if(idx>=0){
-    const parts=[];
-    for(let i=idx+1;i<Math.min(lines.length,idx+5);i++){
-      const l=clean(lines[i]);if(!l)continue;
-      if(/^(?:RA\s+Reference|Department|Location|Persons\s+at\s+risk|Task|Linked\s+controls)\b/i.test(l))break;
-      if(/SHIELD\s+SAFETY|Maintenance\s+RA|Page\s+\d+/i.test(l))continue;
-      parts.push(l);
-    }
-    const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
+  const flat=clean(text);
+  if(ref){
+    const refEsc=String(ref).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const m=flat.match(new RegExp(`\\b${refEsc}\\s*[-–—:]\\s*(.{4,180}?)(?=\\s+(?:Department|Location|Scope|Task|Frequency|Linked|Related|Chemical|Typical|Fuel|Existing)\\b)`,'i'));
+    if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
   }
-  const m=clean(text).match(/(?:^|Page\s+1\s+)(.{4,180}?)\s+Marriott\s+Portsmouth\b/i);
-  if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
   return '';
 }
 function titleForDetected(kind,text,lines,ref){
@@ -208,7 +224,7 @@ async function storedHash(v){if(!v)return null;if(v.content_text_sha256)return v
 function modeOptions(i){if(i.kind==='TOOLBOX_TALK'){if(i.existingId)return `<option value="SKIP" ${i.mode==='SKIP'?'selected':''}>Skip</option><option value="REPLACE_TRAINING" ${i.mode==='REPLACE_TRAINING'?'selected':''}>Create revised training</option>`;return `<option value="CREATE" selected>Create training</option><option value="SKIP">Skip</option>`}if(i.existingId)return `<option value="SKIP" ${i.mode==='SKIP'?'selected':''}>Skip existing</option><option value="NEW_VERSION" ${i.mode==='NEW_VERSION'?'selected':''}>Publish new version</option>`;return `<option value="CREATE" selected>Create</option><option value="SKIP">Skip</option>`}
 function renderPreview(){const box=$('bulkImportPreview'),sum=$('bulkImportSummary');if(!box)return;const counts={};B.items.forEach(i=>counts[i.kind]=(counts[i.kind]||0)+1);const changed=B.items.filter(i=>i.compareStatus==='CHANGED').length,unchanged=B.items.filter(i=>i.compareStatus==='UNCHANGED').length,fresh=B.items.filter(i=>i.compareStatus==='NEW').length;sum.innerHTML=Object.entries(counts).map(([k,n])=>`<div class="stat"><strong>${n}</strong><span>${esc(kindLabel(k))}${n===1?'':'s'}</span></div>`).join('')+`<div class="stat"><strong>${changed}</strong><span>Changed</span></div><div class="stat"><strong>${unchanged}</strong><span>Unchanged</span></div><div class="stat"><strong>${fresh}</strong><span>New</span></div>`;box.innerHTML=B.items.map((i,idx)=>`<div class="item-card bulk-preview-card" data-kind="${i.kind}" data-index="${idx}"><div class="row-between"><label class="check-row"><input class="bulk-select" type="checkbox" ${i.selected?'checked':''}> <span><strong>${esc(i.reference||kindLabel(i.kind))}</strong> · ${esc(i.title)}</span></label><span class="badge ${i.compareStatus==='CHANGED'?'due':i.compareStatus==='UNCHANGED'?'complete':''}">${esc(i.compareStatus)}</span></div><div class="meta"><span>${esc(i.sourceName)} · pages ${i.startPage}-${i.endPage}</span><span>${esc(kindLabel(i.kind))}</span>${i.relatedRefs.length?`<span>References: ${esc(i.relatedRefs.join(', '))}</span>`:''}</div><div class="bulk-grid"><label>Action<select class="bulk-mode">${modeOptions(i)}</select></label><label class="wide">Title<input class="bulk-title" value="${esc(i.title)}"></label><label>Reference<input class="bulk-ref" value="${esc(i.reference)}"></label><label>Version<input class="bulk-version" value="${esc(i.version)}"></label><label>Issue date<input type="date" class="bulk-issue" value="${esc(i.issueDate||today())}"></label><label>Review date<input type="date" class="bulk-review" value="${esc(i.reviewDate||'')}" ${i.kind==='SDS'?'disabled':''}></label></div></div>`).join('');box.querySelectorAll('[data-index]').forEach(card=>{const i=B.items[Number(card.dataset.index)];card.querySelector('.bulk-select').onchange=e=>i.selected=e.target.checked;card.querySelector('.bulk-mode').onchange=e=>{i.mode=e.target.value;i.selected=i.mode!=='SKIP';renderPreview()};card.querySelector('.bulk-title').onchange=e=>i.title=clean(e.target.value)||i.title;card.querySelector('.bulk-ref').onchange=e=>i.reference=clean(e.target.value).toUpperCase();card.querySelector('.bulk-version').onchange=e=>i.version=clean(e.target.value)||'1';card.querySelector('.bulk-issue').onchange=e=>{i.issueDate=e.target.value||today();if(i.kind!=='SDS')i.reviewDate=plusYear(i.issueDate)};card.querySelector('.bulk-review')?.addEventListener('change',e=>i.reviewDate=e.target.value||null)});$('bulkImportBtn').disabled=!B.items.some(i=>i.selected&&i.mode!=='SKIP')}
 async function analyse(){if(B.busy)return;if(!navigator.onLine)return api.toast('Bulk Import requires an internet connection.');if(!window.pdfjsLib||!window.PDFLib)return api.toast('PDF libraries did not load.');const files=[...($('bulkImportFiles')?.files||[])];if(!files.length)return api.toast('Choose one or more PDF files first.');if(files.some(f=>f.size>45*1024*1024))return api.toast('One or more PDFs exceed 45 MB.');B.busy=true;B.sources=[];B.items=[];$('bulkAnalyzeBtn').disabled=true;try{await api.loadAll();for(let i=0;i<files.length;i++){const items=await analyseOne(files[i],i);B.items.push(...items)}let n=0;for(const item of B.items){setStatus(`Comparing existing records: ${++n} of ${B.items.length}…`);await compareItem(item)}renderPreview();const sdsCount=B.items.filter(x=>x.kind==='SDS').length;setStatus(`Analysis complete: ${B.items.length} record${B.items.length===1?'':'s'} detected from ${files.length} PDF pack${files.length===1?'':'s'}${sdsCount?` (${sdsCount} SDS/MSDS)`:''}. Review the page ranges below before importing. Filenames are not used to decide whether content changed.`)}catch(e){console.error(e);setStatus(`Analysis failed: ${e.message||e}`);api.toast('Could not analyse the PDF.')}finally{B.busy=false;$('bulkAnalyzeBtn').disabled=false}}
-async function createDoc(item,blob){const type=item.kind,renewal={value:null,unit:null};const ins=await sb.from('documents').insert({title:item.title,reference:item.reference||null,doc_type:type,delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',status:'ACTIVE',default_renewal_value:renewal.value,default_renewal_unit:renewal.unit,resign_on_new_version:false,created_by:state.user.id}).select().single();if(ins.error)throw ins.error;const d=ins.data,name=`${api.safeFileName(item.reference||item.title)}-v${api.safeFileName(item.version||'1')}.pdf`,path=`documents/${d.id}/${crypto.randomUUID()}-${name}`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf'});if(up.error){await sb.from('documents').delete().eq('id',d.id);throw up.error}const vr=await sb.from('document_versions').insert({document_id:d.id,version_label:item.version||'1',issue_date:item.issueDate||today(),review_date:type==='SDS'?null:(item.reviewDate||plusYear(today())),delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',storage_path:path,file_name:name,notes:`Bulk imported from ${item.sourceName}, pages ${item.startPage}-${item.endPage}.`,status:'CURRENT',content_text_sha256:item.contentHash||await api.hashPdf(blob),created_by:state.user.id}).select().single();if(vr.error){await sb.storage.from('safety-files').remove([path]);await sb.from('documents').delete().eq('id',d.id);throw vr.error}item.dbDocId=d.id}
+async function createDoc(item,blob){const type=item.kind,renewal=['RISK_ASSESSMENT','COSHH'].includes(type)?{value:12,unit:'MONTHS'}:{value:null,unit:null};const ins=await sb.from('documents').insert({title:item.title,reference:item.reference||null,doc_type:type,delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',status:'ACTIVE',default_renewal_value:renewal.value,default_renewal_unit:renewal.unit,resign_on_new_version:false,created_by:state.user.id}).select().single();if(ins.error)throw ins.error;const d=ins.data,name=`${api.safeFileName(item.reference||item.title)}-v${api.safeFileName(item.version||'1')}.pdf`,path=`documents/${d.id}/${crypto.randomUUID()}-${name}`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf'});if(up.error){await sb.from('documents').delete().eq('id',d.id);throw up.error}const vr=await sb.from('document_versions').insert({document_id:d.id,version_label:item.version||'1',issue_date:item.issueDate||today(),review_date:type==='SDS'?null:(item.reviewDate||plusYear(today())),delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',storage_path:path,file_name:name,notes:`Bulk imported from ${item.sourceName}, pages ${item.startPage}-${item.endPage}.`,status:'CURRENT',content_text_sha256:item.contentHash||await api.hashPdf(blob),created_by:state.user.id}).select().single();if(vr.error){await sb.storage.from('safety-files').remove([path]);await sb.from('documents').delete().eq('id',d.id);throw vr.error}item.dbDocId=d.id}
 async function replaceTraining(item,blob){const old=state.training.find(t=>t.id===item.existingId),oldAssignments=state.trainingAssignments.filter(a=>a.training_session_id===old?.id&&a.active!==false);if(old){const ar=await sb.from('training_sessions').update({status:'ARCHIVED'}).eq('id',old.id);if(ar.error)throw ar.error;for(const a of oldAssignments){const off=await sb.from('training_assignments').update({active:false}).eq('id',a.id);if(off.error)throw off.error}}const t=await createToolbox(item,blob);for(const a of oldAssignments){const add=await sb.from('training_assignments').insert({training_session_id:t.id,user_id:a.user_id,due_date:new Date(Date.now()+14*864e5).toISOString().slice(0,10),renewal_value:a.renewal_value,renewal_unit:a.renewal_unit,assigned_by:state.user.id,active:true});if(add.error)throw add.error}}
 async function createToolbox(item,blob){const name=item.reference?`${item.reference} - ${item.title}`:item.title,ins=await sb.from('training_sessions').insert({name,session_type:'TOOLBOX_TALK',delivery_method:'INSTRUCTOR_LED',description:`Bulk imported Toolbox Talk. Relevant documents: ${item.relatedRefs.join(', ')||'none detected'}.`,delivered_date:null,trainer_name:null,trainer_user_id:state.user.id,review_date:item.reviewDate||plusYear(today()),default_due_date:new Date(Date.now()+14*864e5).toISOString().slice(0,10),renewal_value:null,renewal_unit:null,status:'ACTIVE',created_by:state.user.id,reference:item.reference||null,source_kind:'TOOLBOX_TALK',auto_managed:false,review_required:false,review_reason:null}).select().single();if(ins.error)throw ins.error;const t=ins.data,path=`training/${t.id}/${crypto.randomUUID()}-${api.safeFileName(item.reference||item.title)}.pdf`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf'});if(up.error)throw up.error;const fi=await sb.from('training_files').insert({training_session_id:t.id,file_name:`${api.safeFileName(item.reference||item.title)}.pdf`,storage_path:path,uploaded_by:state.user.id,content_text_sha256:item.contentHash||await api.hashPdf(blob)});if(fi.error)throw fi.error;await api.loadAll();for(const ref of item.relatedRefs){const d=state.documents.find(x=>clean(x.reference).toUpperCase()===ref.toUpperCase());if(d)await api.ensureTrainingDocLink(t.id,d.id,'RELATED')}return t}
 async function importSelected(){if(B.busy)return;const items=B.items.filter(i=>i.selected&&i.mode!=='SKIP');if(!items.length)return api.toast('Nothing selected to import.');if(!confirm(`Import ${items.length} selected record${items.length===1?'':'s'} into Safety Tracker v2?`))return;B.busy=true;$('bulkImportBtn').disabled=true;$('bulkAnalyzeBtn').disabled=true;let done=0,failed=0;try{for(const item of items){try{setStatus(`Importing ${done+1} of ${items.length}: ${item.reference||item.title}…`);const blob=await splitItem(item);if(item.kind==='TOOLBOX_TALK'&&item.mode==='REPLACE_TRAINING')await replaceTraining(item,blob);else if(item.kind==='TOOLBOX_TALK')await createToolbox(item,blob);else if(item.mode==='NEW_VERSION'){const d=state.documents.find(x=>x.id===item.existingId);if(!d)throw new Error('Existing document not found');const ok=await api.publishFileAsNewVersion(d,blob,item.issueDate,item.reviewDate,`Bulk imported changed content from ${item.sourceName}, pages ${item.startPage}-${item.endPage}.`,true);if(!ok)throw new Error('New version was not published')}else await createDoc(item,blob);done++;await api.loadAll()}catch(e){failed++;item.error=e.message||String(e);console.error('Bulk item failed',item,e)}}setStatus('Synchronising Training, document links and review flags…');await api.loadAll();const r=await api.runSafetySync({scan:'full',progress:m=>setStatus(m)});await api.refresh();setStatus(`Bulk import finished: ${done} imported${failed?`, ${failed} failed`:''}. Force Sync made ${r.changes} update${r.changes===1?'':'s'}.`);api.toast(failed?'Bulk import completed with some errors.':'Bulk import complete.')}finally{B.busy=false;$('bulkImportBtn').disabled=false;$('bulkAnalyzeBtn').disabled=false;renderPreview()}}

@@ -1,5 +1,5 @@
 {
-  "version": "2.1.5",
-  "build": "open-before-sign-v215-20260910",
+  "version": "2.1.6",
+  "build": "ra-renewal-instructor-v216-20260910",
   "service_worker": false
 }
