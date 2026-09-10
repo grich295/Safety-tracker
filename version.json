@@ -1,6 +1,6 @@
 {
-  "version": "2.1.8",
+  "version": "2.1.9",
   "build": "CLEAN",
   "service_worker": false,
-  "notes": "SDS product-name cleanup tightened; Training type filter is preserved across archive/edit/assign refreshes; archiving a document immediately removes active links and restoring rebuilds declared links."
+  "notes": "Adds person-specific incident evidence packs with directly linked controlled PDFs, and reliable confirmed archive/restore actions for Documents and Training."
 }
