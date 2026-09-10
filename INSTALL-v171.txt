@@ -1,0 +1,73 @@
+SAFETY TRACKER v1.7.1 — UPGRADE FROM v1.6.1
+============================================
+
+IMPORTANT CORRECTION IN v1.7.1
+------------------------------
+Your existing Force Sync & Review is already working. This build deliberately leaves it alone.
+The v1.7.1 patch does NOT create a Force Sync button, replace its handler, intercept its click,
+disable it, or change its status text.
+
+WHAT THIS BUILD CHANGES
+-----------------------
+1. Documents becomes the controlled source library.
+   - RA, COSHH, SSW, SDS/MSDS, policies and procedures remain controlled documents.
+   - Normal staff learning/sign-off is managed from Training rather than assigning source documents directly.
+
+2. Training becomes the learning/sign-off area.
+   - Risk Assessment -> self-training.
+   - COSHH Assessment -> self-training.
+   - Safe System of Work -> instructor-led.
+   - Toolbox Talk -> instructor-led.
+   - Existing induction, refresher, ad-hoc and other training remain supported.
+
+3. Controlled RA/COSHH/SSW files create matching auto-managed Training records.
+   - Training points at the current source-document version.
+   - A new controlled version creates a fresh active training record while retaining historic evidence.
+   - Existing active source-document assignments are copied to Training and deactivated, not deleted.
+
+4. Linking is clearer and more automatic.
+   - Link search displays full reference + title + type instead of only a generic SDS/type label.
+   - Training can link directly to controlled documents.
+   - Newly uploaded/recent PDFs are automatically scanned for RA/COSHH/SSW/PROC references after refresh.
+   - Existing document relationships are copied into the matching auto-managed Training record.
+   - Conservative SDS <-> COSHH matching remains available.
+
+5. Date defaults.
+   - New document issue date defaults to the upload/current date.
+   - Controlled-document review date defaults to one year after issue/upload.
+   - New training review date defaults to one year after creation.
+   - SDS/MSDS remains reference-only with no mandatory one-year review date.
+
+6. Training frequency is editable.
+   - One-off, 3, 6, 12, 24 months or Custom.
+   - Frequency changes can be applied to current active assignees.
+
+7. Backup includes training-document links.
+
+INSTALL
+-------
+A. Make a Full Backup ZIP using your current working Safety Tracker.
+
+B. In Supabase -> SQL Editor run:
+   001-safety-tracker-v171.sql
+   The migration is idempotent. It is safe if the earlier v1.7.0 schema migration was already run.
+
+C. Add app-v171-patch.js beside app-v161.js and bulk-import-v161.js.
+
+D. At the bottom of index.html use:
+   <script src="app-v161.js"></script>
+   <script src="bulk-import-v161.js"></script>
+   <script src="app-v171-patch.js"></script>
+
+E. Replace sw.js with the supplied v1.7.1 service worker.
+
+F. Publish the changed files and refresh the app. A manager/admin refresh performs the v1.7.1
+   structural synchronisation and recent-upload link scan automatically.
+
+G. Leave your existing Force Sync & Review exactly as it is.
+
+NOTES
+-----
+- This build does not delete controlled documents, old assignments, signatures or training evidence.
+- Historical document sign-offs remain available even after active RA/COSHH/SSW assignments move to Training.
+- Do not clear Documents/history until the new Training structure and links have been checked.

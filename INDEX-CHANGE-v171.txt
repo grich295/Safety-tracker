@@ -1,0 +1,8 @@
+At the bottom of index.html, use this exact script order:
+
+<script src="app-v161.js"></script>
+<script src="bulk-import-v161.js"></script>
+<script src="app-v171-patch.js"></script>
+
+Do not remove app-v161.js or bulk-import-v161.js.
+Do not change your existing Force Sync & Review implementation. v1.7.1 does not create, replace, intercept or disable it.
