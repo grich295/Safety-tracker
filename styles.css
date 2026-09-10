@@ -49,3 +49,27 @@
 .training-status-card.traffic-amber{border-color:#e0a21a!important}
 .training-status-card.traffic-red{border-color:#dc4a4a!important}
 @media(max-width:760px){#mySafetyStats{grid-template-columns:repeat(2,minmax(0,1fr))}#mySafetyStats .stat{min-height:105px}}
+
+/* v2.2.1 controlled-document traffic lights and Pending Approval queue */
+.approval-overview-card{border-width:2px}
+.document-control-stats .stat{position:relative;overflow:hidden;border-width:2px;min-height:105px;padding-left:19px}
+.document-control-stats .stat::before{content:"";position:absolute;inset:0 auto 0 0;width:8px;background:currentColor}
+.document-control-stats .traffic-dot{position:absolute;right:14px;top:14px;width:14px;height:14px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(255,255,255,.55)}
+.document-control-stats .traffic-green strong,.document-control-stats .traffic-green span:not(.traffic-dot){color:#1f6f3d!important}
+.document-control-stats .traffic-amber strong,.document-control-stats .traffic-amber span:not(.traffic-dot){color:#805400!important}
+.document-control-stats .traffic-red strong,.document-control-stats .traffic-red span:not(.traffic-dot){color:#962727!important}
+.traffic-legend{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.legend{display:inline-flex;align-items:center;gap:6px;border:2px solid;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:var(--card)}
+.legend::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+.legend.green{color:#258a4b;border-color:#36a864}.legend.amber{color:#a66a00;border-color:#e0a21a}.legend.red{color:#b72f2f;border-color:#dc4a4a}
+.pending-approval-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin:18px 0 10px}.pending-approval-head h4{margin:0 0 3px}
+.document-status-card,.training-catalogue-card{border-style:solid!important;border-width:2px!important;border-left-width:8px!important;background:var(--card)!important;color:inherit!important}
+.document-status-card.traffic-green,.training-catalogue-card.traffic-green{border-color:#36a864!important}
+.document-status-card.traffic-amber,.training-catalogue-card.traffic-amber{border-color:#e0a21a!important}
+.document-status-card.traffic-red,.training-catalogue-card.traffic-red{border-color:#dc4a4a!important}
+.document-status-card.traffic-neutral,.training-catalogue-card.traffic-neutral{border-color:#8a98a8!important}
+.traffic-neutral{color:#667585!important;border-color:#8a98a8!important;background:#f0f3f5!important}
+.pending-use-warning{border:2px solid #dc4a4a;border-left-width:8px;border-radius:10px;background:#fff2f2;color:#962727;padding:10px 12px;font-weight:900;letter-spacing:.015em}
+.traffic-register-green{border-left:6px solid #36a864;padding-left:10px}
+.pending-approval-list .item-card{box-shadow:0 2px 9px rgba(18,42,66,.05)}
+@media(max-width:760px){.traffic-legend{justify-content:flex-start}.pending-approval-head{flex-direction:column}.document-control-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -1,6 +1,6 @@
 {
-  "version": "2.2.0",
+  "version": "2.2.1",
   "build": "CLEAN",
   "service_worker": false,
-  "notes": "Clarifies file review versus formal Training and adds full controlled-review history/signatures to person Evidence Packs."
+  "notes": "Adds Pending Approval/Acceptance before controlled documents become usable, traffic-light status borders and a document-control approval queue. Source Training only becomes active or reissued after approval."
 }
