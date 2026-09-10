@@ -1,4 +1,4 @@
-/* Safety Tracker v2.1.7 - multi-document PDF pack importer.
+/* Safety Tracker v2.1.8 - multi-document PDF pack importer.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
@@ -26,9 +26,9 @@ function sdsProductName(text,lines,fileName){
   ];
   for(let i=0;i<lines.length;i++)for(const rx of labels){
     const line=clean(lines[i]),m=line.match(rx);
-    if(m?.[1]){const c=clean(m[1]);if(c.length>2&&!/^\d+\s*\/\s*\d+$/.test(c)&&!/^Page\b/i.test(c))return c}
+    if(m?.[1]){const c=clean(m[1]).replace(/\s+(?:According to|In accordance with|Conforms? to|COMMISSION REGULATION|REGULATION \(?:EU|EC\)).*$/i,'').replace(/\s*[:;,-]?\s*1\.[12](?:\.\d+)?\s*$/i,'').trim();if(c.length>2&&!/^\d+\s*\/\s*\d+$/.test(c)&&!/^Page\b/i.test(c))return c}
     if(rx.test(line)&&i+1<lines.length){
-      const c=clean(lines[i+1]);
+      const c=clean(lines[i+1]).replace(/\s+(?:According to|In accordance with|Conforms? to|COMMISSION REGULATION|REGULATION \(?:EU|EC\)).*$/i,'').replace(/\s*[:;,-]?\s*1\.[12](?:\.\d+)?\s*$/i,'').trim();
       if(c.length>2&&!/^(?:1\.2|Product code|Article No|SECTION|Page\b|Contains\b)/i.test(c)&&!/^\d+\s*\/\s*\d+$/.test(c))return c;
       // Some SDS layouts put a label such as "Product Name" on one line and the
       // actual product after an intervening "Contains" or blank-like text line.
