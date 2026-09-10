@@ -1,5 +1,5 @@
 {
-  "version": "2.0.7",
-  "build": "tbt-ssw-linking-20260910",
+  "version": "2.0.8",
+  "build": "traffic-light-my-safety",
   "service_worker": false
 }

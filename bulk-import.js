@@ -1,4 +1,4 @@
-/* Safety Tracker v2.0.7 - bulk PDF importer with COSHH/SDS, Toolbox Talk and SSW linking */
+/* Safety Tracker v2.0.8 - bulk PDF importer with COSHH/SDS, Toolbox Talk and SSW linking */
 'use strict';
 (() => {
 const api=window.SafetyTrackerV2;if(!api)return;

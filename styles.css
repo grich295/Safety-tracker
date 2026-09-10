@@ -30,3 +30,22 @@
 .register-meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;color:var(--muted);font-size:13px}
 .compact-empty{padding:12px 0}
 @media(max-width:760px){.document-register-card{min-height:115px}.register-toolbar{align-items:stretch;flex-direction:column}.register-row{grid-template-columns:1fr;gap:7px}.register-main{grid-template-columns:1fr;gap:3px}.register-meta{justify-content:flex-start}}
+
+
+/* v2.0.8 My Safety traffic-light status */
+#mySafetyStats .stat{position:relative;overflow:hidden;border-width:2px;min-height:112px;padding-left:19px}
+#mySafetyStats .stat::before{content:"";position:absolute;inset:0 auto 0 0;width:7px;background:currentColor}
+#mySafetyStats .stat strong{font-size:30px}
+#mySafetyStats .traffic-dot{position:absolute;right:14px;top:14px;width:14px;height:14px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(255,255,255,.42)}
+.traffic-green{color:#258a4b!important;border-color:#36a864!important;background:#e9f7ee!important}
+.traffic-amber{color:#a66a00!important;border-color:#e0a21a!important;background:#fff4d6!important}
+.traffic-red{color:#b72f2f!important;border-color:#dc4a4a!important;background:#fde8e8!important}
+#mySafetyStats .traffic-green strong,#mySafetyStats .traffic-green span:not(.traffic-dot){color:#1f6f3d!important}
+#mySafetyStats .traffic-amber strong,#mySafetyStats .traffic-amber span:not(.traffic-dot){color:#805400!important}
+#mySafetyStats .traffic-red strong,#mySafetyStats .traffic-red span:not(.traffic-dot){color:#962727!important}
+.training-status-card{border-left-width:7px!important}
+.training-status-card.traffic-green,.training-status-card.traffic-amber,.training-status-card.traffic-red{background:var(--card)!important;color:inherit!important}
+.training-status-card.traffic-green{border-color:#36a864!important}
+.training-status-card.traffic-amber{border-color:#e0a21a!important}
+.training-status-card.traffic-red{border-color:#dc4a4a!important}
+@media(max-width:760px){#mySafetyStats{grid-template-columns:repeat(2,minmax(0,1fr))}#mySafetyStats .stat{min-height:105px}}
