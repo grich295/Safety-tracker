@@ -1,4 +1,4 @@
-/* Safety Tracker v2.1.3 - multi-document PDF pack importer.
+/* Safety Tracker v2.1.5 - multi-document PDF pack importer.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
@@ -69,11 +69,48 @@ function coshhSubstanceTitle(text){
   for(const rx of patterns){const m=clean(text).match(rx);if(m?.[1]){const v=clean(m[1]).replace(/\s+COSHH-\d{3}.*$/i,'');if(v.length>2&&v.length<220)return v}}
   return '';
 }
+function cleanRaTitleCandidate(value,ref=''){
+  let t=clean(value);if(!t)return '';
+  if(ref)t=t.replace(new RegExp(`\\b${ref.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')}\\b.*$`,'i'),'').trim();
+  if(!t||t.length<4||t.length>180)return '';
+  if(/SHIELD\s+SAFETY|CONTROL\s+MEASURES|\bHAZARDS?\b|RISK\s+RATING|SEVERITY|LIKELIHOOD|PEOPLE\s+EXPOSED|Page\s+\d+|Version\b/i.test(t))return '';
+  if(/^(?:Surface and Work Area Checks|Dust Control and PPE|Sanding Equipment|Product and COSHH Checks|Fire and Ventilation|Application and Spill Control|Access and Surface Preparation|Housekeeping and Waste|Storage, Waste and Completion)$/i.test(t))return '';
+  if(/\b(?:Follow\s+RA-|Follow\s+SSW-|Follow\s+COSHH-|reposition\s+access\s+equipment|avoid\s+prolonged|keep\s+hands|wear\s+eye\s+protection)\b/i.test(t))return '';
+  if(t.length>120&&/[.!?]/.test(t))return '';
+  return t;
+}
+function riskAssessmentTitle(text,lines,ref){
+  const hotelIndex=lines.findIndex(x=>/^Marriott\s+Portsmouth$/i.test(clean(x)));
+  if(hotelIndex>0){
+    const parts=[];
+    for(let i=hotelIndex-1;i>=0&&parts.length<3;i--){
+      const l=clean(lines[i]);if(!l)continue;
+      if(/SHIELD\s+SAFETY|RISK\s+ASSESSMENT|Maintenance\s+RA|Page\s+\d+|SECTION\s+\d/i.test(l))break;
+      if(/^Maintenance$/i.test(l))continue;
+      parts.unshift(l);if(clean(parts.join(' ')).length>=35)break;
+    }
+    const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
+  }
+  const idx=lines.findIndex(x=>/^RISK\s+ASSESSMENT$/i.test(clean(x)));
+  if(idx>=0){
+    const parts=[];
+    for(let i=idx+1;i<Math.min(lines.length,idx+5);i++){
+      const l=clean(lines[i]);if(!l)continue;
+      if(/^(?:RA\s+Reference|Department|Location|Persons\s+at\s+risk|Task|Linked\s+controls)\b/i.test(l))break;
+      if(/SHIELD\s+SAFETY|Maintenance\s+RA|Page\s+\d+/i.test(l))continue;
+      parts.push(l);
+    }
+    const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
+  }
+  const m=clean(text).match(/(?:^|Page\s+1\s+)(.{4,180}?)\s+Marriott\s+Portsmouth\b/i);
+  if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+  return '';
+}
 function titleForDetected(kind,text,lines,ref){
   if(kind==='COSHH')return coshhSubstanceTitle(text)||titleAfter(lines,'COSHH RISK ASSESSMENT',/\bCOSHH\s+(Reference|Ref)\b/i)||titleAfter(lines,'COSHH ASSESSMENT',/\bCOSHH\s+(Reference|Ref)\b/i)||ref;
   if(kind==='TOOLBOX_TALK')return titleAfter(lines,'TOOLBOX TALK',/\bTBT\s+(Reference|Ref)\b/i)||titleFromRef(lines,ref)||ref;
   if(kind==='SSW')return titleAfter(lines,'SAFE SYSTEM OF WORK (SSW)',/\bSSW\s+(Reference|Ref)\b/i)||titleAfter(lines,'SAFE SYSTEM OF WORK',/\bSSW\s+(Reference|Ref)\b/i)||titleFromRef(lines,ref)||ref;
-  if(kind==='RISK_ASSESSMENT')return titleAfter(lines,'RISK ASSESSMENT',/\b(?:RA\s+Reference|Risk Assessment\s+(?:Reference|Ref))\b/i)||titleFromRef(lines,ref)||ref;
+  if(kind==='RISK_ASSESSMENT')return riskAssessmentTitle(text,lines,ref)||titleAfter(lines,'RISK ASSESSMENT',/\b(?:RA\s+Reference|Risk Assessment\s+(?:Reference|Ref))\b/i)||titleFromRef(lines,ref)||ref;
   return ref;
 }
 function isDirectoryOrIndexPage(text){const u=String(text||'').toUpperCase();return /\b(?:DIRECTORY|MASTER\s+INDEX|DOCUMENT\s+INDEX|RISK\s+ASSESSMENT\s+INVENTORY|CHEMICAL\s+INVENTORY)\b/.test(u)&&!/COSHH\s+RISK\s+ASSESSMENT\s+FORM/.test(u)}
