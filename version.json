@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1",
-  "build": "clean-v2-sds-title-fix-20260910",
-  "serviceWorker": false
+  "version": "2.0.2",
+  "build": "document-indexes-classifier-fix-20260910",
+  "service_worker": false
 }
