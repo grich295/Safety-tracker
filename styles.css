@@ -32,7 +32,7 @@
 @media(max-width:760px){.document-register-card{min-height:115px}.register-toolbar{align-items:stretch;flex-direction:column}.register-row{grid-template-columns:1fr;gap:7px}.register-main{grid-template-columns:1fr;gap:3px}.register-meta{justify-content:flex-start}}
 
 
-/* v2.0.9 My Safety traffic-light status + SDS name alignment build */
+/* v2.1.0 My Safety traffic-light status + SDS name alignment build */
 #mySafetyStats .stat{position:relative;overflow:hidden;border-width:2px;min-height:112px;padding-left:19px}
 #mySafetyStats .stat::before{content:"";position:absolute;inset:0 auto 0 0;width:7px;background:currentColor}
 #mySafetyStats .stat strong{font-size:30px}

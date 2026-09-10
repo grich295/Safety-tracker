@@ -1,5 +1,5 @@
 {
-  "version": "2.0.9",
-  "build": "sds-name-alignment-and-coshh-matching",
+  "version": "2.1.0",
+  "build": "multi-document-pack-import",
   "service_worker": false
 }
