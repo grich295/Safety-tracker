@@ -1,5 +1,5 @@
 {
-  "version": "2.0.2",
-  "build": "document-indexes-classifier-fix-20260910",
+  "version": "2.0.4",
+  "build": "authoritative-link-rebuild-20260910",
   "service_worker": false
 }
