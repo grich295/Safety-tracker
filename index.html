@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Clean build v2.1.1 · no service worker</div>
+      <div class="build-badge">Clean build v2.1.2 · no service worker</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -51,7 +51,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.1.1</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.1.2</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -117,6 +117,12 @@
           <button id="reviewDatesPdfBtn" class="secondary">Review dates PDF</button>
           <button id="backupBtn" class="secondary">JSON backup</button>
           <button id="fullBackupBtn" class="primary">Full backup ZIP</button>
+        </div>
+        <div class="section-card activity-audit-section">
+          <div class="row-between"><div><h3>Document activity audit</h3><p class="muted">Who opened, downloaded or reviewed files, including activity outside assigned training.</p></div><button id="documentActivityPdfBtn" class="secondary" type="button">Activity audit PDF</button></div>
+          <div class="filters"><input id="activitySearch" placeholder="Search user, reference or document"><select id="activityPersonFilter"><option value="">All people</option></select><select id="activityActionFilter"><option value="">All actions</option><option value="OPENED">Opened</option><option value="DOWNLOADED">Downloaded</option><option value="REVIEWED">Reviewed</option><option value="CONTROLLED_REVIEW">Controlled review</option><option value="TRAINING_COMPLETED">Training completed</option></select></div>
+          <div id="activityStats" class="stats-grid"></div>
+          <div id="activityList" class="card-list"></div>
         </div>
       </section>
 

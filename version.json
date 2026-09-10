@@ -1,5 +1,5 @@
 {
-  "version": "2.1.1",
-  "build": "sds-pack-split",
+  "version": "2.1.2",
+  "build": "document-access-review-audit",
   "service_worker": false
 }
