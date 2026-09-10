@@ -97,7 +97,7 @@
     <header class="topbar">
       <div>
         <strong>Safety Tracker</strong>
-        <span class="version">v1.6.0</span>
+        <span class="version">v1.7.0</span>
       </div>
       <div class="user-chip">
         <span id="currentUserName">User</span>
@@ -267,11 +267,11 @@
         <div class="page-heading"><div><h2>Admin</h2><p class="muted">Bulk import, system controls and backup.</p></div></div>
         <div class="section-card">
           <h3>Bulk Import</h3>
-          <p class="muted">Upload complete section PDFs. Safety Tracker analyses them locally, splits clearly referenced documents, compares each existing record with the current tracker copy, organises them into the correct section, and shows a preview before anything is saved.</p>
-          <div class="hint-box"><strong>Built-in rules:</strong> RA and COSHH → Documents / self-training; SSW → Documents / instructor-led; SDS/MSDS → reference-only with no assignment or signature; Toolbox Talks → Training / instructor-led. Directory/index files are stored as control records.<br><br><strong>Automatic change detection:</strong> filenames are ignored. The actual PDF text is fingerprinted and compared with the current tracker copy. Unchanged records are skipped automatically; changed records are selected as a new version.</div>
+          <p class="muted">Upload complete section PDFs. Safety Tracker analyses them locally, splits clearly referenced documents, compares each existing record with the current tracker copy, and shows a preview before anything is saved. New controlled documents and Toolbox Talks then wait for your digital approval.</p>
+          <div class="hint-box"><strong>Built-in rules:</strong> RA and COSHH → Documents / self-training; SSW → Documents / instructor-led; SDS/MSDS → reference-only with no assignment or signature; Toolbox Talks → Training / instructor-led. Directory/index files are stored as control records. Every newly uploaded controlled document and Toolbox Talk requires a Manager/Admin digital approval before assignment; SDS/MSDS is excluded.<br><br><strong>Automatic change detection:</strong> filenames are ignored. The actual PDF text is fingerprinted and compared with the current tracker copy. Unchanged records are skipped automatically; changed records are selected as a new version.</div>
           <div class="bulk-drop" id="bulkDropZone">
             <label>Section PDF files<input id="bulkImportFiles" type="file" accept="application/pdf,.pdf" multiple></label>
-            <p class="muted">You can select several packs at once. Maximum 45 MB per PDF. Shield Safety RA packs are split using each RA-xxx Page 1 marker.</p>
+            <p class="muted">You can select several packs at once. Maximum 45 MB per PDF. Shield Safety RA packs are split using each RA-xxx Page 1 marker.</p><label style="margin-top:10px">Default TBT refresher frequency<select id="bulkTbtDefault"><option value="">One-off only</option><option value="3|MONTHS">Every 3 months</option><option value="6|MONTHS">Every 6 months</option><option value="12|MONTHS">Every 12 months</option><option value="24|MONTHS">Every 24 months</option></select></label><p class="muted">This is applied to newly detected Toolbox Talks. You can override each TBT in the preview and edit the frequency later.</p>
           </div>
           <div class="row">
             <button id="bulkAnalyzeBtn" class="secondary" type="button">Analyse PDFs</button>
@@ -303,7 +303,7 @@
     </form>
   </dialog>
 
-  <script src="app-v162.js"></script>
-  <script src="bulk-import-v162.js"></script>
+  <script src="app-v170.js"></script>
+  <script src="bulk-import-v170.js"></script>
 </body>
 </html>
