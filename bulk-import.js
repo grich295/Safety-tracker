@@ -1,4 +1,4 @@
-/* Safety Tracker v2.2.2 - pending-approval multi-document PDF pack importer (reports/awareness build).
+/* Safety Tracker v2.2.6 - pending-approval multi-document PDF pack importer (standalone final build).
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
