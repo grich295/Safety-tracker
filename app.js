@@ -1,8 +1,9 @@
-/* Safety Tracker v2.3.3 - cache-bust fix for user editing and resend access email. */
+/* Safety Tracker v2.3.5 - version/cache fix + production auth redirect hardening. */
 'use strict';
 
-const APP_VERSION='2.3.3';
-const BUILD_ID='people-edit-resend-access-v232-20260911';
+const APP_VERSION='2.3.5';
+const BUILD_ID='v235-version-auth-redirect-20260911';
+const SAFETY_APP_URL='https://grich295.github.io/Safety-tracker/';
 const CFG=window.SAFETY_TRACKER_CONFIG||{};
 const configured=!!(CFG.supabaseUrl&&CFG.supabaseKey&&!String(CFG.supabaseUrl).includes('PASTE_')&&!String(CFG.supabaseKey).includes('PASTE_'));
 const sb=configured?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey):null;
@@ -639,6 +640,9 @@ async function refresh(msg){if(isReportViewer()){await loadReportViewerData();re
 
 async function init(){
   if(!configured){showAuthMessage('Copy your working Safety Tracker config.js into this new v2 folder, then reload.');return}
+  const authParams=new URLSearchParams((location.hash||'').replace(/^#/,''));
+  const authError=authParams.get('error_description')||new URLSearchParams(location.search).get('error_description');
+  if(authError)showAuthMessage(decodeURIComponent(authError.replace(/\+/g,' ')));
   if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   $('loginForm').addEventListener('submit',login);$('forgotPasswordBtn').addEventListener('click',forgotPassword);$('signOutBtn').addEventListener('click',()=>sb.auth.signOut());
   $('completePasswordSetupBtn').addEventListener('click',completeMandatoryPasswordSetup);$('modalCloseBtn').addEventListener('click',closeModal);
@@ -671,7 +675,7 @@ async function init(){
 }
 function showLogin(){$('appView').hidden=true;$('authView').hidden=false;$('loginForm').hidden=false;$('forgotPasswordBtn').hidden=false;$('passwordSetupArea').hidden=true}
 async function login(e){e.preventDefault();$('authMessage').hidden=true;const {error}=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(error)showAuthMessage(error.message)}
-async function forgotPassword(){const email=$('loginEmail').value.trim().toLowerCase();if(!email)return showAuthMessage('Enter your email address first.');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});showAuthMessage(error?error.message:'Password reset request sent. Check Inbox and Junk/Spam.')}
+async function forgotPassword(){const email=$('loginEmail').value.trim().toLowerCase();if(!email)return showAuthMessage('Enter your email address first.');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:`${SAFETY_APP_URL}?recovery=1`});showAuthMessage(error?error.message:'Password reset request sent. Check Inbox and Junk/Spam.')}
 function showPasswordReset(){openModal('Set new password',`<label>New password<input id="newPassword" type="password" minlength="8"></label><div class="actions">${btn('Save password','primary','id="saveNewPassword"')}</div>`)}
 function showMandatoryPasswordSetup(user){state.user=user;state.profile=null;$('appView').hidden=true;$('authView').hidden=false;$('loginForm').hidden=true;$('forgotPasswordBtn').hidden=true;$('passwordSetupArea').hidden=false;$('authMessage').hidden=true}
 async function completeMandatoryPasswordSetup(){const p=$('invitePassword').value,c=$('invitePasswordConfirm').value;if(!p||p.length<8)return showAuthMessage('Password must be at least 8 characters.');if(p!==c)return showAuthMessage('Passwords do not match.');const current=state.user?.user_metadata||{};const {error}=await sb.auth.updateUser({password:p,data:{...current,must_set_password:false,password_set_at:new Date().toISOString()}});if(error)return showAuthMessage(error.message);const {data:{user}}=await sb.auth.getUser();if(user)await enterApp(user)}
