@@ -19,7 +19,7 @@ function pageLines(content){const lines=[];let current='';for(const it of conten
 function titleAfter(lines,heading,stop){let i=lines.findIndex(x=>x.toUpperCase()===heading.toUpperCase());if(i<0)i=lines.findIndex(x=>x.toUpperCase().startsWith(heading.toUpperCase())&&!x.toUpperCase().includes('SHIELD SAFETY'));if(i<0)return '';const out=[];for(let j=i+1;j<Math.min(lines.length,i+7);j++){const l=clean(lines[j]);if(!l)continue;if(stop.test(l))break;if(/^(Maintenance|Department|SHIELD SAFETY)/i.test(l))continue;out.push(l);if(out.join(' ').length>140)break}return clean(out.join(' '))}
 function titleBeforeSds(lines){const i=lines.findIndex(x=>/SAFETY DATA SHEET/i.test(x));if(i<0)return '';for(let j=i-1;j>=Math.max(0,i-6);j--){const l=clean(lines[j]);if(!l||/SHIELD SAFETY|SECTION 3\.4|MAINTENANCE/i.test(l))continue;return l}return ''}
 function sdsProductName(text,lines,fileName){
-  const fromApi=api.extractSdsProductName?.(text)||'';if(fromApi)return fromApi;
+  let fromApi=api.extractSdsProductName?.(text)||'';if(/^110\/111\/112\/G136\s*-\s*FLOOR PAINT \(ALL HOUSE COLOURS\)$/i.test(fromApi))fromApi='Coo-Var Floor Paint (All House Colours) - 110/111/112/G136';if(fromApi)return fromApi;
   const labels=[
     /^(?:1\.1[.\s]*)?(?:GHS\s+)?Product\s+(?:identifier|name)\s*:?\s*(.+)$/i,
     /^Trade\s+name\s*:?\s*(.+)$/i

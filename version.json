@@ -1,6 +1,6 @@
 {
-  "version": "2.4.0",
-  "build": "v240-assignment-audiences-20260911",
+  "version": "2.4.1",
+  "build": "v241-sds-name-alignment-20260911",
   "clean": true,
   "notes": "Assignment audiences at creation for controlled RA/COSHH/SSW documents, standalone Training including Toolbox Talks, Safety Awareness and PPE. Supports Everyone, Departments and specific people, with future department members assigned automatically. Retains simplified User interface and login/button fixes."
 }
