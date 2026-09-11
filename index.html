@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles.css?v=2.3.0" />
+  <link rel="stylesheet" href="styles.css?v=2.3.1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Clean build v2.3.0 · no service worker</div>
+      <div class="build-badge">Clean build v2.3.1 · no service worker</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -51,7 +51,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.3.0</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.3.1</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -214,7 +214,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app.js?v=2.3.0"></script>
-  <script src="bulk-import.js?v=2.3.0"></script>
+  <script src="app.js?v=2.3.1"></script>
+  <script src="bulk-import.js?v=2.3.1"></script>
 </body>
 </html>

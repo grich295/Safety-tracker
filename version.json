@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "build": "departments-auto-assignment-reports-evidence-v230-20260911",
+  "version": "2.3.1",
+  "build": "qa-self-department-approved-audience-v231-20260911",
   "clean_build": true,
-  "notes": "Adds admin-managed Departments, user department assignment, automatic Everyone/Department/Person training audiences captured during controlled document approval, future-user reconciliation, and moves Person Evidence Pack creation into Reports."
+  "notes": "Fixes self department assignment for admins, adds editable training audiences to already-approved RA/COSHH/SSW documents, and retains all v2.3.0 department/evidence functionality."
 }
