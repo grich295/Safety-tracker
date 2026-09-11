@@ -1,6 +1,6 @@
 {
-  "version": "2.2.7",
-  "build": "unused-delete-hotfix-v227-20260911",
+  "version": "2.2.8",
+  "build": "pending-queue-delete-v228-20260911",
   "clean_build": true,
-  "notes": "Hotfix: unused pending documents can be permanently deleted even when Safety Tracker has created an empty auto-managed training shell. Any real assignment, attendance, sign-off, exception, review or approval evidence still blocks deletion."
+  "notes": "Pending approval documents now appear immediately below filters, index tiles are hidden in Pending approval view, and eligible pending documents show Delete unused."
 }
