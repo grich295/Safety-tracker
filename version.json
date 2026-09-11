@@ -1,6 +1,6 @@
 {
-  "version": "2.2.12",
-  "build": "simplified-documents-evidence-v2212-20260911",
+  "version": "2.3.0",
+  "build": "departments-auto-assignment-reports-evidence-v230-20260911",
   "clean_build": true,
-  "notes": "Simplified workflow: no document-link controls or link-based training blockers. Approved/current controlled documents feed Training. Incident/person evidence packs use manual multi-select with optional date range."
+  "notes": "Adds admin-managed Departments, user department assignment, automatic Everyone/Department/Person training audiences captured during controlled document approval, future-user reconciliation, and moves Person Evidence Pack creation into Reports."
 }

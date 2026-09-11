@@ -102,3 +102,13 @@
 
 /* v2.2.4 report-only access */
 .report-access[hidden],.report-manager-content[hidden]{display:none!important}
+
+
+/* v2.3.0 Departments + approval audience */
+.audience-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.audience-grid h5{margin:0 0 8px;font-size:.95rem}
+.approval-audience-card{margin-top:14px}
+.approval-audience-card .checkbox-list{max-height:220px;overflow:auto}
+.audience-everyone{padding:10px 12px;border:1px solid var(--line,#d8dee6);border-radius:10px;margin:8px 0 12px}
+.evidence-report-section{border-left:4px solid var(--accent,#2e6da4)}
+@media(max-width:760px){.audience-grid{grid-template-columns:1fr}.approval-audience-card .checkbox-list{max-height:180px}}
