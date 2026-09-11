@@ -1,4 +1,4 @@
-/* Safety Tracker v2.2.6 - pending-approval multi-document PDF pack importer (standalone final build).
+/* Safety Tracker v2.2.9 - pending-approval PDF pack importer with stricter SDS title extraction.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
@@ -35,8 +35,10 @@ function sdsProductName(text,lines,fileName){
       for(let j=i+1;j<Math.min(lines.length,i+5);j++){const v=clean(lines[j]);if(!v||/^(?:Contains|Product code|Article No|CAS No|EC No|SECTION|Page\b)/i.test(v))continue;if(v.length>2&&!/^\d+\s*\/\s*\d+$/.test(v))return v}
     }
   }
-  const before=titleBeforeSds(lines);if(before&&!/^\d+\s*\/\s*\d+$/.test(before)&&!(before.length<24&&/\)$/.test(before)&&!before.includes('(')))return before;
-  return api.safeFileName(fileName.replace(/\.pdf$/i,''));
+  const before=titleBeforeSds(lines);if(before&&!/^\d+\s*\/\s*\d+$/.test(before)&&!(before.length<24&&/\)$/.test(before)&&!before.includes('('))&&!/^(?:maintenance|sds|msds|safety data|document pack|combined|no directory)/i.test(before))return before;
+  // Never use the combined source-pack filename as an SDS title. A neutral title is safer
+  // and Force Sync can repair it later from Section 1.1, including pending-only versions.
+  return 'Manufacturer Safety Data Sheet';
 }
 function isSdsStartPage(text,lines){
   const t=String(text||''),u=t.toUpperCase();

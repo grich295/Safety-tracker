@@ -1,6 +1,6 @@
 {
-  "version": "2.2.8",
-  "build": "pending-queue-delete-v228-20260911",
+  "version": "2.2.9",
+  "build": "sds-pending-title-repair-v229-20260911",
   "clean_build": true,
-  "notes": "Pending approval documents now appear immediately below filters, index tiles are hidden in Pending approval view, and eligible pending documents show Delete unused."
+  "notes": "SDS title repair now scans pending-only versions, never falls back to combined-pack filenames, and Force Sync repairs bad SDS names from Section 1.1."
 }
