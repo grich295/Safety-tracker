@@ -1,6 +1,6 @@
 {
-  "version": "2.4.1",
-  "build": "v241-sds-name-alignment-20260911",
+  "version": "2.5.0",
+  "build": "v250-ui-training-workflow-20260911",
   "clean": true,
-  "notes": "Assignment audiences at creation for controlled RA/COSHH/SSW documents, standalone Training including Toolbox Talks, Safety Awareness and PPE. Supports Everyone, Departments and specific people, with future department members assigned automatically. Retains simplified User interface and login/button fixes."
+  "notes": "Controlled RA/COSHH/SSW training schedules are confirmed at document approval. Training tab is reserved for standalone policy/induction/refresher/ad-hoc H&S training with file upload, audience, self/instructor delivery and refresher frequency. Includes simplified User UI and consistent traffic-light guidance."
 }

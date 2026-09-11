@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles.css?v=2.4.1" />
+  <link rel="stylesheet" href="styles.css?v=2.5.0" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.4.1 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.5.0 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -52,7 +52,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.4.1</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.5.0</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -97,8 +97,8 @@
       </section>
 
       <section id="trainingView" class="view">
-        <div class="page-heading"><div><h2>Training</h2><p class="muted">All RA, COSHH, SSW, Toolbox Talk, induction, refresher and ad-hoc training.</p></div><button id="newTrainingBtn" class="primary manager-only" hidden>New training</button></div>
-        <div class="filters"><input id="trainingSearch" placeholder="Search training, reference or linked document"><select id="trainingTypeFilter"><option value="">All types</option></select><select id="trainingStatusFilter"><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="UNUSED">Unused / safe to delete</option><option value="">All statuses</option></select></div>
+        <div class="page-heading"><div><h2>Standalone Training</h2><p class="muted">Policies, inductions, refresher courses and other H&amp;S training that is not driven by a controlled RA, COSHH RA, SSW or Toolbox Talk.</p></div><button id="newTrainingBtn" class="primary manager-only" hidden>Upload training</button></div>
+        <div class="filters"><input id="trainingSearch" placeholder="Search standalone training or reference"><select id="trainingTypeFilter"><option value="">All types</option></select><select id="trainingStatusFilter"><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="UNUSED">Unused / safe to delete</option><option value="">All statuses</option></select></div>
         <div id="trainingList" class="card-list"></div>
       </section>
 
@@ -215,8 +215,8 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app.js?v=2.4.1"></script>
-  <script src="bulk-import.js?v=2.4.1"></script>
+  <script src="app.js?v=2.5.0"></script>
+  <script src="bulk-import.js?v=2.5.0"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
