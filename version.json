@@ -1,6 +1,6 @@
 {
-  "version": "2.2.9",
-  "build": "sds-pending-title-repair-v229-20260911",
+  "version": "2.2.10",
+  "build": "sds-ghs-title-repair-v2210-20260911",
   "clean_build": true,
-  "notes": "SDS title repair now scans pending-only versions, never falls back to combined-pack filenames, and Force Sync repairs bad SDS names from Section 1.1."
+  "notes": "SDS title repair now supports GHS product identifier headers, scans pending-only versions, rejects combined-pack filenames, and Force Sync repairs bad SDS names from Section 1.1."
 }

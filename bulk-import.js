@@ -1,4 +1,4 @@
-/* Safety Tracker v2.2.9 - pending-approval PDF pack importer with stricter SDS title extraction.
+/* Safety Tracker v2.2.10 - pending-approval PDF pack importer with stricter SDS title extraction.
    Splits combined RA / COSHH / SSW / TBT packs and combined manufacturer SDS/MSDS packs
    into individual records before import. */
 'use strict';
