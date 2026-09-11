@@ -1,6 +1,6 @@
 {
-  "version": "2.2.6",
-  "build": "standalone-final-v226-20260911",
+  "version": "2.2.7",
+  "build": "unused-delete-hotfix-v227-20260911",
   "clean_build": true,
-  "notes": "Final standalone hardening build: filter-consistent pending queue, stronger SDS Section 1.1 naming, Supporting vs Required training links, safe permanent delete for never-used documents, and orphaned storage cleanup. No Inventory/Safety integration included."
+  "notes": "Hotfix: unused pending documents can be permanently deleted even when Safety Tracker has created an empty auto-managed training shell. Any real assignment, attendance, sign-off, exception, review or approval evidence still blocks deletion."
 }
