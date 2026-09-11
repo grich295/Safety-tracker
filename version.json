@@ -1,6 +1,6 @@
 {
-  "version": "2.3.5",
-  "build": "v235-version-auth-redirect-20260911",
+  "version": "2.3.6",
+  "build": "v236-tbt-approval-integrity-20260911",
   "clean_build": true,
-  "notes": "Corrects all visible/runtime version labels and cache-busting to v2.3.5, retains TBT active controls and user edit/resend access, and forces password recovery emails back to the live GitHub Pages Safety Tracker URL."
+  "notes": "Restores signed approval workflow for Toolbox Talks, fixes Open/Download handlers, blocks assignment until approval, clears obsolete document-link sync warnings, and keeps current user/email fixes."
 }
