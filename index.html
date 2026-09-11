@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles.css?v=2.2.1" />
+  <link rel="stylesheet" href="styles.css?v=2.2.2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Clean build v2.2.1 · no service worker</div>
+      <div class="build-badge">Clean build v2.2.2 · no service worker</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -51,7 +51,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.2.1</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.2.2</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -59,6 +59,7 @@
       <button data-view="mySafety" class="active">My Safety</button>
       <button data-view="documents">Documents</button>
       <button data-view="training">Training</button>
+      <button data-view="awareness">Safety Awareness</button>
       <button data-view="people" class="manager-only" hidden>People</button>
       <button data-view="compliance" class="manager-only" hidden>Compliance</button>
       <button data-view="instructor" class="manager-only" hidden>Instructor</button>
@@ -72,10 +73,12 @@
         <div class="page-heading"><div><h2>My Safety</h2><p class="muted">Your assigned safety training and acknowledgements.</p></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div id="mySafetyList" class="card-list"></div>
+        <div class="section-card awareness-my-section"><div class="row-between"><div><h3>Annual Safety Awareness</h3><p class="muted">Short guidance reviews that support formal training. These are not a replacement for training, instruction or competence.</p></div><button class="secondary" type="button" data-view-awareness>Open Safety Awareness</button></div><div id="myAwarenessStats" class="stats-grid"></div><div id="myAwarenessList" class="card-list"></div></div>
       </section>
 
       <section id="documentsView" class="view">
         <div class="page-heading"><div><h2>Documents</h2><p class="muted">Controlled source library only. Training and sign-off are managed in Training.</p></div><button id="newDocumentBtn" class="primary manager-only" hidden>New document</button></div>
+        <div class="filters document-top-filters"><input id="documentSearch" placeholder="Search reference or title"><select id="documentTypeFilter"><option value="">All types</option></select><select id="documentStatusFilter"><option value="ACTIVE">Active + pending</option><option value="APPROVED">Approved/current</option><option value="PENDING">Pending approval</option><option value="REVIEW_REQUIRED">Review required / due soon</option><option value="OVERDUE">Review overdue</option><option value="ARCHIVED">Archived</option><option value="">All statuses</option></select></div>
         <div id="documentApprovalOverview" class="manager-only" hidden>
           <div class="section-card approval-overview-card">
             <div class="row-between"><div><h3>Document control</h3><p class="muted">Traffic-light status for approved/current documents, pending approvals and reviews.</p></div><div class="traffic-legend"><span class="legend green">Approved/current</span><span class="legend amber">Action required</span><span class="legend red">Overdue / not approved</span></div></div>
@@ -87,7 +90,6 @@
         <div id="documentIndexContext" class="section-card document-index-context" hidden>
           <div class="row-between"><div><h3 id="documentIndexTitle">Document index</h3><p id="documentIndexDescription" class="muted"></p></div><button id="documentIndexBackBtn" class="secondary" type="button">All indexes</button></div>
         </div>
-        <div class="filters"><input id="documentSearch" placeholder="Search reference or title"><select id="documentTypeFilter"><option value="">All types</option></select><select id="documentStatusFilter"><option value="ACTIVE">Active + pending</option><option value="APPROVED">Approved/current</option><option value="PENDING">Pending approval</option><option value="REVIEW_REQUIRED">Review required / due soon</option><option value="OVERDUE">Review overdue</option><option value="ARCHIVED">Archived</option><option value="">All statuses</option></select></div>
         <div id="documentsList" class="card-list"></div>
       </section>
 
@@ -95,6 +97,13 @@
         <div class="page-heading"><div><h2>Training</h2><p class="muted">All RA, COSHH, SSW, Toolbox Talk, induction, refresher and ad-hoc training.</p></div><button id="newTrainingBtn" class="primary manager-only" hidden>New training</button></div>
         <div class="filters"><input id="trainingSearch" placeholder="Search training, reference or linked document"><select id="trainingTypeFilter"><option value="">All types</option></select><select id="trainingStatusFilter"><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="">All statuses</option></select></div>
         <div id="trainingList" class="card-list"></div>
+      </section>
+
+      <section id="awarenessView" class="view">
+        <div class="page-heading"><div><h2>Safety Awareness</h2><p class="muted">Annual practical guidance and refresher reading. This supports, but does not replace, formal training or task-specific controls.</p></div></div>
+        <div id="awarenessStats" class="stats-grid"></div>
+        <div class="filters"><input id="awarenessSearch" placeholder="Search awareness topic"><select id="awarenessStatusFilter"><option value="">All statuses</option><option value="DUE">Review required / due soon</option><option value="OVERDUE">Overdue</option><option value="CURRENT">Up to date</option></select></div>
+        <div id="awarenessList" class="card-list"></div>
       </section>
 
       <section id="peopleView" class="view">
@@ -124,6 +133,15 @@
           <button id="reviewDatesPdfBtn" class="secondary">Review dates PDF</button>
           <button id="backupBtn" class="secondary">JSON backup</button>
           <button id="fullBackupBtn" class="primary">Full backup ZIP</button>
+        </div>
+        <div class="section-card monthly-report-section">
+          <div class="row-between"><div><h3>Monthly Safety Compliance Report</h3><p class="muted">Generate and archive a monthly PDF showing training completed, annual awareness reviews, overdue actions, approvals and controlled reviews.</p></div></div>
+          <div class="form-grid"><label>Month<input id="monthlyReportMonth" type="month"></label><label>&nbsp;<button id="generateMonthlyReportBtn" class="primary" type="button">Generate monthly report</button></label></div>
+          <div id="monthlyReportStatus" class="message" hidden></div>
+        </div>
+        <div class="section-card">
+          <div class="row-between"><div><h3>Report archive</h3><p class="muted">Previously generated monthly reports retained in Safety Tracker.</p></div></div>
+          <div id="reportArchiveList" class="card-list"></div>
         </div>
         <div class="section-card activity-audit-section">
           <div class="row-between"><div><h3>Document activity audit</h3><p class="muted">Who opened, downloaded or reviewed files, including activity outside assigned training.</p></div><button id="documentActivityPdfBtn" class="secondary" type="button">Activity audit PDF</button></div>
@@ -157,6 +175,11 @@
           <div id="bulkImportSummary" class="stats-grid bulk-summary"></div>
           <div id="bulkImportPreview" class="card-list"></div>
         </div>
+        <div class="section-card">
+          <div class="row-between"><div><h3>Scheduled Reports</h3><p class="muted">Create monthly or weekly compliance schedules. Reports are archived automatically by the server runner and can be emailed when an email provider is configured.</p></div><button id="newReportScheduleBtn" class="primary" type="button">New schedule</button></div>
+          <div class="hint-box">Monthly schedules default to the previous calendar month. Automatic email uses the optional Supabase Edge Function included in this build; manual report generation works without email setup.</div>
+          <div id="reportScheduleList" class="card-list" style="margin-top:12px"></div>
+        </div>
         <div class="section-card"><h3>Build diagnostics</h3><div id="buildDiagnostics"></div></div>
       </section>
 
@@ -169,7 +192,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app.js?v=2.2.1"></script>
-  <script src="bulk-import.js?v=2.2.1"></script>
+  <script src="app.js?v=2.2.2"></script>
+  <script src="bulk-import.js?v=2.2.2"></script>
 </body>
 </html>

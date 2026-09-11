@@ -73,3 +73,20 @@
 .traffic-register-green{border-left:6px solid #36a864;padding-left:10px}
 .pending-approval-list .item-card{box-shadow:0 2px 9px rgba(18,42,66,.05)}
 @media(max-width:760px){.traffic-legend{justify-content:flex-start}.pending-approval-head{flex-direction:column}.document-control-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v2.2.2 top filters, annual Safety Awareness and monthly reports */
+.document-top-filters{margin-top:-2px;margin-bottom:16px}
+.awareness-my-section{margin-top:20px;border-width:2px}
+#myAwarenessStats .stat,#awarenessStats .stat{position:relative;overflow:hidden;border-width:2px;min-height:100px;padding-left:19px}
+#myAwarenessStats .stat .traffic-dot,#awarenessStats .stat .traffic-dot{position:absolute;right:14px;top:14px;width:13px;height:13px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(255,255,255,.55)}
+.awareness-card,.schedule-card{border-style:solid!important;border-width:2px!important;border-left-width:8px!important;background:var(--card)!important;color:inherit!important}
+.awareness-card.traffic-green,.schedule-card.traffic-green{border-color:#36a864!important}
+.awareness-card.traffic-amber{border-color:#e0a21a!important}
+.awareness-card.traffic-red{border-color:#dc4a4a!important}
+.awareness-card.traffic-neutral,.schedule-card.traffic-neutral{border-color:#8a98a8!important}
+.awareness-sheet{display:grid;gap:14px}.awareness-kicker{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.awareness-guidance{border:1px solid var(--border);border-radius:12px;padding:14px;background:#fbfcfd;line-height:1.48}.awareness-guidance p{margin:0 0 10px}.awareness-guidance p:last-child{margin-bottom:0}.awareness-guidance-list{margin:8px 0 12px;padding-left:22px}.awareness-guidance-list li{margin:6px 0}
+.review-confirm-box{border:2px solid #d6e1ea;border-radius:12px;padding:12px;background:#f8fbfd}.button-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:10px;padding:11px 15px;font-weight:700}.button-link.secondary{background:var(--soft);color:var(--ink)}
+.monthly-report-section{border-left:6px solid var(--ink)}
+.schedule-card{margin-top:8px}
+@media(max-width:760px){.document-top-filters{position:sticky;top:53px;z-index:6;background:#f4f6f8;padding:8px 0 4px;margin-bottom:10px}#myAwarenessStats,#awarenessStats{grid-template-columns:repeat(2,minmax(0,1fr))}.awareness-my-section{padding:13px}}

@@ -1,6 +1,6 @@
 {
-  "version": "2.2.1",
+  "version": "2.2.2",
   "build": "CLEAN",
   "service_worker": false,
-  "notes": "Adds Pending Approval/Acceptance before controlled documents become usable, traffic-light status borders and a document-control approval queue. Source Training only becomes active or reissued after approval."
+  "notes": "Moves Documents filters to the top, adds Annual Safety Awareness with HSE guidance links and 12-month acknowledgements, plus monthly compliance reports, report archive and scheduled report configuration."
 }
