@@ -1,6 +1,6 @@
 {
-  "version": "2.3.7",
-  "build": "v237-simple-user-my-safety-20260911",
-  "clean_build": true,
-  "notes": "Standard Users see only My Safety, Safety Awareness, PPE Checks and Help. The Documents and Training catalogues are management-only. Completed training cards retain direct access to the current approved safety document. Backend role/RLS hardening mirrors the UI."
+  "version": "2.3.8",
+  "build": "v238-login-recovery-20260911",
+  "clean": true,
+  "notes": "Login bootstrap recovery and clearer sign-in diagnostics. Keeps v2.3.7 simplified User access."
 }
