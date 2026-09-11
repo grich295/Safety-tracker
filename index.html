@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles.css?v=2.3.6" />
+  <link rel="stylesheet" href="styles.css?v=2.3.7" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Clean build v2.3.6 · no service worker</div>
+      <div class="build-badge">Clean build v2.3.7 · no service worker</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -51,14 +51,14 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.3.6</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.3.7</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
     <nav id="mainNav" class="nav-tabs">
       <button data-view="mySafety" class="active">My Safety</button>
       <button data-view="documents">Documents</button>
-      <button data-view="training">Training</button>
+      <button data-view="training" class="manager-catalogue" hidden>Training</button>
       <button data-view="awareness">Safety Awareness</button>
       <button data-view="ppe">PPE Checks</button>
       <button data-view="people" class="manager-only" hidden>People</button>
@@ -71,7 +71,7 @@
 
     <main class="page-shell">
       <section id="mySafetyView" class="view active-view">
-        <div class="page-heading"><div><h2>My Safety</h2><p class="muted">Your assigned safety training and acknowledgements.</p></div></div>
+        <div class="page-heading"><div><h2>My Safety</h2><p class="muted">Everything you need for your own safety training. Completed items stay here so you can reopen the current safety document whenever you need it.</p></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div id="mySafetyList" class="card-list"></div>
         <div class="section-card awareness-my-section"><div class="row-between"><div><h3>Annual Safety Awareness</h3><p class="muted">Short employee-focused guidance reviews that support formal training. These are not a replacement for training, instruction or competence.</p></div><button class="secondary" type="button" data-view-awareness>Open Safety Awareness</button></div><div id="myAwarenessStats" class="stats-grid"></div><div id="myAwarenessList" class="card-list"></div></div>
@@ -79,7 +79,7 @@
       </section>
 
       <section id="documentsView" class="view">
-        <div class="page-heading"><div><h2>Documents</h2><p class="muted">Controlled source library only. Training and sign-off are managed in Training.</p></div><button id="newDocumentBtn" class="primary manager-only" hidden>New document</button></div>
+        <div class="page-heading"><div><h2>Documents</h2><p id="documentsIntro" class="muted">Approved/current safety documents for reference.</p></div><button id="newDocumentBtn" class="primary manager-only" hidden>New document</button></div>
         <div class="filters document-top-filters"><input id="documentSearch" placeholder="Search reference or title"><select id="documentTypeFilter"><option value="">All types</option></select><select id="documentStatusFilter"><option value="ACTIVE">Active + pending</option><option value="APPROVED">Approved/current</option><option value="PENDING">Pending approval</option><option value="REVIEW_REQUIRED">Review required / due soon</option><option value="OVERDUE">Review overdue</option><option value="ARCHIVED">Archived</option><option value="UNUSED">Unused / safe to delete</option><option value="">All statuses</option></select></div>
         <div id="documentApprovalOverview" class="manager-only" hidden>
           <div class="section-card approval-overview-card">
@@ -214,7 +214,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app.js?v=2.3.6"></script>
-  <script src="bulk-import.js?v=2.3.6"></script>
+  <script src="app.js?v=2.3.7"></script>
+  <script src="bulk-import.js?v=2.3.7"></script>
 </body>
 </html>
