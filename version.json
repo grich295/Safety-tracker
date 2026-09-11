@@ -1,6 +1,6 @@
 {
-  "version": "2.2.2",
-  "build": "CLEAN",
-  "service_worker": false,
-  "notes": "Moves Documents filters to the top, adds Annual Safety Awareness with HSE guidance links and 12-month acknowledgements, plus monthly compliance reports, report archive and scheduled report configuration."
+  "version": "2.2.4",
+  "build": "report-viewer-ppe-awareness-v224-20260911",
+  "clean_build": true,
+  "notes": "Adds report-only user access, report download audit and archives Monthly PPE reports; includes v2.2.3 employee awareness and configurable monthly PPE checks."
 }

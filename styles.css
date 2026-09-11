@@ -90,3 +90,15 @@
 .monthly-report-section{border-left:6px solid var(--ink)}
 .schedule-card{margin-top:8px}
 @media(max-width:760px){.document-top-filters{position:sticky;top:53px;z-index:6;background:#f4f6f8;padding:8px 0 4px;margin-bottom:10px}#myAwarenessStats,#awarenessStats{grid-template-columns:repeat(2,minmax(0,1fr))}.awareness-my-section{padding:13px}}
+
+/* v2.2.3 employee-focused awareness + configurable monthly PPE checks */
+.ppe-my-section{margin-top:20px;border-width:2px}
+#myPpeStats .stat,#ppeStats .stat{position:relative;overflow:hidden;border-width:2px;min-height:96px;padding-left:19px}
+#myPpeStats .stat .traffic-dot,#ppeStats .stat .traffic-dot{position:absolute;right:14px;top:14px;width:13px;height:13px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(255,255,255,.55)}
+.ppe-status-card{border-style:solid!important;border-width:2px!important;border-left-width:8px!important;background:var(--card)!important;color:inherit!important}
+.ppe-status-card.traffic-green{border-color:#36a864!important}.ppe-status-card.traffic-amber{border-color:#e0a21a!important}.ppe-status-card.traffic-red{border-color:#dc4a4a!important}.ppe-status-card.traffic-neutral{border-color:#8a98a8!important}
+.ppe-check-grid{display:grid;gap:12px;margin:12px 0}.ppe-check-row{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(180px,.8fr) minmax(220px,1fr);gap:12px;align-items:end;padding:12px;border:1px solid var(--border);border-radius:12px;background:#fbfcfd}.ppe-check-row label{margin:0}.ppe-chip-list{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.ppe-catalogue-list{max-height:58vh;overflow:auto}.signature-readback{margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fbfcfd}
+@media(max-width:760px){#myPpeStats,#ppeStats{grid-template-columns:repeat(2,minmax(0,1fr))}.ppe-check-row{grid-template-columns:1fr}.ppe-my-section{padding:13px}}
+
+/* v2.2.4 report-only access */
+.report-access[hidden],.report-manager-content[hidden]{display:none!important}

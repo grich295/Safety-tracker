@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles.css?v=2.2.2" />
+  <link rel="stylesheet" href="styles.css?v=2.2.3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Clean build v2.2.2 · no service worker</div>
+      <div class="build-badge">Clean build v2.2.4 · no service worker</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -51,7 +51,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.2.2</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.2.4</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -60,10 +60,11 @@
       <button data-view="documents">Documents</button>
       <button data-view="training">Training</button>
       <button data-view="awareness">Safety Awareness</button>
+      <button data-view="ppe">PPE Checks</button>
       <button data-view="people" class="manager-only" hidden>People</button>
       <button data-view="compliance" class="manager-only" hidden>Compliance</button>
       <button data-view="instructor" class="manager-only" hidden>Instructor</button>
-      <button data-view="reports" class="manager-only" hidden>Reports</button>
+      <button data-view="reports" class="report-access" hidden>Reports</button>
       <button data-view="admin" class="admin-only" hidden>Admin</button>
       <button data-view="help">Help</button>
     </nav>
@@ -73,7 +74,8 @@
         <div class="page-heading"><div><h2>My Safety</h2><p class="muted">Your assigned safety training and acknowledgements.</p></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div id="mySafetyList" class="card-list"></div>
-        <div class="section-card awareness-my-section"><div class="row-between"><div><h3>Annual Safety Awareness</h3><p class="muted">Short guidance reviews that support formal training. These are not a replacement for training, instruction or competence.</p></div><button class="secondary" type="button" data-view-awareness>Open Safety Awareness</button></div><div id="myAwarenessStats" class="stats-grid"></div><div id="myAwarenessList" class="card-list"></div></div>
+        <div class="section-card awareness-my-section"><div class="row-between"><div><h3>Annual Safety Awareness</h3><p class="muted">Short employee-focused guidance reviews that support formal training. These are not a replacement for training, instruction or competence.</p></div><button class="secondary" type="button" data-view-awareness>Open Safety Awareness</button></div><div id="myAwarenessStats" class="stats-grid"></div><div id="myAwarenessList" class="card-list"></div></div>
+        <div class="section-card ppe-my-section"><div class="row-between"><div><h3>Monthly PPE Check</h3><p class="muted">Check the PPE assigned to you by the 28th of each month so missing or damaged items can be ordered for the following month.</p></div><button class="secondary" type="button" data-view-ppe>Open PPE Checks</button></div><div id="myPpeStats" class="stats-grid"></div><div id="myPpeList" class="card-list"></div></div>
       </section>
 
       <section id="documentsView" class="view">
@@ -106,6 +108,14 @@
         <div id="awarenessList" class="card-list"></div>
       </section>
 
+      <section id="ppeView" class="view">
+        <div class="page-heading"><div><h2>Monthly PPE Checks</h2><p class="muted">Employee PPE availability and condition checks. Due by the 28th each month; this does not replace normal pre-use checks.</p></div></div>
+        <div id="ppeStats" class="stats-grid"></div>
+        <div class="filters"><input id="ppeSearch" placeholder="Search assigned PPE"><select id="ppeStatusFilter"><option value="">All statuses</option><option value="DUE">Due / overdue</option><option value="ISSUES">Issues reported</option><option value="COMPLETE">Complete</option></select></div>
+        <div id="ppeList" class="card-list"></div>
+        <div id="ppeManagerArea" class="manager-only" hidden></div>
+      </section>
+
       <section id="peopleView" class="view">
         <div class="page-heading"><div><h2>People</h2><p class="muted">Manage Safety Tracker users and roles.</p></div><button id="inviteUserBtn" class="primary admin-only" hidden>Invite user</button></div>
         <div id="peopleList" class="card-list"></div>
@@ -124,9 +134,9 @@
       </section>
 
       <section id="reportsView" class="view">
-        <div class="page-heading"><div><h2>Reports</h2><p class="muted">PDF evidence and backup exports.</p></div></div>
+        <div class="page-heading"><div><h2>Reports</h2><p class="muted">Archived safety and PPE reports available for authorised report access.</p></div></div>
         <div id="reportStats" class="stats-grid"></div>
-        <div class="button-grid">
+        <div class="button-grid report-manager-content">
           <button id="outstandingPdfBtn" class="secondary">Outstanding actions PDF</button>
           <button id="trainingMatrixPdfBtn" class="secondary">Training matrix PDF</button>
           <button id="trainingSignoffsPdfBtn" class="secondary">Training sign-offs PDF</button>
@@ -134,16 +144,16 @@
           <button id="backupBtn" class="secondary">JSON backup</button>
           <button id="fullBackupBtn" class="primary">Full backup ZIP</button>
         </div>
-        <div class="section-card monthly-report-section">
-          <div class="row-between"><div><h3>Monthly Safety Compliance Report</h3><p class="muted">Generate and archive a monthly PDF showing training completed, annual awareness reviews, overdue actions, approvals and controlled reviews.</p></div></div>
-          <div class="form-grid"><label>Month<input id="monthlyReportMonth" type="month"></label><label>&nbsp;<button id="generateMonthlyReportBtn" class="primary" type="button">Generate monthly report</button></label></div>
+        <div class="section-card monthly-report-section report-manager-content">
+          <div class="row-between"><div><h3>Monthly Safety Compliance Report</h3><p class="muted">Generate and archive a monthly PDF showing training completed, annual awareness reviews, PPE checks/issues, overdue actions, approvals and controlled reviews.</p></div></div>
+          <div class="form-grid"><label>Month<input id="monthlyReportMonth" type="month"></label><label>&nbsp;<button id="generateMonthlyReportBtn" class="primary" type="button">Generate monthly report</button></label><label>&nbsp;<button id="generatePpeReportBtn" class="secondary" type="button">Download PPE report</button></label></div>
           <div id="monthlyReportStatus" class="message" hidden></div>
         </div>
         <div class="section-card">
           <div class="row-between"><div><h3>Report archive</h3><p class="muted">Previously generated monthly reports retained in Safety Tracker.</p></div></div>
           <div id="reportArchiveList" class="card-list"></div>
         </div>
-        <div class="section-card activity-audit-section">
+        <div class="section-card activity-audit-section report-manager-content">
           <div class="row-between"><div><h3>Document activity audit</h3><p class="muted">Who opened, downloaded or reviewed files, including activity outside assigned training.</p></div><button id="documentActivityPdfBtn" class="secondary" type="button">Activity audit PDF</button></div>
           <div class="filters"><input id="activitySearch" placeholder="Search user, reference or document"><select id="activityPersonFilter"><option value="">All people</option></select><select id="activityActionFilter"><option value="">All actions</option><option value="OPENED">Opened</option><option value="DOWNLOADED">Downloaded</option><option value="REVIEWED">Reviewed</option><option value="CONTROLLED_REVIEW">Controlled review</option><option value="TRAINING_COMPLETED">Training completed</option></select></div>
           <div id="activityStats" class="stats-grid"></div>
@@ -192,7 +202,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app.js?v=2.2.2"></script>
-  <script src="bulk-import.js?v=2.2.2"></script>
+  <script src="app.js?v=2.2.3"></script>
+  <script src="bulk-import.js?v=2.2.3"></script>
 </body>
 </html>
