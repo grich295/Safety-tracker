@@ -1,6 +1,6 @@
 {
-  "version": "2.2.11",
-  "build": "required-dependency-links-v2211-20260911",
+  "version": "2.2.12",
+  "build": "simplified-documents-evidence-v2212-20260911",
   "clean_build": true,
-  "notes": "Document links can exist while pending. Linked COSHH assessments and SSWs are automatically Required for Training; Training is blocked until source and all Required documents are approved/current. Strong title matches are suggested for manager confirmation."
+  "notes": "Simplified workflow: no document-link controls or link-based training blockers. Approved/current controlled documents feed Training. Incident/person evidence packs use manual multi-select with optional date range."
 }
