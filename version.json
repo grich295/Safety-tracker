@@ -1,6 +1,6 @@
 {
-  "version": "2.3.9",
-  "build": "v239-button-actions-recovery-20260911",
+  "version": "2.4.0",
+  "build": "v240-assignment-audiences-20260911",
   "clean": true,
-  "notes": "Restores the delegated click handler accidentally omitted in v2.3.7/v2.3.8. Repairs My Safety Open safety document, Training record, sign-off and other dynamically rendered action buttons while retaining v2.3.8 login recovery and v2.3.7 role/access changes."
+  "notes": "Assignment audiences at creation for controlled RA/COSHH/SSW documents, standalone Training including Toolbox Talks, Safety Awareness and PPE. Supports Everyone, Departments and specific people, with future department members assigned automatically. Retains simplified User interface and login/button fixes."
 }
