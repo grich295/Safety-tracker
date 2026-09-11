@@ -1,6 +1,6 @@
 {
-  "version": "2.2.4",
-  "build": "report-viewer-ppe-awareness-v224-20260911",
+  "version": "2.2.5",
+  "build": "back-navigation-guard-v225-20260911",
   "clean_build": true,
-  "notes": "Adds report-only user access, report download audit and archives Monthly PPE reports; includes v2.2.3 employee awareness and configurable monthly PPE checks."
+  "notes": "Android/PWA Back navigation guard hotfix. Preserves v2.2.4 Report Viewer, PPE and awareness features."
 }
