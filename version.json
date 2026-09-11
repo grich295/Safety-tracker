@@ -1,6 +1,6 @@
 {
-  "version": "2.3.1",
-  "build": "qa-self-department-approved-audience-v231-20260911",
+  "version": "2.3.2",
+  "build": "people-edit-resend-access-v232-20260911",
   "clean_build": true,
-  "notes": "Fixes self department assignment for admins, adds editable training audiences to already-approved RA/COSHH/SSW documents, and retains all v2.3.0 department/evidence functionality."
+  "notes": "Adds full admin user editing (name, email, role and department) plus a resend access/password email action. Retains v2.3.1 departments and approved-document audience editing."
 }
