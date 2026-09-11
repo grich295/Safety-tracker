@@ -1,6 +1,6 @@
 {
-  "version": "2.2.10",
-  "build": "sds-ghs-title-repair-v2210-20260911",
+  "version": "2.2.11",
+  "build": "required-dependency-links-v2211-20260911",
   "clean_build": true,
-  "notes": "SDS title repair now supports GHS product identifier headers, scans pending-only versions, rejects combined-pack filenames, and Force Sync repairs bad SDS names from Section 1.1."
+  "notes": "Document links can exist while pending. Linked COSHH assessments and SSWs are automatically Required for Training; Training is blocked until source and all Required documents are approved/current. Strong title matches are suggested for manager confirmation."
 }
