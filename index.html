@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v289.css" />
+  <link rel="stylesheet" href="styles-v290.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -24,7 +24,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.8.9 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.9.0 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -33,7 +33,7 @@
       </form>
       <button id="forgotPasswordBtn" class="link-button" type="button">Forgot password?</button>
       <div class="security-login-note"><strong>Keep your password private.</strong> Never share your Safety Tracker password. If you think someone else may know it, use <strong>Forgot password?</strong> above to reset it immediately.</div>
-      <button id="contractorSignInBtn" class="secondary contractor-entry-button" type="button">Contractor Sign In / Permit to Work</button>
+      <button id="contractorSignInBtn" class="secondary contractor-entry-button" type="button">Contractor Sign In</button>
       <div class="demo-entry">
         <div class="demo-entry-divider"><span>or</span></div>
         <button id="tryDemoBtn" class="demo-launch-button" type="button">Try Demo</button>
@@ -52,8 +52,8 @@
 
   <main id="contractorView" class="auth-shell" hidden>
     <section class="auth-card contractor-portal-card">
-      <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Permit to Work and site sign-in.</p></div><button id="contractorBackBtn" class="ghost" type="button">Back to staff login</button></div>
-      <div class="build-badge">Safety Tracker v2.8.9 CLEAN</div>
+      <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Site sign-in, fire/life-safety, asbestos and Permit to Work screening.</p></div><button id="contractorBackBtn" class="ghost" type="button">Back to staff login</button></div>
+      <div class="build-badge">Safety Tracker v2.9.0 CLEAN</div>
       <div id="contractorPortalContent"></div>
     </section>
   </main>
@@ -61,7 +61,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.4</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.9.0</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -93,7 +93,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.4</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.9.0</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -223,7 +223,7 @@
             <label>From<input id="permitReportFrom" type="date"></label>
             <label>To<input id="permitReportTo" type="date"></label>
             <label>Status<select id="permitReportStatus"><option value="">All statuses</option><option value="AWAITING_APPROVAL">Awaiting approval</option><option value="ACTIVE">Active</option><option value="AWAITING_CLOSE">Awaiting close-out</option><option value="CLOSED">Closed</option><option value="CANCELLED">Cancelled</option></select></label>
-            <label>High-risk work<select id="permitReportWorkType"><option value="">All work types</option><option value="ELECTRICAL">Electrical work / isolation</option><option value="GAS">Gas work</option><option value="MECHANICAL">Mechanical work</option><option value="HOT_WORK">Hot work</option><option value="WORKING_AT_HEIGHT">Working at height / roof work</option><option value="CONFINED_SPACE">Confined space entry</option><option value="EXCAVATION">Excavation / ground works</option><option value="ASBESTOS_RELATED">Asbestos-related work</option><option value="DEMOLITION_STRUCTURAL">Demolition / structural work</option><option value="LIFTING">Lifting operations</option><option value="PRESSURE_SYSTEMS">Pressure systems</option><option value="OTHER">Other high-risk work</option><option value="NONE">No listed high-risk work</option></select></label>
+            <label>High-risk work<select id="permitReportWorkType"><option value="">All work types</option><option value="ELECTRICAL">Electrical work / isolation</option><option value="GAS">Gas work</option><option value="MECHANICAL">Mechanical work</option><option value="HOT_WORK">Hot work</option><option value="WORKING_AT_HEIGHT">Working at height / roof work</option><option value="CONFINED_SPACE">Confined space entry</option><option value="EXCAVATION">Excavation / ground works</option><option value="ASBESTOS_RELATED">Asbestos-related work</option><option value="DEMOLITION_STRUCTURAL">Demolition / structural work</option><option value="LIFTING">Lifting operations</option><option value="LIFT_ELEVATOR">Lift / elevator work</option><option value="PRESSURE_SYSTEMS">Pressure systems</option><option value="FIRE_SYSTEMS">Fire alarm / fire systems</option><option value="BUILDING_FABRIC">Building fabric disturbance</option><option value="OTHER">Other high-risk work</option><option value="NONE">No listed high-risk work</option></select></label>
           </div>
           <div class="actions"><button id="permitReportPreviewBtn" class="secondary" type="button">Preview report</button><button id="permitReportPdfBtn" class="primary" type="button">Download PDF</button><button id="permitReportCsvBtn" class="secondary" type="button">Download CSV</button></div>
           <div id="permitReportSummary" class="stats-grid"></div>
@@ -309,16 +309,16 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v289.js"></script>
-  <script src="bulk-import-v289.js"></script>
-  <script src="demo-v289.js"></script>
+  <script src="app-v290.js"></script>
+  <script src="bulk-import-v290.js"></script>
+  <script src="demo-v290.js"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v289.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v290.js and keep your existing config.js.';}
       }
     },3500);
   </script>
