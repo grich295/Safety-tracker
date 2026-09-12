@@ -1,6 +1,6 @@
 {
-  "version": "2.6.2",
-  "build": "v262-cache-button-recovery-20260912",
+  "version": "2.6.3",
+  "build_id": "v263-hard-button-router-password-recovery-20260912",
   "clean": true,
-  "notes": "Fixes v2.6.1 asset references that still requested cached v2.6.0 JavaScript. Forces fresh v2.6.2 assets and makes PDF Open actions Android/popup-safe. Retains restored delegated button actions and v2.6 traffic-light UI."
+  "notes": "Hard capture-phase button router; unique uncached assets; repaired password recovery/new-password flow; traffic-light UI and v2.5 workflow retained."
 }
