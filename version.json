@@ -1,6 +1,14 @@
 {
-  "version": "2.7.1",
-  "build_id": "v271-file-open-recovery-20260912",
-  "clean": true,
-  "notes": "Fixes manager/admin opening of pending controlled documents and Toolbox Talks using an authenticated Edge Function/file download fallback. Retains demo mode and repaired password recovery."
+  "version": "2.7.2",
+  "build": "v272-admin-user-offline-20260912",
+  "label": "CLEAN",
+  "features": [
+    "Admin/User interface switch",
+    "Safe read-only offline User mode",
+    "Personal offline snapshot",
+    "Offline cache for safety PDFs",
+    "Demo mode",
+    "Password recovery",
+    "Robust file open"
+  ]
 }

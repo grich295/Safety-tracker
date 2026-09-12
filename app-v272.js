@@ -1,0 +1,1733 @@
+/* Safety Tracker v2.7.2 - Admin/User view switch + safe offline user mode. */
+'use strict';
+
+const APP_VERSION='2.7.2';
+const BUILD_ID='v272-admin-user-offline-20260912';
+const SAFETY_APP_URL='https://grich295.github.io/Safety-tracker/';
+const CFG=window.SAFETY_TRACKER_CONFIG||{};
+const configured=!!(CFG.supabaseUrl&&CFG.supabaseKey&&!String(CFG.supabaseUrl).includes('PASTE_')&&!String(CFG.supabaseKey).includes('PASTE_'));
+const sb=configured?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey):null;
+
+const state={
+  user:null,profile:null,uiMode:'full',offline:!navigator.onLine,offlineSnapshotAt:null,people:[],documents:[],versions:[],documentLinks:[],documentReviews:[],
+  training:[],trainingAssignments:[],trainingSignoffs:[],trainingExceptions:[],trainingConfirmations:[],trainingFiles:[],trainingDocumentLinks:[],
+  historicalDocAssignments:[],historicalDocSignoffs:[],historicalDocConfirmations:[],documentActivity:[],
+  awarenessItems:[],awarenessAssignments:[],awarenessActivity:[],ppeItems:[],ppeAssignments:[],ppeChecks:[],ppeCheckItems:[],ppeAlertQueue:[],reportSchedules:[],generatedReports:[],reportEmailLog:[],
+  departments:[],userDepartments:[],documentAudiences:[],trainingAudiences:[],awarenessAudiences:[],ppeAudiences:[],
+  settings:[],loadErrors:{},syncBusy:false,documentIndex:'ALL',storageOrphans:[]
+};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const daysFromNow=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const plusYear=iso=>{const d=new Date((iso||todayISO())+'T12:00:00');d.setFullYear(d.getFullYear()+1);return d.toISOString().slice(0,10)};
+const fmtDate=d=>d?new Date(String(d).length===10?d+'T00:00:00':d).toLocaleDateString('en-GB'):'—';
+const fmtDateTime=d=>d?new Date(d).toLocaleString('en-GB'):'—';
+const actualIsAdmin=()=>state.profile?.role==='admin'&&state.profile?.report_only!==true;
+const actualIsManager=()=>['admin','manager'].includes(state.profile?.role)&&state.profile?.report_only!==true;
+const isReportViewer=()=>state.profile?.report_only===true;
+const isUserViewMode=()=>actualIsAdmin()&&(state.offline||state.uiMode==='user');
+const effectiveRole=()=>isReportViewer()?'report_viewer':isUserViewMode()?'user':(state.profile?.role||'user');
+const isManager=()=>['admin','manager'].includes(effectiveRole())&&!isReportViewer();
+const isAdmin=()=>effectiveRole()==='admin'&&!isReportViewer();
+const isStandardUser=()=>effectiveRole()==='user'&&!isReportViewer();
+const canViewReports=()=>isManager()||isReportViewer();
+const modeStorageKey=uid=>`safetyTrackerUiMode:${uid||'unknown'}`;
+function preferredUiMode(){if(!actualIsAdmin())return 'full';try{return localStorage.getItem(modeStorageKey(state.user?.id))==='user'?'user':'full'}catch{return 'full'}}
+function applyViewModeUi(){
+  const offline=state.offline||!navigator.onLine;
+  document.querySelectorAll('.manager-only').forEach(el=>el.hidden=!isManager());
+  document.querySelectorAll('.admin-only').forEach(el=>el.hidden=!isAdmin());
+  document.querySelectorAll('#mainNav button[data-view]').forEach(b=>b.hidden=!canAccessView(b.dataset.view));
+  const role=$('currentUserRole');if(role)role.textContent=isReportViewer()?'Report Viewer':isUserViewMode()?'User mode':actualIsAdmin()?'Admin':actualIsManager()?'Manager':'User';
+  const sw=$('adminUserModeBtn');if(sw){sw.hidden=!actualIsAdmin();sw.disabled=offline;sw.textContent=isUserViewMode()?'Return to Admin':'Switch to User';sw.title=offline?'Offline mode is already restricted to the safe User view.':'Change only the interface; your account and audit identity stay Admin.'}
+  const banner=$('offlineBanner');if(banner){banner.hidden=!offline;banner.innerHTML=`<strong>Offline mode:</strong> saved My Safety, Awareness and PPE information is available read-only. Previously saved safety PDFs can be opened. Reconnect to sign, acknowledge, submit checks or use management functions.${state.offlineSnapshotAt?` <span>Saved ${fmtDateTime(state.offlineSnapshotAt)}</span>`:''}`}
+}
+function toggleAdminUserMode(){
+  if(!actualIsAdmin())return;
+  if(state.offline||!navigator.onLine)return toast('Offline mode already uses the safe User view. Reconnect to return to Admin mode.');
+  state.uiMode=isUserViewMode()?'full':'user';
+  try{localStorage.setItem(modeStorageKey(state.user?.id),state.uiMode)}catch{}
+  applyViewModeUi();
+  const target=canAccessView(currentViewName)?currentViewName:'mySafety';
+  showView(target,{push:false});
+  renderMySafety();renderAwareness();renderPpe();renderHelp();
+  toast(state.uiMode==='user'?'User mode on — your account remains Admin.':'Admin mode restored.');
+}
+const STANDARD_USER_VIEWS=new Set(['mySafety','awareness','ppe','help']);
+const MANAGER_VIEWS=new Set(['mySafety','documents','training','awareness','ppe','people','compliance','instructor','reports','help']);
+const ADMIN_VIEWS=new Set([...MANAGER_VIEWS,'admin']);
+function canAccessView(name){if(isReportViewer())return name==='reports';if(isAdmin())return ADMIN_VIEWS.has(name);if(isManager())return MANAGER_VIEWS.has(name);return STANDARD_USER_VIEWS.has(name)}
+const activePeople=()=>state.people.filter(p=>p.active!==false&&p.report_only!==true);
+const activeDepartments=()=>state.departments.filter(d=>d.active!==false).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+const departmentName=id=>state.departments.find(d=>d.id===id)?.name||'No department';
+const userDepartmentRow=userId=>state.userDepartments.find(x=>x.user_id===userId)||null;
+const userDepartmentId=userId=>userDepartmentRow(userId)?.department_id||null;
+const userDepartmentName=userId=>{const id=userDepartmentId(userId);return id?departmentName(id):'No department'};
+const audienceRowsForDocument=documentId=>state.documentAudiences.filter(x=>x.document_id===documentId);
+const audienceTargetsForDocument=documentId=>{const rows=audienceRowsForDocument(documentId);return {everyone:rows.some(x=>x.target_type==='EVERYONE'),departmentIds:new Set(rows.filter(x=>x.target_type==='DEPARTMENT'&&x.department_id).map(x=>x.department_id)),userIds:new Set(rows.filter(x=>x.target_type==='PERSON'&&x.user_id).map(x=>x.user_id)),dueDays:Number(rows.find(x=>x.due_days)?.due_days||14)}};
+function documentAudiencePeople(documentId){const a=audienceTargetsForDocument(documentId),people=activePeople();if(a.everyone)return people;return people.filter(p=>a.userIds.has(p.id)||(userDepartmentId(p.id)&&a.departmentIds.has(userDepartmentId(p.id))))}
+function documentAudienceSummary(documentId){const a=audienceTargetsForDocument(documentId);if(!audienceRowsForDocument(documentId).length)return 'No automatic audience';if(a.everyone)return `Everyone · ${documentAudiencePeople(documentId).length} active user${documentAudiencePeople(documentId).length===1?'':'s'}`;const parts=[];if(a.departmentIds.size)parts.push(`${a.departmentIds.size} department${a.departmentIds.size===1?'':'s'}`);if(a.userIds.size)parts.push(`${a.userIds.size} person${a.userIds.size===1?'':'s'}`);parts.push(`${documentAudiencePeople(documentId).length} matched user${documentAudiencePeople(documentId).length===1?'':'s'}`);return parts.join(' · ')}
+function audienceRowsFor(kind,id){const map={TRAINING:state.trainingAudiences,AWARENESS:state.awarenessAudiences,PPE:state.ppeAudiences};const key={TRAINING:'training_session_id',AWARENESS:'awareness_item_id',PPE:'ppe_item_id'}[kind];return (map[kind]||[]).filter(x=>x[key]===id)}
+function audienceTargetsFromRows(rows){return {everyone:rows.some(x=>x.target_type==='EVERYONE'),departmentIds:new Set(rows.filter(x=>x.target_type==='DEPARTMENT'&&x.department_id).map(x=>x.department_id)),userIds:new Set(rows.filter(x=>x.target_type==='PERSON'&&x.user_id).map(x=>x.user_id)),dueDays:Number(rows.find(x=>x.due_days)?.due_days||14)}}
+function genericAudienceHtml(prefix,rows=[],opts={}){const a=audienceTargetsFromRows(rows),showDue=opts.showDue!==false,heading=opts.heading||'Assignment audience',help=opts.help||'Choose who this applies to now. Department rules also apply automatically to future active users added to that department.';const deps=activeDepartments().map(d=>`<label class="check-row"><input type="checkbox" class="${prefix}-department-choice" value="${d.id}" ${a.departmentIds.has(d.id)?'checked':''}>${esc(d.name)}</label>`).join('')||'<span class="muted">No active departments. Create one in Admin → Departments.</span>';const ppl=activePeople().map(p=>`<label class="check-row"><input type="checkbox" class="${prefix}-person-choice" value="${p.id}" ${a.userIds.has(p.id)?'checked':''}>${esc(p.display_name||p.email)} <span class="muted">· ${esc(userDepartmentName(p.id))}</span></label>`).join('')||'<span class="muted">No active users.</span>';return `<div id="${prefix}AudienceSection" class="section-card approval-audience-card"><h4>${esc(heading)}</h4><p class="muted">${esc(help)}</p><label class="check-row audience-everyone"><input id="${prefix}AssignEveryone" type="checkbox" ${a.everyone?'checked':''}> <strong>Everyone</strong> — all current and future active users</label>${showDue?`<div class="form-grid"><label>Completion due after assignment<input id="${prefix}AssignDueDays" type="number" min="1" max="365" value="${a.dueDays||14}"><span class="muted">days</span></label></div>`:''}<div class="audience-grid"><div><h5>Departments</h5><div class="checkbox-list">${deps}</div></div><div><h5>Specific people</h5><div class="checkbox-list">${ppl}</div></div></div><div id="${prefix}AudienceSummary" class="hint-box"></div></div>`}
+function genericAudienceSelection(prefix,showDue=true){return {everyone:!!$(prefix+'AssignEveryone')?.checked,departmentIds:[...document.querySelectorAll('.'+prefix+'-department-choice:checked')].map(x=>x.value),userIds:[...document.querySelectorAll('.'+prefix+'-person-choice:checked')].map(x=>x.value),dueDays:showDue?Math.max(1,Math.min(365,Number($(prefix+'AssignDueDays')?.value||14))):14}}
+function wireGenericAudience(prefix,showDue=true){const section=$(prefix+'AudienceSection');if(!section)return;const update=()=>{const a=genericAudienceSelection(prefix,showDue),ids=new Set();document.querySelectorAll('.'+prefix+'-department-choice,.'+prefix+'-person-choice').forEach(x=>x.disabled=a.everyone);if(a.everyone)activePeople().forEach(p=>ids.add(p.id));else activePeople().forEach(p=>{const dep=userDepartmentId(p.id);if((dep&&a.departmentIds.includes(dep))||a.userIds.includes(p.id))ids.add(p.id)});const box=$(prefix+'AudienceSummary');if(box)box.innerHTML=ids.size?`<strong>${ids.size} active user${ids.size===1?'':'s'} matched.</strong> Department membership will keep this audience current automatically.`:'<strong>No audience selected.</strong> Choose Everyone, a Department, or a specific person before saving.'};section.addEventListener('change',update);update()}
+function audienceSelectionValid(a){return !!(a?.everyone||a?.departmentIds?.length||a?.userIds?.length)}
+function audienceSummaryFromRows(rows){const a=audienceTargetsFromRows(rows);if(!rows.length)return 'No audience';if(a.everyone)return 'Everyone';const bits=[];if(a.departmentIds.size)bits.push(`${a.departmentIds.size} department${a.departmentIds.size===1?'':'s'}`);if(a.userIds.size)bits.push(`${a.userIds.size} person${a.userIds.size===1?'':'s'}`);return bits.join(' + ')||'No audience'}
+const sourceDocTypes=new Set(['RISK_ASSESSMENT','COSHH','SSW']);
+const trainingKinds=['RISK_ASSESSMENT','COSHH','SSW','TOOLBOX_TALK','INDUCTION','REFRESHER','AD_HOC','OTHER'];
+const standaloneTrainingKinds=['INDUCTION','REFRESHER','AD_HOC','OTHER'];
+const refRx=/\b(?:COSHH\s*RA|COSHHRA|COSHH|RA|SSW|TBT|PROC|SDS|MSDS)[\s_-]*\d{1,4}\b/gi;
+const documentIndexDefs={
+  RISK_ASSESSMENT:{title:'Risk Assessment Index',short:'Risk Assessments',description:'Controlled risk assessments, current versions and review dates.'},
+  COSHH:{title:'COSHH Risk Assessment Index',short:'COSHH Risk Assessments',description:'COSHH assessments only — kept separate from manufacturer MSDS/Safety Data Sheets.'},
+  SSW:{title:'Safe System of Work Index',short:'Safe Systems of Work',description:'Controlled SSW documents and current versions.'},
+  SDS:{title:'MSDS / Safety Data Sheet Index',short:'MSDS / Safety Data Sheets',description:'Manufacturer safety data sheets only. These are reference documents, not COSHH risk assessments.'},
+  TOOLBOX_TALK:{title:'Toolbox Talk Index',short:'Toolbox Talks',description:'Toolbox Talk source files are indexed here while completion and sign-off stay in Training.'}
+};
+
+function toast(msg){const t=$('toast');if(!t)return;t.textContent=msg;t.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.hidden=true,4200)}
+function showAuthMessage(msg){$('authMessage').textContent=msg;$('authMessage').hidden=false}
+function btn(label,cls='secondary',attrs=''){return `<button type="button" class="${cls}" ${attrs}>${esc(label)}</button>`}
+
+function trafficPriority(t){return ({red:0,amber:1,green:2,neutral:3})[t]??4}
+function statusChip(label,traffic='neutral'){return `<span class="status-chip status-${traffic}"><span class="status-dot" aria-hidden="true"></span>${esc(label)}</span>`}
+function moreActions(html,label='More'){return html?`<details class="card-more"><summary>${esc(label)}</summary><div class="more-actions">${html}</div></details>`:''}
+function assignmentTraffic(status,depsReady=true){if(!depsReady)return 'red';if(status?.code==='OVERDUE')return 'red';if(status?.code==='COMPLETED')return 'green';return 'amber'}
+function trainingOperationalTraffic(t){
+  const base=trainingCatalogueTraffic(t);
+  if(base==='red'||base==='neutral')return base;
+  const assigns=state.trainingAssignments.filter(a=>a.training_session_id===t.id&&a.active!==false);
+  if(assigns.some(a=>assignmentStatus(a,t).code==='OVERDUE'))return 'red';
+  if(base==='amber'||assigns.some(a=>assignmentStatus(a,t).code!=='COMPLETED'))return 'amber';
+  return 'green';
+}
+
+// Installed Android PWAs can open with only one browser-history entry. Keep a
+// protected in-app root plus normal view/modal entries so Back navigates within
+// Safety Tracker instead of immediately closing the installed app.
+let navigationReady=false;
+let currentViewName='mySafety';
+const safetyNavState=(extra={})=>({safetyTracker:true,view:currentViewName,modal:false,guard:false,...extra});
+function seedSafetyNavigation(initialView){
+  currentViewName=initialView||'mySafety';
+  const st=history.state;
+  if(!st?.safetyTracker){
+    history.replaceState(safetyNavState({view:currentViewName,guard:true,modal:false}),'',location.href);
+    history.pushState(safetyNavState({view:currentViewName,guard:false,modal:false}),'',location.href);
+  }else if(st.guard){
+    history.pushState(safetyNavState({view:currentViewName,guard:false,modal:false}),'',location.href);
+  }else{
+    history.replaceState({...st,...safetyNavState({view:currentViewName,guard:false,modal:false})},'',location.href);
+  }
+  navigationReady=true;
+}
+function openModal(title,html){
+  const modal=$('modal');
+  const wasOpen=!!modal?.open;
+  $('modalTitle').textContent=title;
+  $('modalBody').innerHTML=html;
+  if(!wasOpen)modal.showModal();
+  if(navigationReady&&!wasOpen&&!history.state?.modal){
+    history.pushState(safetyNavState({view:currentViewName,modal:true,guard:false}),'',location.href);
+  }
+}
+function closeModal(fromPopstate=false){
+  if($('modal')?.open)$('modal').close();
+  if(!fromPopstate&&navigationReady&&history.state?.safetyTracker&&history.state.modal)history.back();
+}
+function handleSafetyPopstate(e){
+  if(!navigationReady)return;
+  if($('modal')?.open)closeModal(true);
+  const st=e.state;
+  const root=isReportViewer()?'reports':'mySafety';
+  if(st?.safetyTracker){
+    if(st.guard){
+      currentViewName=root;
+      showView(root,{push:false});
+      history.pushState(safetyNavState({view:root,modal:false,guard:false}),'',location.href);
+      return;
+    }
+    currentViewName=st.view||root;
+    showView(currentViewName,{push:false});
+    return;
+  }
+  currentViewName=root;
+  showView(root,{push:false});
+  history.pushState(safetyNavState({view:root,modal:false,guard:false}),'',location.href);
+}
+function docTypeLabel(type){return ({RISK_ASSESSMENT:'Risk Assessment',COSHH:'COSHH Risk Assessment',SSW:'Safe System of Work',SDS:'MSDS / Safety Data Sheet',POLICY:'Policy',PROCEDURE:'Procedure',OTHER:'Other'})[type]||String(type||'')}
+function kindLabel(type){return ({RISK_ASSESSMENT:'Risk Assessment',COSHH:'COSHH Risk Assessment',SSW:'Safe System of Work',TOOLBOX_TALK:'Toolbox Talk',INDUCTION:'Induction',REFRESHER:'Refresher',AD_HOC:'Ad-hoc training',OTHER:'Policy / general H&S / other'})[type]||String(type||'Training').replaceAll('_',' ')}
+function deliveryText(v){return v==='INSTRUCTOR_LED'?'Instructor-led':'Self-training'}
+function defaultTrainingDelivery(type){return ['SSW','TOOLBOX_TALK','INDUCTION'].includes(type)?'INSTRUCTOR_LED':'SELF_TRAINING'}
+function sourceDelivery(docType){return docType==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING'}
+function defaultSourceRenewal(docType){return ['RISK_ASSESSMENT','COSHH'].includes(docType)?{value:12,unit:'MONTHS'}:{value:null,unit:null}}
+function renewalText(v,u,onChangeOnly=false){return v&&u?`Every ${v} ${String(u).toLowerCase()}`:(onChangeOnly?'On change only':'One-off')}
+function addRenewal(date,v,u){if(!date||!v||!u)return null;const d=new Date(date);if(u==='DAYS')d.setDate(d.getDate()+Number(v));if(u==='MONTHS')d.setMonth(d.getMonth()+Number(v));if(u==='YEARS')d.setFullYear(d.getFullYear()+Number(v));return d.toISOString()}
+function versionApprovalStatus(v){return String(v?.approval_status||'APPROVED').toUpperCase()}
+function isVersionApproved(v){return !!v&&versionApprovalStatus(v)==='APPROVED'}
+function currentVersion(docId){return state.versions.find(v=>v.document_id===docId&&v.status==='CURRENT')||null}
+function approvedCurrentVersion(docId){const v=currentVersion(docId);return isVersionApproved(v)?v:null}
+function latestVersion(docId){return state.versions.filter(v=>v.document_id===docId).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null}
+function pendingApprovalVersions(docId){return state.versions.filter(v=>v.document_id===docId&&versionApprovalStatus(v)==='PENDING').sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))}
+function pendingApprovalVersion(docId){return pendingApprovalVersions(docId)[0]||null}
+function rejectedVersion(docId){return state.versions.filter(v=>v.document_id===docId&&versionApprovalStatus(v)==='REJECTED').sort((a,b)=>new Date(b.approval_at||b.created_at||0)-new Date(a.approval_at||a.created_at||0))[0]||null}
+function documentHasApprovedCurrent(d){return !!d&&d.status!=='ARCHIVED'&&!!approvedCurrentVersion(d.id)}
+function trainingSourceVersion(t){return t?.source_document_version_id?state.versions.find(v=>v.id===t.source_document_version_id)||null:null}
+function trainingSourceApproved(t){const v=trainingSourceVersion(t);return !v||isVersionApproved(v)}
+function versionApprovalLabel(v,d=null){const st=versionApprovalStatus(v);if(st==='APPROVED')return d?.doc_type==='SDS'?'Accepted/current':'Approved/current';if(st==='PENDING')return d?.doc_type==='SDS'?'Pending acceptance':'Pending approval';if(st==='REJECTED')return d?.doc_type==='SDS'?'Not accepted':'Not approved';return st}
+function documentTraffic(d){if(!d||d.status==='ARCHIVED')return 'neutral';const approved=approvedCurrentVersion(d.id),pending=pendingApprovalVersion(d.id),rejected=rejectedVersion(d.id);if(!approved&&rejected&&!pending)return 'red';if(pending)return 'amber';if(!approved)return 'red';if(approved.review_date&&approved.review_date<todayISO())return 'red';if(d.review_required||(approved.review_date&&approved.review_date>=todayISO()&&approved.review_date<=daysFromNow(30)))return 'amber';return 'green'}
+function personName(id){const p=state.people.find(x=>x.id===id);return p?.display_name||p?.email||'Unknown user'}
+function trainingReference(t){return t?.reference||(String(t?.name||'').match(/\bTBT-\d{3}\b/i)?.[0]?.toUpperCase()||'')}
+function trainingKind(t){return t?.source_kind||t?.session_type||'OTHER'}
+function sourceForTraining(t){return state.documents.find(d=>d.id===t?.source_document_id)||null}
+function trainingLinks(tid){return state.trainingDocumentLinks.filter(l=>l.training_session_id===tid)}
+function linkedTrainingDocs(tid){return trainingLinks(tid).map(l=>({link:l,doc:state.documents.find(d=>d.id===l.document_id)})).filter(x=>x.doc)}
+function defaultTrainingLinkRole(doc,sourceId=null){if(!doc)return 'RELATED';if(doc.id===sourceId)return 'SOURCE';return ['COSHH','SSW'].includes(doc.doc_type)?'REQUIRED':'RELATED'}
+function documentApprovalSummary(d){
+  const approved=approvedCurrentVersion(d?.id),pending=pendingApprovalVersion(d?.id);
+  if(approved&&pending)return {ready:true,label:`${d?.doc_type==='SDS'?'Accepted':'Approved'} current · replacement pending`,traffic:'amber',version:approved};
+  if(approved)return {ready:true,label:d?.doc_type==='SDS'?'Accepted/current':'Approved/current',traffic:'green',version:approved};
+  if(pending)return {ready:false,label:d?.doc_type==='SDS'?'Pending acceptance':'Pending approval',traffic:'amber',version:pending};
+  return {ready:false,label:'No approved/current version',traffic:'red',version:latestVersion(d?.id)};
+}
+function trainingDependencyState(t){
+  const reasons=[];
+  if(!t)return {ready:false,reasons:['Training record not found'],required:[]};
+  if(t.source_document_id){
+    const src=state.documents.find(d=>d.id===t.source_document_id),approved=approvedCurrentVersion(t.source_document_id);
+    if(!approved||approved.id!==t.source_document_version_id)reasons.push(`${src?.reference||src?.title||'Controlled source'} is not approved/current`);
+  }
+  return {ready:reasons.length===0,reasons,required:[]};
+}
+function trainingDependencyMessage(t){const d=trainingDependencyState(t);return d.ready?'':`Training is not live until its controlled source is approved/current: ${d.reasons.join('; ')}`}
+function linksForDocument(did){return state.documentLinks.filter(l=>l.source_document_id===did||l.target_document_id===did)}
+function otherDocForLink(link,did){return state.documents.find(d=>d.id===(link.source_document_id===did?link.target_document_id:link.source_document_id))}
+function pairExists(a,b){return state.documentLinks.some(l=>(l.source_document_id===a&&l.target_document_id===b)||(l.source_document_id===b&&l.target_document_id===a))}
+function inferLinkType(a,b){
+  if(a?.doc_type==='SDS'&&b?.doc_type==='COSHH')return {source:a,target:b,type:'SDS_TO_COSHH'};
+  if(a?.doc_type==='COSHH'&&b?.doc_type==='SDS')return {source:b,target:a,type:'SDS_TO_COSHH'};
+  if(a?.doc_type==='COSHH'&&b?.doc_type==='SSW')return {source:a,target:b,type:'COSHH_TO_SSW'};
+  if(a?.doc_type==='SSW'&&b?.doc_type==='COSHH')return {source:b,target:a,type:'COSHH_TO_SSW'};
+  if(a?.doc_type==='RISK_ASSESSMENT'&&b?.doc_type==='SSW')return {source:a,target:b,type:'RA_TO_SSW'};
+  if(a?.doc_type==='SSW'&&b?.doc_type==='RISK_ASSESSMENT')return {source:b,target:a,type:'RA_TO_SSW'};
+  return {source:a,target:b,type:'RELATED'};
+}
+function linkTypeLabel(t){return ({SDS_TO_COSHH:'SDS/MSDS → COSHH',COSHH_TO_SSW:'COSHH → SSW',RA_TO_SSW:'RA → SSW',RELATED:'Related document'})[t]||t}
+
+function canonicalRef(raw){
+  const s=clean(raw).toUpperCase().replace(/_/g,' ').replace(/\s+/g,' ').replace(/^COSHH\s*RA\b/,'COSHH ').replace(/^COSHHRA\b/,'COSHH ');
+  const m=s.match(/^(COSHH|RA|SSW|TBT|PROC|SDS|MSDS)[\s-]*(\d{1,4})$/);
+  if(!m)return clean(raw).toUpperCase();
+  const digits=m[2].length<3?m[2].padStart(3,'0'):m[2];
+  const prefix=m[1]==='MSDS'?'SDS':m[1];
+  return `${prefix}-${digits}`;
+}
+function normalisedPhrase(s){
+  return clean(s).toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function normalisedProductName(s){
+  return normalisedPhrase(s)
+    .replace(/\b(?:safety|data|sheet|sds|msds|coshh|risk|assessment|current|official|manufacturer|supplier|product|name|identifier|trade|brand|version|revision|date|gb|uk|en|eu|as|used)\b/g,' ')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:ml|millilitres?|l|litres?|g|grams?|kg|kilograms?)\b/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+function productMatchTokens(s){
+  const stop=new Set(['safety','data','sheet','sds','msds','coshh','risk','assessment','current','official','manufacturer','supplier','product','name','identifier','trade','brand','version','revision','date','the','and','for','with','from','this','that','use','using','of','to','in','on','a','an','gb','uk','en','eu','as','used']);
+  return normalisedPhrase(s).split(' ').filter(w=>w.length>1&&!stop.has(w)&&!/^(?:ml|kg|mg|litre|litres|gram|grams)$/.test(w));
+}
+function productNameMatchScore(a,b){
+  const A=productMatchTokens(a),B=productMatchTokens(b);
+  if(!A.length||!B.length)return 0;
+  const na=normalisedProductName(a),nb=normalisedProductName(b);
+  if(na&&nb&&(na===nb||na.includes(nb)||nb.includes(na)))return 1;
+  const bs=new Set(B),common=[...new Set(A.filter(x=>bs.has(x)))];
+  const coverage=common.length/Math.max(1,Math.min(new Set(A).size,new Set(B).size));
+  const union=new Set([...A,...B]).size;
+  const jaccard=common.length/Math.max(1,union);
+  const distinctive=common.some(x=>x.length>=5||/\d/.test(x));
+  if(!distinctive)return 0;
+  return Math.min(0.99,coverage*0.78+jaccard*0.22);
+}
+function extractCoshhProductCandidates(text,owner=null){
+  const raw=clean(text),out=[];
+  if(owner?.title)out.push(owner.title);
+  const patterns=[
+    /\bName of Substance\s*:?\s*([\s\S]{3,140}?)(?=\s+Brand\s*:|\s+Where is SDS|\s+Substance Details|\s+Form\s*:)/ig,
+    /\bCurrent\s+(?:[A-Za-z0-9&./'() -]+?\s+)?(?:GB(?:-en)?|UK|EU)?\s*SDS\s*:\s*([\s\S]{3,120}?)(?=\s+(?:product codes?|UFI|revision|version|classification|signal word|precautions|\bH\d{3}\b)|[.;])/ig,
+    /\b(?:SDS|MSDS|Safety Data Sheet)\s+(?:for|covering)\s+([\s\S]{3,100}?)(?=[.;]|\s+(?:version|revision|dated|date)\b)/ig
+  ];
+  for(const rx of patterns){let m;while((m=rx.exec(raw))!==null){const c=cleanSdsCandidate(m[1]);if(c&&!isBadSdsTitle(c))out.push(c);if(out.length>=12)break}}
+  return [...new Set(out.map(clean).filter(Boolean))];
+}
+function coshhMatchesSds(text,owner,sdsDoc){
+  const aliases=[sdsDoc?.title,documentDisplayTitle(sdsDoc),stripPdfName(originalBulkSourceName(currentVersion(sdsDoc?.id)))].map(clean).filter(Boolean);
+  const hay=normalisedProductName(text);
+  let best=0;
+  for(const alias of aliases){
+    const na=normalisedProductName(alias);
+    if(na&&na.length>=4&&hay.includes(na))best=Math.max(best,1);
+  }
+  const candidates=extractCoshhProductCandidates(text,owner);
+  for(const c of candidates)for(const alias of aliases)best=Math.max(best,productNameMatchScore(c,alias));
+  return best;
+}
+function significantLinkWords(s){
+  const stop=new Set(['risk','assessment','coshh','safe','system','work','safety','data','sheet','msds','sds','document','documents','procedure','policy','version','the','and','for','with','from','this','that','use','using','of','to','in','on','a','an']);
+  return normalisedPhrase(s).split(' ').filter(w=>w.length>2&&!stop.has(w));
+}
+function linkContextText(text){
+  const raw=clean(text);
+  // Only use text around wording that actually declares a relationship. This avoids
+  // creating links merely because another document type is mentioned somewhere.
+  const markers=/\b(?:RELATED DOCUMENTS?|LINKED DOCUMENTS?|ASSOCIATED DOCUMENTS?|REFERENCE DOCUMENTS?|REFERENCES?|SUPPORTING DOCUMENTS?|RELEVANT DOCUMENTS?|APPLICABLE DOCUMENTS?|DOCUMENTS? REFERENCED|SEE ALSO|REFER TO|REFERRED TO|LINKED TO|ASSOCIATED WITH|RELATED CONTROLS?|SUPPORTING CONTROLS?|RELATED ASSESSMENTS?|RELEVANT RA(?:S)?|RELEVANT RISK ASSESSMENTS?|RELEVANT COSHH(?: RISK ASSESSMENTS?)?|APPLICABLE RA(?:S)?|APPLICABLE RISK ASSESSMENTS?|APPLICABLE COSHH(?: RISK ASSESSMENTS?)?|SUPPORTING (?:RA|RISK ASSESSMENTS?|COSHH(?: RISK ASSESSMENTS?)?|SSW|SAFE SYSTEMS? OF WORK|TBT|TOOLBOX TALKS?|DOCUMENTS?|CONTROLS?)|RELATED (?:RA|RISK ASSESSMENTS?|COSHH(?: RISK ASSESSMENTS?)?|SSW|SAFE SYSTEMS? OF WORK|TBT|TOOLBOX TALKS?|CONTROLS?)|LINKED (?:RA|RISK ASSESSMENTS?|COSHH(?: RISK ASSESSMENTS?)?|SSW|SAFE SYSTEMS? OF WORK|TBT|TOOLBOX TALKS?)|(?:RA|RISK ASSESSMENT|COSHH|SSW|SAFE SYSTEM OF WORK|TBT|TOOLBOX TALK) REFERENCES?)\b/gi;
+  const chunks=[]; let m;
+  while((m=markers.exec(raw))!==null){
+    chunks.push(raw.slice(Math.max(0,m.index-140),Math.min(raw.length,m.index+760)));
+    if(chunks.length>=50)break;
+  }
+  return chunks.join(' | ');
+}
+function declaredRefsForLinking(text,owner=null){
+  const refs=new Set(refsInText(linkContextText(text)));
+  const ownerRef=canonicalRef(owner?.reference||'');
+  if(ownerRef)refs.delete(ownerRef);
+  return [...refs];
+}
+function referencedTrainingByRef(ref){
+  const c=canonicalRef(ref);
+  return activeTraining().find(t=>canonicalRef(trainingReference(t))===c)||null;
+}
+function referencedDocumentByRef(ref){
+  const c=canonicalRef(ref);
+  return state.documents.find(d=>d.status!=='ARCHIVED'&&canonicalRef(d.reference||'')===c)||null;
+}
+function missingDeclaredRefs(text,owner=null){
+  return declaredRefsForLinking(text,owner).filter(ref=>!referencedDocumentByRef(ref)&&!referencedTrainingByRef(ref));
+}
+function textMentionsDocumentTitle(text,title){
+  const hay=normalisedPhrase(text), needle=normalisedPhrase(title);
+  if(!hay||!needle||needle.length<4)return false;
+  const words=significantLinkWords(title);
+  const distinctive=words.length>=2 || /\d/.test(needle) || needle.length>=12;
+  return distinctive && hay.includes(needle);
+}
+function declaredDocumentMatches(text,owner=null){
+  // Link discovery is independent of approval. Pending controlled documents can be
+  // related immediately; approval controls whether Training is allowed to go live.
+  const active=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.id!==owner?.id);
+  const refs=new Set(declaredRefsForLinking(text,owner));
+  const contexts=linkContextText(text);
+  const hasSdsCue=/\b(?:SDS|MSDS|SAFETY DATA SHEET|MATERIAL SAFETY DATA SHEET)\b/i.test(text);
+  const out=[];
+  for(const d of active){
+    const cref=canonicalRef(d.reference||'');
+    let reason='';
+    if(cref&&refs.has(cref))reason='reference stated in linked/reference section';
+    else if(textMentionsDocumentTitle(contexts,documentDisplayTitle(d)||d.title))reason='title stated in linked/reference section';
+    else if(owner?.doc_type==='COSHH'&&d.doc_type==='SDS'&&hasSdsCue){
+      const score=coshhMatchesSds(text,owner,d);
+      if(score>=0.74)reason=`SDS/product name aligned with COSHH assessment (${Math.round(score*100)}% match)`;
+    }
+    if(reason)out.push({doc:d,reason});
+  }
+  return out;
+}
+function activeTraining(){return state.training.filter(t=>t.status!=='ARCHIVED')}
+
+function looksLikeCoshhAssessment(text){
+  const u=clean(text).toUpperCase();
+  const named=/\bCOSHH\s+(?:RISK\s+)?ASSESSMENT\b|CONTROL OF SUBSTANCES HAZARDOUS TO HEALTH/.test(u);
+  const assessmentSignals=[/RISK\s+(?:RATING|SCORE|LEVEL)/, /LIKELIHOOD/, /SEVERITY/, /CONTROL\s+MEASURES?/, /PERSONS?\s+(?:AT|EXPOSED TO)\s+RISK/, /ASSESS(?:ED|MENT)\s+BY/, /ADOPTED\s+BY/, /AFTER\s+CONTROLS?/].filter(rx=>rx.test(u)).length;
+  if(/\bCOSHH\s+RISK\s+ASSESSMENT\b/.test(u))return true;
+  return named && assessmentSignals>=2;
+}
+function looksLikeSafetyDataSheet(text){
+  const u=clean(text).toUpperCase();
+  if(looksLikeCoshhAssessment(u))return false;
+  const heading=/\b(?:SAFETY DATA SHEET|MATERIAL SAFETY DATA SHEET|MSDS)\b/.test(u);
+  const section1=/\b1\.1\s+(?:PRODUCT IDENTIFIER|PRODUCT NAME)|SECTION\s+1\s*[:.-]?\s*(?:IDENTIFICATION|IDENTIFICATION OF THE SUBSTANCE)/.test(u);
+  const section2=/SECTION\s+2\s*[:.-]?\s*HAZARD|2\.1\s+CLASSIFICATION/.test(u);
+  const section3=/SECTION\s+3\s*[:.-]?\s*COMPOSITION|3\.1\s+SUBSTANCES|3\.2\s+MIXTURES/.test(u);
+  return heading && section1 && (section2||section3);
+}
+function classifySafetyPdfText(text){
+  if(looksLikeCoshhAssessment(text))return 'COSHH';
+  if(looksLikeSafetyDataSheet(text))return 'SDS';
+  const u=clean(text).toUpperCase();
+  if(/\bSAFE SYSTEM OF WORK\b|\bSSW\s+(?:REFERENCE|REF)\b/.test(u))return 'SSW';
+  if(/\bTOOLBOX TALK\b|\bTBT\s+(?:REFERENCE|REF)\b/.test(u))return 'TOOLBOX_TALK';
+  if(!/\bCOSHH\b/.test(u)&&(/\bRISK ASSESSMENT\b|\bRA\s+(?:REFERENCE|REF)\b/.test(u)))return 'RISK_ASSESSMENT';
+  return null;
+}
+
+
+function activityActionLabel(action){return ({OPENED:'Opened',DOWNLOADED:'Downloaded',REVIEWED:'Reviewed',CONTROLLED_REVIEW:'Controlled review',TRAINING_COMPLETED:'Training completed'})[action]||String(action||'Activity').replaceAll('_',' ')}
+function activityPersonName(a){const p=state.people.find(x=>x.id===a?.user_id);return p?.display_name||p?.email||a?.user_name_snapshot||a?.user_email_snapshot||'Unknown user'}
+function activityTargetLabel(a){const ref=clean(a?.document_reference),title=clean(a?.document_title),ver=clean(a?.version_label);const base=ref&&title?`${ref} - ${title}`:(ref||title||clean(a?.file_name)||'Document');return ver?`${base} · v${ver}`:base}
+function activityForDocument(docId){return state.documentActivity.filter(a=>a.document_id===docId).sort((a,b)=>new Date(b.occurred_at||0)-new Date(a.occurred_at||0))}
+function activityForTraining(trainingId){return state.documentActivity.filter(a=>a.training_session_id===trainingId).sort((a,b)=>new Date(b.occurred_at||0)-new Date(a.occurred_at||0))}
+function activityVersionSnapshot(v){const d=state.documents.find(x=>x.id===v?.document_id);return {document_id:d?.id||null,document_version_id:v?.id||null,document_reference:d?.reference||null,document_title:d?documentDisplayTitle(d):null,version_label:v?.version_label||null,file_name:v?.file_name||null}}
+function activityTrainingFileSnapshot(f){const t=state.training.find(x=>x.id===f?.training_session_id);return {training_session_id:t?.id||null,training_file_id:f?.id||null,document_reference:t?trainingReference(t)||null:null,document_title:t?.name||null,version_label:null,file_name:f?.file_name||null}}
+async function logDocumentActivity(action,snapshot={},metadata=null,showError=false){
+  if(!sb||!state.user?.id)return null;
+  const payload={user_id:state.user.id,user_name_snapshot:state.profile?.display_name||state.user?.email||null,user_email_snapshot:state.user?.email||state.profile?.email||null,action,source_context:snapshot.source_context||'DOCUMENT_LIBRARY',document_id:snapshot.document_id||null,document_version_id:snapshot.document_version_id||null,training_session_id:snapshot.training_session_id||null,training_file_id:snapshot.training_file_id||null,document_reference:snapshot.document_reference||null,document_title:snapshot.document_title||null,version_label:snapshot.version_label||null,file_name:snapshot.file_name||null,metadata:metadata||{}};
+  const r=await sb.from('document_activity').insert(payload).select().single();
+  if(r.error){console.warn('Document activity audit',r.error);if(showError)toast('Could not record document activity. Check the v2.1.2 document-activity SQL migration.');return null}
+  state.documentActivity.unshift(r.data);return r.data;
+}
+async function downloadDocument(versionId){const v=state.versions.find(x=>x.id===versionId);if(!v?.storage_path)return toast('Stored PDF not found.');if(!isManager()&&(!isVersionApproved(v)||v.status!=='CURRENT'))return toast('Only the approved current version is available for use.');const r=await sb.storage.from('safety-files').download(v.storage_path);if(r.error||!r.data)return toast(r.error?.message||'Download failed.');downloadBlob(r.data,v.file_name||'safety-document.pdf');await logDocumentActivity('DOWNLOADED',{...activityVersionSnapshot(v),source_context:'DOCUMENT_LIBRARY'});}
+function documentUsesFormalTraining(d){return !!d&&sourceDocTypes.has(d.doc_type)}
+function hasOpenedVersion(versionId,userId=state.user?.id){return state.documentActivity.some(a=>a.user_id===userId&&a.document_version_id===versionId&&a.action==='OPENED')}
+function showMarkDocumentReviewed(versionId){const v=state.versions.find(x=>x.id===versionId),d=state.documents.find(x=>x.id===v?.document_id);if(!v||!d)return;if(documentUsesFormalTraining(d))return toast('This controlled document is acknowledged through Training. Open it from the assigned training and complete the training sign-off instead.');if(!hasOpenedVersion(versionId))return toast('Open the file first. Safety Tracker must record the file was opened before it can be marked read/reviewed.');openModal('Mark file as read / reviewed',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong> · v${esc(v.version_label||'—')}</p><div class="hint-box">For reference documents that are not formal training, this records that you opened and reviewed the file. It does <strong>not</strong> create a training completion.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Confirm read / reviewed','primary',`data-confirm-doc-reviewed="${v.id}"`)}</div>`)}
+async function confirmDocumentReviewed(versionId){const v=state.versions.find(x=>x.id===versionId),d=state.documents.find(x=>x.id===v?.document_id);if(!v||!d)return;if(documentUsesFormalTraining(d))return toast('RA, COSHH RA and SSW acknowledgements are completed through Training.');if(!hasOpenedVersion(versionId))return toast('Open the file first.');const row=await logDocumentActivity('REVIEWED',{...activityVersionSnapshot(v),source_context:'REFERENCE_DOCUMENT'},null,true);if(!row)return;closeModal();toast('Read / review recorded.');}
+function activityCards(rows){return rows.length?rows.map(a=>`<div class="item-card compact"><div class="row-between"><div><strong>${esc(activityActionLabel(a.action))}</strong><div>${esc(activityTargetLabel(a))}</div><div class="meta"><span>${esc(activityPersonName(a))}</span><span>${fmtDateTime(a.occurred_at)}</span>${a.source_context?`<span>${esc(String(a.source_context).replaceAll('_',' ').toLowerCase())}</span>`:''}</div></div></div></div>`).join(''):'<div class="empty">No document activity recorded yet.</div>'}
+function showDocumentActivity(docId){const d=state.documents.find(x=>x.id===docId);if(!d)return;const rows=activityForDocument(docId);openModal('Document activity',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="muted">Opened, downloaded, reviewed and training-completion events are timestamped against the user and version.</div><div class="card-list" style="margin-top:1rem">${activityCards(rows)}</div>`)}
+function showTrainingFileActivity(trainingId){const t=state.training.find(x=>x.id===trainingId);if(!t)return;openModal('File activity',`<p><strong>${esc(trainingReference(t)?trainingReference(t)+' - '+t.name:t.name)}</strong></p><div class="card-list">${activityCards(activityForTraining(trainingId))}</div>`)}
+function filteredDocumentActivity(){const q=clean($('activitySearch')?.value).toLowerCase(),person=$('activityPersonFilter')?.value||'',action=$('activityActionFilter')?.value||'';return [...state.documentActivity].filter(a=>(!person||a.user_id===person)&&(!action||a.action===action)&&(!q||`${a.document_reference||''} ${a.document_title||''} ${a.file_name||''} ${activityPersonName(a)} ${activityActionLabel(a.action)}`.toLowerCase().includes(q))).sort((a,b)=>new Date(b.occurred_at||0)-new Date(a.occurred_at||0))}
+function renderDocumentActivityReport(){const list=$('activityList'),stats=$('activityStats');if(!list||!stats)return;const rows=filteredDocumentActivity();stats.innerHTML=[['Events',rows.length,'neutral'],['Opened',rows.filter(x=>x.action==='OPENED').length,'neutral'],['Reviewed',rows.filter(x=>x.action==='REVIEWED'||x.action==='CONTROLLED_REVIEW').length,'green'],['Downloads',rows.filter(x=>x.action==='DOWNLOADED').length,'neutral']].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${n}</strong><span>${l}</span></div>`).join('');list.innerHTML=activityCards(rows)}
+function downloadDocumentActivityPdf(){const rows=filteredDocumentActivity().map(a=>({date_time:fmtDateTime(a.occurred_at),user:activityPersonName(a),action:activityActionLabel(a.action),reference:a.document_reference||'',document:a.document_title||a.file_name||'',version:a.version_label||''}));pdfTable('Document Activity Audit',rows,`document-activity-audit-${todayISO()}.pdf`)}
+
+function originalBulkSourceName(v){
+  const m=String(v?.notes||'').match(/Bulk imported(?: changed content)? from (.+?), pages?\s+\d+/i);
+  return m?clean(m[1]):'';
+}
+function stripPdfName(name){return clean(String(name||'').replace(/\.pdf$/i,'').replace(/[_-]+/g,' '))}
+function isBadSdsTitle(title){
+  const t=clean(title);
+  if(!t)return true;
+  if(/^(?:manufacturer\s+)?(?:material\s+)?safety data sheet$/i.test(t))return true;
+  if(/^\d+\s*\/\s*\d+$/.test(t))return true;
+  if(/^page\s+\d+(?:\s+of\s+\d+)?$/i.test(t))return true;
+  if(/^(?:version|revision|revision date|print date|date of issue|section\s+\d+)\b/i.test(t))return true;
+  if(/^[\W_\d]+$/.test(t))return true;
+  if(t.length<3)return true;
+  if(t.length<60&&/\)$/.test(t)&&!t.includes('('))return true;
+  if(/^(?:product name|product identifier|product form|form of product|type of product|product type|physical state|trade name|name of product|chemical name|substance|mixture|article|liquid|solid|gas|aerosol|preparation|not applicable|n\/a|unknown)(?:\s*[:;-].*)?$/i.test(t))return true;
+  if(/^(?:product|identifier|form|classification|supplier|manufacturer|details of the supplier|relevant identified uses)\s*:?$/i.test(t))return true;
+  // Never expose a combined-pack/source filename as the SDS product title.
+  if(/\b(?:sds\s+msds|msds\s+sds)\s+only\b/i.test(t)||/\bno\s+directory\b/i.test(t))return true;
+  return false;
+}
+function cleanSdsCandidate(s){
+  let t=clean(s).replace(/^[\s:;\-–—]+/,'').replace(/[\s|]+$/,'');
+  t=t.replace(/^(?:Product name|Product identifier|Trade name|Name of product|Chemical name)\s*:?\s*/i,'');
+  t=t.replace(/\s+\d+\s*\/\s*\d+\s*$/,'');
+  // Stop at another Section 1 field label or metadata/regulatory text.
+  t=t.replace(/\s+(?:Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|Chemical name|UFI|REACH(?: registration)?|Relevant identified uses|Details of the supplier|Emergency telephone|1\.2\.?\b|SECTION\s+1\b|Revision(?: date)?|Version|Print date|Date of issue|According to|In accordance with|Conforms? to|COMMISSION REGULATION|REGULATION \(EU\)|REGULATION \(EC\)).*$/i,'');
+  t=t.replace(/\s*[:;,-]?\s*1\.[12](?:\.\d+)?\s*$/i,'');
+  t=t.replace(/[\s:;|,\-–—]+$/,'').trim();
+  // Some manufacturer PDFs repeat the product name twice on the first page.
+  // Collapse an exact duplicated phrase, e.g. "DIAMOND MATT ... WHITE DIAMOND MATT ... WHITE".
+  const words=t.split(/\s+/).filter(Boolean);
+  if(words.length>=4&&words.length%2===0){
+    const h=words.length/2;
+    if(words.slice(0,h).join(' ').toLowerCase()===words.slice(h).join(' ').toLowerCase())t=words.slice(0,h).join(' ');
+  }
+  if(t.length>140)t=t.slice(0,140).trim();
+  return t;
+}
+function extractSdsProductName(text){
+  const t=clean(text);
+  // Prefer an explicit Product name value wherever it appears in Section 1.1.
+  // This avoids titles being polluted by neighbouring labels such as
+  // "Product form: Article" or "1.1 Product identifier".
+  const explicitName=t.match(/\bProduct\s+name\s*:?\s*([\s\S]{2,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|Chemical name|Trade name|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i);
+  if(explicitName){
+    let c=cleanSdsCandidate(explicitName[1]);
+    if(/^110\/111\/112\/G136\s*-\s*FLOOR PAINT \(ALL HOUSE COLOURS\)$/i.test(c))
+      c='Coo-Var Floor Paint (All House Colours) - 110/111/112/G136';
+    if(c&&!isBadSdsTitle(c))return c;
+  }
+  // First isolate Section 1.1. Many manufacturer sheets put "Product form"
+  // before the actual Product name; never use those generic field values.
+  const blockMatch=t.match(/\b1\.1\.?\s*Product identifier\b([\s\S]{0,900}?)(?=\b1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\s+2\b)/i);
+  const block=blockMatch?blockMatch[1]:'';
+  const fieldPatterns=[
+    /\bGHS product identifier\s*:?\s*([\s\S]{2,220}?)(?=\s+(?:e-?mail address|Product use|Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|Chemical name|Trade name|UFI|REACH|1\.3\.?\b|Details of the supplier|Date of previous issue|1\.4\b|Version|Telephone number|SECTION\b))/i,
+    /\bProduct name\s*:?\s*([\s\S]{2,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|Chemical name|Trade name|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i,
+    /\bTrade name\s*:?\s*([\s\S]{2,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|Chemical name|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i,
+    /\bName of product\s*:?\s*([\s\S]{2,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|Article(?: No\.?| number)?|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i
+  ];
+  for(const scope of [block,t]){
+    if(!scope)continue;
+    for(const rx of fieldPatterns){const m=scope.match(rx);if(m){const c=cleanSdsCandidate(m[1]);if(c&&!isBadSdsTitle(c))return c}}
+  }
+  // Fallback only when Product identifier itself has a real value, not a field label.
+  const fallbacks=[
+    /\b1\.1\.?\s*Product identifier\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i,
+    /\bProduct identifier\s*:?\s*([\s\S]{3,180}?)(?=\s+(?:Product form|Form of product|Type of product|Product code|UFI|REACH|1\.2\.?\b|Relevant identified uses|Details of the supplier|SECTION\b))/i,
+    /\bSAFETY DATA SHEET\s+([\s\S]{3,110}?)(?=\s+\d+\s*\/\s*\d+\b)/i
+  ];
+  for(const rx of fallbacks){const m=t.match(rx);if(m){const c=cleanSdsCandidate(m[1]);if(c&&!isBadSdsTitle(c))return c}}
+  return '';
+}
+function cleanRaTitleCandidate(value,ref=''){
+  let t=clean(value);
+  if(!t)return '';
+  // Shield RAs commonly print "RA-007 - Title" directly below the heading.
+  // Remove only the LEADING reference; older code removed everything after it.
+  const refEsc=String(ref||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  if(refEsc)t=t.replace(new RegExp(`^\\s*${refEsc}\\s*[-–—:]?\\s*`,'i'),'').trim();
+  t=t.replace(/^RISK\s+ASSESSMENT\s*/i,'').replace(/^TASK\s+RISK\s+ASSESSMENT\s*/i,'').trim();
+  t=t.replace(/\s+(?:Marriott\s+Portsmouth|Adopted\s+on|Department\s*\/\s*job\s+title|RA\s+Reference|Location|Persons\s+at\s+risk|Task|Scope|Frequency|Linked\s+(?:controls|documents|assessments)|Related\s+(?:document|documents|assessments)|Chemical\s+controls|Typical\s+location|Fuel\s+handling|Existing\s+features)\b.*$/i,'').trim();
+  if(!t||t.length<4||t.length>180)return '';
+  if(/SHIELD\s+SAFETY|CONTROL\s+MEASURES|\bHAZARDS?\b|RISK\s+RATING|SEVERITY|LIKELIHOOD|PEOPLE\s+EXPOSED|Page\s+\d+|Version\b/i.test(t))return '';
+  if(/^(?:Surface and Work Area Checks|Dust Control and PPE|Sanding Equipment|Product and COSHH Checks|Fire and Ventilation|Application and Spill Control|Access and Surface Preparation|Housekeeping and Waste|Storage, Waste and Completion)$/i.test(t))return '';
+  if(/\b(?:Follow\s+RA-|Follow\s+SSW-|Follow\s+COSHH-|reposition\s+access\s+equipment|avoid\s+prolonged|keep\s+hands|wear\s+eye\s+protection)\b/i.test(t))return '';
+  if(t.length>120&&/[.!?]/.test(t))return '';
+  return t.replace(/\s+/g,' ').trim();
+}
+function extractRiskAssessmentTitle(text,ref=''){
+  const raw=String(text||'').replace(/\r/g,'\n');
+  const lines=raw.split(/\n+/).map(clean).filter(Boolean);
+  // Most current Shield RAs expose the exact controlled title as
+  // "RA-005 - Use of Hazardous Paint - Brush and Roller Application".
+  if(ref){
+    const refEsc=String(ref).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    for(const l of lines.slice(0,18)){
+      const m=l.match(new RegExp(`^\\s*${refEsc}\\s*[-–—:]\\s*(.+)$`,'i'));
+      if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+    }
+  }
+  // Also accept any RA-xxx title line on the first page when the stored ref is blank.
+  for(const l of lines.slice(0,18)){
+    const m=l.match(/^\s*RA-\d{3}\s*[-–—:]\s*(.+)$/i);
+    if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+  }
+  // TASK RISK ASSESSMENT (e.g. RA-004) prints the title immediately below the heading.
+  let idx=lines.findIndex(x=>/^(?:TASK\s+)?RISK\s+ASSESSMENT$/i.test(x));
+  if(idx>=0){
+    const parts=[];
+    for(let i=idx+1;i<Math.min(lines.length,idx+6);i++){
+      const l=clean(lines[i]);
+      if(!l)continue;
+      if(/^(?:Department|Location|Persons\s+at\s+risk|Task|Scope|Frequency|Linked\s+(?:controls|documents|assessments)|Related\s+(?:document|documents|assessments)|Chemical\s+controls|Typical\s+location|Fuel\s+handling|Existing\s+features)\b/i.test(l))break;
+      if(/SHIELD\s+SAFETY|Maintenance\s+RA|Page\s+\d+/i.test(l))continue;
+      parts.push(l);
+      const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
+    }
+  }
+  // Legacy Shield layout: title immediately before Marriott Portsmouth.
+  const hotelIndex=lines.findIndex(x=>/^Marriott\s+Portsmouth$/i.test(x));
+  if(hotelIndex>0){
+    const parts=[];
+    for(let i=hotelIndex-1;i>=0&&parts.length<3;i--){
+      const l=clean(lines[i]);if(!l)continue;
+      if(/SHIELD\s+SAFETY|(?:TASK\s+)?RISK\s+ASSESSMENT|Maintenance\s+RA|Page\s+\d+|SECTION\s+\d/i.test(l))break;
+      if(/^Maintenance$/i.test(l))continue;
+      parts.unshift(l);
+    }
+    const c=cleanRaTitleCandidate(parts.join(' '),ref);if(c)return c;
+  }
+  const flat=clean(raw);
+  if(ref){
+    const refEsc=String(ref).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const m=flat.match(new RegExp(`\\b${refEsc}\\s*[-–—:]\\s*(.{4,180}?)(?=\\s+(?:Department|Location|Scope|Task|Frequency|Linked|Related|Chemical|Typical|Fuel|Existing)\\b)`,'i'));
+    if(m){const c=cleanRaTitleCandidate(m[1],ref);if(c)return c;}
+  }
+  return '';
+}
+async function pdfFirstPageTextFromBlob(blob){
+  if(!blob||!window.pdfjsLib)return '';
+  const pdf=await pdfjsLib.getDocument({data:(await blob.arrayBuffer()).slice(0)}).promise;
+  if(!pdf.numPages)return '';
+  const pg=await pdf.getPage(1),c=await pg.getTextContent();
+  const out=[];let line='';
+  for(const it of c.items||[]){const t=String(it.str||'').trim();if(t)line+=(line?' ':'')+t;if(it.hasEOL){if(clean(line))out.push(clean(line));line=''}}
+  if(clean(line))out.push(clean(line));
+  return out.join('\n');
+}
+async function repairRaTitles(options={}){
+  const {silent=false,refreshAfter=true,progress=null}=options&&typeof options==='object'?options:{};
+  if(!isAdmin()&&!state.user){if(!silent)toast('Admin access required.');return {changed:0,failed:0}}
+  const docs=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type==='RISK_ASSESSMENT');
+  if(!docs.length){if(!silent)toast('No active Risk Assessments found.');return {changed:0,failed:0}}
+  const status=$('raRepairStatus');if(!silent&&status){status.hidden=false;status.textContent=`Checking ${docs.length} Risk Assessment title${docs.length===1?'':'s'}…`}
+  let changed=0,failed=0;
+  for(let i=0;i<docs.length;i++){
+    const d=docs[i],v=currentVersion(d.id);if(!v?.storage_path)continue;
+    const msg=`Checking RA ${i+1} of ${docs.length}: ${d.reference||d.title}`;
+    if(progress)progress(msg);if(!silent&&status)status.textContent=msg;
+    try{
+      const r=await sb.storage.from('safety-files').download(v.storage_path);if(r.error||!r.data){failed++;continue}
+      const first=await pdfFirstPageTextFromBlob(r.data),extracted=extractRiskAssessmentTitle(first,d.reference||'');
+      const finalTitle=extracted||clean(d.title);
+      if(extracted&&clean(extracted)!==clean(d.title)){
+        const u=await sb.from('documents').update({title:extracted}).eq('id',d.id);if(u.error){failed++;continue}
+        d.title=extracted;changed++;
+      }
+      // Auto-managed Training must always mirror the corrected controlled-document title.
+      const desiredName=`${d.reference?d.reference+' - ':''}${finalTitle}`;
+      for(const t of state.training.filter(t=>t.auto_managed===true&&t.source_document_id===d.id&&t.status!=='ARCHIVED')){
+        if(clean(t.name)!==clean(desiredName)){
+          const u=await sb.from('training_sessions').update({name:desiredName}).eq('id',t.id);
+          if(!u.error){t.name=desiredName;changed++;}
+        }
+      }
+    }catch(e){console.warn('repairRaTitles',d.id,e);failed++}
+  }
+  if(refreshAfter)await refresh();
+  if(!silent&&status){status.hidden=false;status.textContent=`Risk Assessment title/training alignment complete: ${changed} update${changed===1?'':'s'}${failed?`, ${failed} could not be read`:''}.`}
+  if(!silent)toast(`${changed} Risk Assessment/document training update${changed===1?'':'s'} applied.`);
+  return {changed,failed};
+}
+function documentDisplayTitle(d){
+  if(!d)return '';
+  if(d.doc_type!=='SDS'||!isBadSdsTitle(d.title))return d.title||'';
+  // Never expose a combined-pack/source filename as an SDS title. If extraction has
+  // not succeeded yet, show a neutral repair prompt until Force Sync reads Section 1.1.
+  return 'SDS / MSDS (title needs repair)';
+}
+function sdsVersionsForTitleRepair(docId){
+  // Pending-only documents used to be skipped because title repair looked only at CURRENT.
+  // Prefer the newest pending version, then current, then any remaining versions.
+  const all=state.versions.filter(v=>v.document_id===docId&&v.storage_path);
+  return all.sort((a,b)=>{
+    const rank=v=>versionApprovalStatus(v)==='PENDING'?3:(v.status==='CURRENT'?2:1);
+    const r=rank(b)-rank(a);
+    return r||new Date(b.created_at||0)-new Date(a.created_at||0);
+  });
+}
+async function repairSdsTitles(options={}){
+  const {silent=false,refreshAfter=true,progress=null}=options&&typeof options==='object'?options:{};
+  if(!isAdmin()&&!state.user){if(!silent)toast('Admin access required.');return {changed:0,failed:0}}
+  const docs=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type==='SDS');
+  if(!docs.length){if(!silent)toast('No active SDS/MSDS documents found.');return {changed:0,failed:0}}
+  const status=$('sdsRepairStatus');if(!silent&&status){status.hidden=false;status.textContent=`Checking ${docs.length} SDS/MSDS title${docs.length===1?'':'s'}…`}
+  let changed=0,failed=0;
+  for(let i=0;i<docs.length;i++){
+    const d=docs[i],versions=sdsVersionsForTitleRepair(d.id);if(!versions.length)continue;
+    const msg=`Checking SDS/MSDS ${i+1} of ${docs.length}: ${documentDisplayTitle(d)}`;
+    if(progress)progress(msg);if(!silent&&status)status.textContent=msg;
+    let title='',readAny=false;
+    try{
+      for(const v of versions){
+        const r=await sb.storage.from('safety-files').download(v.storage_path);
+        if(r.error||!r.data)continue;
+        readAny=true;
+        const text=await pdfTextFromBlob(r.data);
+        title=extractSdsProductName(text);
+        if(title&&!isBadSdsTitle(title))break;
+        title='';
+      }
+      if(!readAny){failed++;continue}
+      if(title&&!isBadSdsTitle(title)&&clean(title)!==clean(d.title)){
+        const u=await sb.from('documents').update({title}).eq('id',d.id);if(u.error){failed++;continue}
+        d.title=title;changed++;
+      }
+    }catch(e){console.warn('repairSdsTitles',d.id,e);failed++}
+  }
+  if(refreshAfter)await refresh();
+  if(!silent&&status){status.hidden=false;status.textContent=`SDS/MSDS title repair complete: ${changed} updated${failed?`, ${failed} could not be read`:''}.`}
+  if(!silent)toast(`${changed} SDS/MSDS title${changed===1?'':'s'} updated.`);
+  return {changed,failed};
+}
+
+async function loadTable(table,target,optional=false){
+  const r=await sb.from(table).select('*');
+  if(r.error){state.loadErrors[table]=r.error.message;if(!optional)console.warn(table,r.error);state[target]=[];return false}
+  delete state.loadErrors[table];state[target]=r.data||[];return true;
+}
+const offlineSnapshotKey=uid=>`safetyTrackerOfflineSnapshot:v272:${uid||'unknown'}`;
+const offlineFileCacheName=uid=>`safety-user-files-v272-${String(uid||'unknown').replace(/[^a-z0-9_-]/gi,'')}`;
+function buildOfflineSnapshot(){
+  const uid=state.user?.id;if(!uid||!state.profile)return null;
+  const assignments=state.trainingAssignments.filter(a=>a.user_id===uid&&a.active!==false),assignmentIds=new Set(assignments.map(a=>a.id)),trainingIds=new Set(assignments.map(a=>a.training_session_id));
+  const training=state.training.filter(t=>trainingIds.has(t.id));
+  const trainingDocumentLinks=state.trainingDocumentLinks.filter(x=>trainingIds.has(x.training_session_id));
+  const docIds=new Set(training.map(t=>t.source_document_id).filter(Boolean));trainingDocumentLinks.forEach(x=>x.document_id&&docIds.add(x.document_id));
+  let changed=true;while(changed){changed=false;state.documentLinks.forEach(l=>{if(docIds.has(l.source_document_id)&&l.target_document_id&&!docIds.has(l.target_document_id)){docIds.add(l.target_document_id);changed=true}if(docIds.has(l.target_document_id)&&l.source_document_id&&!docIds.has(l.source_document_id)){docIds.add(l.source_document_id);changed=true}})}
+  const documents=state.documents.filter(d=>docIds.has(d.id));
+  const versions=state.versions.filter(v=>docIds.has(v.document_id)&&v.status==='CURRENT'&&isVersionApproved(v));
+  const trainingFiles=state.trainingFiles.filter(f=>trainingIds.has(f.training_session_id));
+  const awarenessAssignments=state.awarenessAssignments.filter(a=>a.user_id===uid&&a.active!==false),awarenessIds=new Set(awarenessAssignments.map(a=>a.awareness_item_id));
+  const ppeAssignments=state.ppeAssignments.filter(a=>a.user_id===uid&&a.active!==false),ppeIds=new Set(ppeAssignments.map(a=>a.ppe_item_id));
+  const ppeChecks=state.ppeChecks.filter(c=>c.user_id===uid),ppeCheckIds=new Set(ppeChecks.map(c=>c.id));
+  return {savedAt:new Date().toISOString(),profile:state.profile,people:[state.profile],documents,versions,documentLinks:state.documentLinks.filter(l=>docIds.has(l.source_document_id)||docIds.has(l.target_document_id)),documentReviews:[],training,trainingAssignments:assignments,trainingSignoffs:state.trainingSignoffs.filter(s=>assignmentIds.has(s.training_assignment_id)),trainingExceptions:state.trainingExceptions.filter(s=>assignmentIds.has(s.training_assignment_id)),trainingConfirmations:state.trainingConfirmations.filter(c=>assignmentIds.has(c.assignment_id)),trainingFiles,trainingDocumentLinks,historicalDocAssignments:[],historicalDocSignoffs:[],historicalDocConfirmations:[],documentActivity:state.documentActivity.filter(a=>a.user_id===uid),awarenessItems:state.awarenessItems.filter(i=>awarenessIds.has(i.id)),awarenessAssignments,awarenessActivity:state.awarenessActivity.filter(a=>a.user_id===uid),ppeItems:state.ppeItems.filter(i=>ppeIds.has(i.id)),ppeAssignments,ppeChecks,ppeCheckItems:state.ppeCheckItems.filter(i=>ppeCheckIds.has(i.check_id)),ppeAlertQueue:[],reportSchedules:[],generatedReports:[],reportEmailLog:[],departments:state.departments,userDepartments:state.userDepartments.filter(x=>x.user_id===uid),documentAudiences:[],trainingAudiences:[],awarenessAudiences:[],ppeAudiences:[],settings:state.settings};
+}
+function saveOfflineSnapshot(){try{const snap=buildOfflineSnapshot();if(snap)localStorage.setItem(offlineSnapshotKey(state.user?.id),JSON.stringify(snap))}catch(e){console.warn('Offline snapshot save failed',e)}}
+function restoreOfflineSnapshot(uid){try{const raw=localStorage.getItem(offlineSnapshotKey(uid));if(!raw)return false;const snap=JSON.parse(raw);if(!snap?.profile)return false;state.profile=snap.profile;for(const k of ['people','documents','versions','documentLinks','documentReviews','training','trainingAssignments','trainingSignoffs','trainingExceptions','trainingConfirmations','trainingFiles','trainingDocumentLinks','historicalDocAssignments','historicalDocSignoffs','historicalDocConfirmations','documentActivity','awarenessItems','awarenessAssignments','awarenessActivity','ppeItems','ppeAssignments','ppeChecks','ppeCheckItems','ppeAlertQueue','reportSchedules','generatedReports','reportEmailLog','departments','userDepartments','documentAudiences','trainingAudiences','awarenessAudiences','ppeAudiences','settings'])state[k]=snap[k]||[];state.offlineSnapshotAt=snap.savedAt||null;populateFilters();return true}catch(e){console.warn('Offline snapshot restore failed',e);return false}}
+async function cacheSafetyBlob(kind,id,blob){if(!blob||!state.user?.id||!('caches'in window))return;try{const c=await caches.open(offlineFileCacheName(state.user.id)),u=`${location.origin}${location.pathname}?offline-file=${encodeURIComponent(kind+':'+id)}`;await c.put(u,new Response(blob,{headers:{'Content-Type':blob.type||'application/pdf','Cache-Control':'private, max-age=31536000'}}))}catch(e){console.warn('Offline PDF cache failed',e)}}
+async function cachedSafetyBlob(kind,id){if(!state.user?.id||!('caches'in window))return null;try{const c=await caches.open(offlineFileCacheName(state.user.id)),u=`${location.origin}${location.pathname}?offline-file=${encodeURIComponent(kind+':'+id)}`,r=await c.match(u);return r?await r.blob():null}catch{return null}}
+async function clearOfflineUserData(uid){try{localStorage.removeItem(offlineSnapshotKey(uid));if('caches'in window)await caches.delete(offlineFileCacheName(uid))}catch{}}
+async function warmOfflineFiles(){if(state.offline||!navigator.onLine||!state.user?.id)return;const jobs=[];for(const {a,t} of myActiveAssignments()){for(const m of requiredTrainingMaterials(a,t)){if(m.available===false)continue;if(m.kind==='DOCUMENT'&&m.version?.storage_path)jobs.push(['document',m.version.id,m.version.storage_path]);if(m.kind==='TRAINING_FILE'&&m.file?.storage_path)jobs.push(['training',m.file.id,m.file.storage_path])}}const seen=new Set();for(const [kind,id,path] of jobs.slice(0,30)){const key=kind+':'+id;if(seen.has(key))continue;seen.add(key);if(await cachedSafetyBlob(kind,id))continue;try{const r=await sb.storage.from('safety-files').download(path);if(!r.error&&r.data)await cacheSafetyBlob(kind,id,r.data)}catch{}}}
+async function loadAll(){
+  if(!sb)return;
+  state.loadErrors={};
+  await Promise.all([
+    loadTable('profiles','people'),loadTable('documents','documents'),loadTable('document_versions','versions'),
+    loadTable('document_links','documentLinks',true),loadTable('document_reviews','documentReviews',true),
+    loadTable('training_sessions','training'),loadTable('training_assignments','trainingAssignments'),loadTable('training_signoffs','trainingSignoffs'),loadTable('training_exceptions','trainingExceptions',true),
+    loadTable('training_delivery_confirmations','trainingConfirmations',true),loadTable('training_files','trainingFiles',true),
+    loadTable('training_document_links','trainingDocumentLinks',true),loadTable('document_activity','documentActivity',true),
+    loadTable('document_assignments','historicalDocAssignments',true),loadTable('document_signoffs','historicalDocSignoffs',true),loadTable('document_delivery_confirmations','historicalDocConfirmations',true),
+    loadTable('safety_awareness_items','awarenessItems',true),loadTable('safety_awareness_assignments','awarenessAssignments',true),loadTable('safety_awareness_activity','awarenessActivity',true),
+    loadTable('ppe_items','ppeItems',true),loadTable('ppe_assignments','ppeAssignments',true),loadTable('ppe_monthly_checks','ppeChecks',true),loadTable('ppe_monthly_check_items','ppeCheckItems',true),loadTable('ppe_alert_queue','ppeAlertQueue',true),
+    loadTable('report_schedules','reportSchedules',true),loadTable('generated_reports','generatedReports',true),loadTable('report_email_log','reportEmailLog',true),
+    loadTable('departments','departments',true),loadTable('user_departments','userDepartments',true),loadTable('document_training_audiences','documentAudiences',true),loadTable('training_session_audiences','trainingAudiences',true),loadTable('awareness_item_audiences','awarenessAudiences',true),loadTable('ppe_item_audiences','ppeAudiences',true),
+    loadTable('safety_tracker_settings','settings',true)
+  ]);
+  state.people.sort((a,b)=>String(a.display_name||a.email).localeCompare(String(b.display_name||b.email)));
+  populateFilters();
+  if(navigator.onLine){state.offline=false;saveOfflineSnapshot();setTimeout(()=>warmOfflineFiles().catch(()=>{}),50)}
+}
+
+async function loadReportViewerData(){
+  if(!sb)return;
+  state.loadErrors={};
+  await Promise.all([
+    loadTable('generated_reports','generatedReports',true),
+    loadTable('safety_tracker_settings','settings',true)
+  ]);
+  state.reportEmailLog=[];
+}
+
+function populateFilters(){
+  const docTypes=['RISK_ASSESSMENT','COSHH','SSW','SDS','TOOLBOX_TALK','POLICY','PROCEDURE','OTHER'];
+  if($('documentTypeFilter')){
+    const el=$('documentTypeFilter'),keep=el.value;
+    el.innerHTML='<option value="">All types</option>'+docTypes.map(x=>`<option value="${x}">${esc(x==='TOOLBOX_TALK'?'Toolbox Talk':docTypeLabel(x))}</option>`).join('');
+    if([...el.options].some(o=>o.value===keep))el.value=keep;
+  }
+  const tOpts=trainingKinds.map(x=>`<option value="${x}">${esc(kindLabel(x))}</option>`).join('');
+  if($('trainingTypeFilter')){
+    const el=$('trainingTypeFilter'),keep=el.value;
+    el.innerHTML='<option value="">All types</option>'+tOpts;
+    if([...el.options].some(o=>o.value===keep))el.value=keep;
+  }
+  if($('complianceTypeFilter')){
+    const el=$('complianceTypeFilter'),keep=el.value;
+    el.innerHTML='<option value="">All training types</option>'+tOpts;
+    if([...el.options].some(o=>o.value===keep))el.value=keep;
+  }
+  const peopleOpts=activePeople().map(p=>`<option value="${p.id}">${esc(p.display_name||p.email)}</option>`).join('');
+  if($('compliancePersonFilter'))$('compliancePersonFilter').innerHTML='<option value="">All people</option>'+peopleOpts;
+  if($('activityPersonFilter'))$('activityPersonFilter').innerHTML='<option value="">All people</option>'+peopleOpts;
+  const instructor=activeTraining().filter(t=>state.trainingAssignments.some(a=>a.training_session_id===t.id&&a.active!==false&&effectiveTrainingMethod(t,a)==='INSTRUCTOR_LED')).sort((a,b)=>a.name.localeCompare(b.name));
+  if($('groupTrainingSelect'))$('groupTrainingSelect').innerHTML='<option value="">Select training</option>'+instructor.map(t=>`<option value="${t.id}">${esc(trainingReference(t)?trainingReference(t)+' - '+t.name:t.name)}</option>`).join('');
+}
+
+function showView(name,{push=true}={}){
+  if(!canAccessView(name))name=isReportViewer()?'reports':'mySafety';
+  currentViewName=name;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));
+  document.querySelectorAll('#mainNav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  $(name+'View')?.classList.add('active-view');
+  if(name==='mySafety')renderMySafety();if(name==='documents')renderDocuments();if(name==='training')renderTraining();if(name==='awareness')renderAwareness();if(name==='ppe')renderPpe();if(name==='people')renderPeople();if(name==='compliance')renderCompliance();if(name==='instructor')renderInstructor();if(name==='reports')renderReports();if(name==='admin')renderAdmin();if(name==='help')renderHelp();
+  if(navigationReady&&push){
+    const st=history.state;
+    if(!(st?.safetyTracker&&!st.modal&&!st.guard&&st.view===name))history.pushState(safetyNavState({view:name,modal:false,guard:false}),'',location.href);
+  }
+}
+async function refresh(msg){if(isReportViewer()){await loadReportViewerData();renderReports();if(msg)toast(msg);return}await loadAll();renderMySafety();if(isManager())renderDocuments();if(isManager())renderTraining();renderAwareness();renderPpe();if(isManager()){renderPeople();renderCompliance();renderInstructor();renderReports()}if(isAdmin())renderAdmin();if(msg)toast(msg)}
+
+let actionRouterInstalled=false;
+function installActionRouter(){
+  if(actionRouterInstalled)return;
+  actionRouterInstalled=true;
+  document.addEventListener('click',e=>{
+    Promise.resolve(globalClick(e)).catch(err=>{
+      console.error('Safety Tracker button action failed',err);
+      toast(`Action failed: ${err?.message||'unknown error'}`);
+    });
+  },true);
+  window.__SAFETY_ACTION_ROUTER='v2.7.2-capture';
+}
+
+async function init(){
+  const boot=$('loginBootStatus');if(boot)boot.textContent='Checking secure sign-in…';
+  installActionRouter();
+  if(new URLSearchParams(location.search).get('demo')==='1'){if(boot)boot.textContent='Starting safe demo…';return;}
+  if(!configured){if(boot)boot.textContent='Configuration missing.';showAuthMessage('Safety Tracker config.js is missing or invalid. Re-upload the working Safety Tracker config.js, then reload.');return}
+  const authParams=new URLSearchParams((location.hash||'').replace(/^#/,''));
+  const authError=authParams.get('error_description')||new URLSearchParams(location.search).get('error_description');
+  if(authError)showAuthMessage(decodeURIComponent(authError.replace(/\+/g,' ')));
+  if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  $('loginForm').addEventListener('submit',login);$('forgotPasswordBtn').addEventListener('click',forgotPassword);$('signOutBtn').addEventListener('click',async()=>{const uid=state.user?.id;await sb.auth.signOut();if(uid)await clearOfflineUserData(uid)});$('adminUserModeBtn')?.addEventListener('click',toggleAdminUserMode);
+  $('completePasswordSetupBtn').addEventListener('click',completeMandatoryPasswordSetup);$('modalCloseBtn').addEventListener('click',closeModal);
+  window.addEventListener('popstate',handleSafetyPopstate);
+  $('mainNav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(b)showView(b.dataset.view)});
+  $('newDocumentBtn').addEventListener('click',showNewDocument);$('newTrainingBtn').addEventListener('click',showNewTraining);$('inviteUserBtn').addEventListener('click',showInviteUser);
+  $('documentSearch').addEventListener('input',renderDocuments);
+  $('documentTypeFilter').addEventListener('change',()=>{
+    // In Register, keep the Register open and filter its sections.
+    // In an individual index, switching the dropdown returns to the all-documents view
+    // so the selected type can take effect immediately.
+    if((state.documentIndex||'ALL')!=='REGISTER')state.documentIndex='ALL';
+    renderDocuments();
+  });
+  $('documentStatusFilter').addEventListener('change',renderDocuments);
+  $('documentIndexBackBtn')?.addEventListener('click',()=>{state.documentIndex='ALL';$('documentTypeFilter').value='';renderDocuments()});
+  ['trainingSearch','trainingTypeFilter','trainingStatusFilter'].forEach(id=>$(id).addEventListener('input',renderTraining));
+  ['awarenessSearch','awarenessStatusFilter'].forEach(id=>$(id)?.addEventListener('input',renderAwareness));
+  ['ppeSearch','ppeStatusFilter'].forEach(id=>$(id)?.addEventListener('input',renderPpe));
+  ['compliancePersonFilter','complianceTypeFilter','complianceStatusFilter'].forEach(id=>$(id).addEventListener('input',renderCompliance));
+  ['activitySearch','activityPersonFilter','activityActionFilter'].forEach(id=>$(id)?.addEventListener('input',renderDocumentActivityReport));
+  $('openGroupAttendanceBtn').addEventListener('click',()=>{const id=$('groupTrainingSelect').value;if(!id)return toast('Select training first.');showInstructorGroupAttendance(id)});
+  $('forceSyncBtn').addEventListener('click',forceSyncFromUI);$('repairSdsTitlesBtn')?.addEventListener('click',repairSdsTitles);$('repairRaTitlesBtn')?.addEventListener('click',repairRaTitles);$('storageCleanupBtn')?.addEventListener('click',scanStorageCleanup);$('outstandingPdfBtn').addEventListener('click',()=>downloadReport('outstanding'));$('documentActivityPdfBtn')?.addEventListener('click',downloadDocumentActivityPdf);$('trainingMatrixPdfBtn').addEventListener('click',()=>downloadReport('matrix'));$('trainingSignoffsPdfBtn').addEventListener('click',()=>downloadReport('signoffs'));$('reviewDatesPdfBtn').addEventListener('click',()=>downloadReport('reviews'));$('backupBtn').addEventListener('click',downloadBackup);$('fullBackupBtn').addEventListener('click',downloadFullBackup);
+  $('generateMonthlyReportBtn')?.addEventListener('click',()=>generateMonthlySafetyReport($('monthlyReportMonth')?.value,{download:true,archive:true}));
+  $('generatePpeReportBtn')?.addEventListener('click',()=>downloadMonthlyPpeReport($('monthlyReportMonth')?.value));
+  $('newReportScheduleBtn')?.addEventListener('click',showNewReportSchedule);$('evidencePackBtn')?.addEventListener('click',()=>showEvidencePackPicker());
+  const recoveryRoute=new URLSearchParams(location.search).get('recovery')==='1';
+  try{
+    const {data:{session},error}=await sb.auth.getSession();if(error)throw error;
+    if(session){if(recoveryRoute)showRecoveryPasswordSetup(session.user);else await enterApp(session.user)}
+    else{showLogin();if(recoveryRoute)showAuthMessage('This password reset link is invalid or has expired. Request a new reset email and use the newest link only.');}
+    if(boot&&!session)boot.textContent='Ready to sign in.';
+  }catch(e){if(boot)boot.textContent='Sign-in service error.';showLogin();showAuthMessage(e?.message||'Could not initialise sign-in. Refresh and try again.');}
+  sb.auth.onAuthStateChange(async(event,session)=>{
+    if((event==='PASSWORD_RECOVERY'||(recoveryRoute&&session))&&session){showRecoveryPasswordSetup(session.user);return}
+    if(session&&(!state.user||state.user.id!==session.user.id))await enterApp(session.user);
+    if(!session){state.user=null;state.profile=null;showLogin()}
+  });
+  if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw-v272.js').catch(e=>console.warn('Offline service worker',e)));
+  window.addEventListener('offline',()=>{state.offline=true;applyViewModeUi();if(state.user){showView('mySafety',{push:false});renderMySafety();renderAwareness();renderPpe();toast('Offline mode on — saved day-to-day safety information is read-only.')}});
+  window.addEventListener('online',async()=>{if(!state.user)return;state.offline=false;try{await loadAll();state.uiMode=preferredUiMode();applyViewModeUi();showView(canAccessView(currentViewName)?currentViewName:'mySafety',{push:false});toast('Connection restored. Safety Tracker is live again.')}catch(e){state.offline=true;applyViewModeUi();toast('Connection is still unavailable. Remaining in offline mode.')}});
+}
+function showLogin(){$('appView').hidden=true;$('authView').hidden=false;$('loginForm').hidden=false;$('forgotPasswordBtn').hidden=false;$('passwordSetupArea').hidden=true}
+async function login(e){e.preventDefault();$('authMessage').hidden=true;const btn=$('loginSubmitBtn'),boot=$('loginBootStatus');if(btn){btn.disabled=true;btn.textContent='Signing in…'}if(boot)boot.textContent='Signing in…';try{const {data,error}=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(error)throw error;if(!data?.session)throw new Error('Sign-in did not create a session.');if(boot)boot.textContent='Signed in. Loading Safety Tracker…';await enterApp(data.user);}catch(err){if(boot)boot.textContent='Ready to sign in.';showAuthMessage(err?.message||'Sign-in failed.');}finally{if(btn){btn.disabled=false;btn.textContent='Sign in'}}}
+async function forgotPassword(){
+  const email=$('loginEmail')?.value.trim().toLowerCase();
+  if(!email)return showAuthMessage('Enter your email address first.');
+  const redirectTo=`${SAFETY_APP_URL}?recovery=1&build=272`;
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo});
+  showAuthMessage(error?error.message:'Password reset email sent. Use the newest reset email only, then choose a new password on the Safety Tracker page.');
+}
+function showPasswordReset(user=state.user){showRecoveryPasswordSetup(user)}
+function showMandatoryPasswordSetup(user,mode='invite'){
+  state.user=user;state.profile=null;
+  $('appView').hidden=true;$('authView').hidden=false;$('loginForm').hidden=true;$('forgotPasswordBtn').hidden=true;$('passwordSetupArea').hidden=false;$('authMessage').hidden=true;
+  $('passwordSetupArea').dataset.mode=mode;
+  if($('passwordSetupTitle'))$('passwordSetupTitle').textContent=mode==='recovery'?'Choose a new password':'Set your password';
+  if($('passwordSetupHelp'))$('passwordSetupHelp').textContent=mode==='recovery'?'Enter and confirm your new Safety Tracker password. After it is saved you will sign in again with the new password.':'Invited users must choose their own password before entering Safety Tracker.';
+  if($('invitePassword'))$('invitePassword').value='';if($('invitePasswordConfirm'))$('invitePasswordConfirm').value='';
+}
+function showRecoveryPasswordSetup(user){showMandatoryPasswordSetup(user,'recovery')}
+async function completeMandatoryPasswordSetup(){
+  const p=$('invitePassword')?.value||'',c=$('invitePasswordConfirm')?.value||'',mode=$('passwordSetupArea')?.dataset.mode||'invite';
+  if(!p||p.length<8)return showAuthMessage('Password must be at least 8 characters.');
+  if(p!==c)return showAuthMessage('Passwords do not match.');
+  const current=state.user?.user_metadata||{};
+  const {data,error}=await sb.auth.updateUser({password:p,data:{...current,must_set_password:false,password_set_at:new Date().toISOString()}});
+  if(error)return showAuthMessage(error.message);
+  if(mode==='recovery'){
+    try{history.replaceState(null,'',SAFETY_APP_URL)}catch{}
+    const email=data?.user?.email||state.user?.email||'';
+    await sb.auth.signOut();
+    showLogin();
+    if($('loginEmail'))$('loginEmail').value=email;
+    if($('loginPassword'))$('loginPassword').value='';
+    showAuthMessage('Password changed successfully. Sign in with the new password.');
+    return;
+  }
+  const {data:{user}}=await sb.auth.getUser();if(user)await enterApp(user)
+}
+async function enterApp(user){
+  state.user=user;if(user?.user_metadata?.must_set_password===true)return showMandatoryPasswordSetup(user);
+  state.offline=!navigator.onLine;
+  let data=null,error=null;
+  if(navigator.onLine){const r=await sb.from('profiles').select('*').eq('id',user.id).single();data=r.data;error=r.error}
+  if((error||!data)&&restoreOfflineSnapshot(user.id)){
+    state.offline=true;data=state.profile;
+  }else if(error||!data){showAuthMessage(navigator.onLine?'Profile not found. Ask an administrator to check the Safety Tracker profile.':'No saved offline Safety Tracker data is available on this device. Connect once and sign in online first.');if(navigator.onLine)await sb.auth.signOut();return}
+  if(data.active===false){showAuthMessage('This Safety Tracker account is disabled.');if(navigator.onLine)await sb.auth.signOut();return}
+  state.profile=data;state.uiMode=preferredUiMode();
+  if(!state.offline){if(isReportViewer())await loadReportViewerData();else await loadAll()}
+  $('authView').hidden=true;$('appView').hidden=false;$('currentUserName').textContent=data.display_name||user.email;
+  applyViewModeUi();
+  const docIntro=$('documentsIntro');if(docIntro)docIntro.textContent='Controlled safety documents are reviewed and approved here. For RA, COSHH RA and SSW, training method, frequency, due period and audience are confirmed at approval; standalone unrelated training is managed in Training.';
+  const docStatus=$('documentStatusFilter');if(docStatus&&isStandardUser()){docStatus.innerHTML='<option value="APPROVED">Approved/current</option>';docStatus.value='APPROVED';}
+  const initialView=isReportViewer()?'reports':'mySafety';seedSafetyNavigation(initialView);showView(initialView,{push:false});
+}
+
+function latestTrainingSignoff(a){return state.trainingSignoffs.filter(s=>s.training_assignment_id===a.id).sort((x,y)=>new Date(y.signed_at||0)-new Date(x.signed_at||0))[0]||null}
+function latestTrainingException(a){return state.trainingExceptions.filter(x=>x.training_assignment_id===a.id).sort((x,y)=>new Date(y.completed_at||0)-new Date(x.completed_at||0))[0]||null}
+function latestTrainingCompletion(a){const signoff=latestTrainingSignoff(a),exception=latestTrainingException(a);if(!exception)return {evidence:signoff,exception:null};if(!signoff||new Date(exception.completed_at||0)>new Date(signoff.signed_at||0))return {evidence:{...exception,signed_at:exception.completed_at},exception};return {evidence:signoff,exception:null}}
+function trainingEvents(a){return state.trainingConfirmations.filter(c=>c.assignment_id===a.id).sort((x,y)=>new Date(y.confirmed_at||0)-new Date(x.confirmed_at||0))}
+function latestTrainingConfirmation(a){return trainingEvents(a).find(c=>(c.attendance_status||'ATTENDED')==='ATTENDED')||null}
+function latestTrainingEvent(a){return trainingEvents(a)[0]||null}
+function freshConfirmation(c,s){return !!c&&(!s||new Date(c.confirmed_at)>new Date(s.signed_at))}
+function effectiveTrainingMethod(t,a){return a?.delivery_method_override||t?.delivery_method||defaultTrainingDelivery(trainingKind(t))}
+function trainingAssignmentDue(a,s){if(!s)return a.due_date?new Date(a.due_date+'T23:59:59').toISOString():new Date().toISOString();const c=trainingEvents(a).find(x=>(x.attendance_status||'ATTENDED')==='ATTENDED'&&new Date(x.confirmed_at)<=new Date(s.signed_at));return addRenewal(c?.delivery_date||s.signed_at,a.renewal_value,a.renewal_unit)}
+function assignmentStatus(a,t){
+  const completion=latestTrainingCompletion(a),s=completion.evidence,exception=completion.exception,method=effectiveTrainingMethod(t,a),due=trainingAssignmentDue(a,s),c=latestTrainingConfirmation(a),event=latestTrainingEvent(a),renewalDue=!!(s&&a.renewal_value&&due&&new Date(due)<=new Date()),needs=!s||renewalDue;
+  if(!needs)return {code:'COMPLETED',label:exception?'Completed · admin exception':'Completed',badge:'complete',due,s,exception,method,c,event,ready:false};
+  if(due&&new Date(due)<new Date())return {code:'OVERDUE',label:'Overdue',badge:'overdue',due,s,exception,method,c,event,ready:freshConfirmation(c,s)};
+  if(method==='INSTRUCTOR_LED'){
+    if(freshConfirmation(c,s))return {code:'READY_TO_SIGN',label:'Ready to sign',badge:'due',due,s,exception,method,c,event,ready:true};
+    if(event?.attendance_status==='ABSENT')return {code:'AWAITING_INSTRUCTOR',label:'Absent / awaiting new session',badge:'due',due,s,exception,method,c,event,ready:false};
+    return {code:'AWAITING_INSTRUCTOR',label:'Awaiting instructor',badge:'due',due,s,exception,method,c,event,ready:false};
+  }
+  return {code:'OUTSTANDING',label:s?'Refresher due':'Not started',badge:'due',due,s,exception,method,c,event,ready:true};
+}
+function myActiveAssignments(){return state.trainingAssignments.filter(a=>a.user_id===state.user?.id&&a.active!==false).map(a=>({a,t:state.training.find(t=>t.id===a.training_session_id)})).filter(x=>x.t&&x.t.status!=='ARCHIVED'&&trainingSourceApproved(x.t))}
+function renderMySafety(){
+  const rows=myActiveAssignments().map(x=>({...x,status:assignmentStatus(x.a,x.t)})).map(x=>({...x,traffic:assignmentTraffic(x.status,trainingDependencyState(x.t).ready)})).sort((a,b)=>trafficPriority(a.traffic)-trafficPriority(b.traffic)||String(a.t.name||'').localeCompare(String(b.t.name||'')));
+  const completed=rows.filter(x=>x.status.code==='COMPLETED').length;
+  const overdue=rows.filter(x=>x.status.code==='OVERDUE'||x.traffic==='red').length;
+  const waiting=rows.filter(x=>x.status.code==='AWAITING_INSTRUCTOR').length;
+  const action=rows.filter(x=>x.status.code!=='COMPLETED').length;
+  const stats=[
+    {label:'Complete',value:completed,traffic:'green'},
+    {label:'Action required',value:action,traffic:overdue?'red':action?'amber':'green'},
+    {label:'Overdue / blocked',value:overdue,traffic:overdue?'red':'green'},
+    {label:'Awaiting instructor',value:waiting,traffic:waiting?'amber':'green'}
+  ];
+  $('mySafetyStats').innerHTML=stats.map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot" aria-hidden="true"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('');
+  $('mySafetyList').innerHTML=rows.length?rows.map(({a,t,status,traffic})=>{
+    const src=sourceForTraining(t),deps=trainingDependencyState(t),materials=requiredTrainingMaterials(a,t),materialOpened=requiredTrainingMaterialOpened(a,t);
+    const openedCount=materials.filter(m=>trainingMaterialOpenedSince(m,a)).length,unavailable=materials.filter(m=>m.available===false).length;
+    const requiredBtn=materials.length?btn(status.code==='COMPLETED'?'Open safety document':(materialOpened?'Safety document opened ✓':'Open safety document'),status.code==='COMPLETED'?'secondary':(materialOpened?'secondary':'primary'),`data-open-required-training="${a.id}"`):'';
+    const materialBadge=materials.length&&status.code!=='COMPLETED'?`<span class="badge ${materialOpened?'complete':'due'}">${materialOpened?'Safety document opened ✓':`Safety document ${openedCount}/${materials.length} opened${unavailable?` · source unavailable`:''}`}</span>`:'';
+    const mainAction=deps.ready&&status.code!=='COMPLETED'&&status.method==='SELF_TRAINING'&&materialOpened?btn('Complete & sign','primary',`data-sign-training="${a.id}"`):deps.ready&&status.code==='READY_TO_SIGN'?btn('Sign attendance','primary',`data-sign-training="${a.id}"`):'';
+    const supportAction=deps.ready&&status.method==='SELF_TRAINING'&&status.code!=='COMPLETED'?btn('Need instructor help','secondary',`data-request-instructor="${a.id}"`):'';
+    const adminException=deps.ready&&isAdmin()&&a.user_id===state.user?.id&&status.method==='INSTRUCTOR_LED'&&status.code!=='COMPLETED'&&!status.ready?btn('Complete as exception','danger',`data-training-exception="${a.id}"`):'';
+    return `<div class="item-card training-status-card traffic-${traffic}"><div class="row-between"><div><h3>${esc(trainingReference(t)&&!t.name.toUpperCase().includes(trainingReference(t))?trainingReference(t)+' - '+t.name:t.name)}</h3><div class="meta"><span class="badge">${esc(kindLabel(trainingKind(t)))}</span><span>${esc(deliveryText(status.method))}</span><span class="badge ${!deps.ready?'overdue':status.badge}">${esc(!deps.ready?'Blocked':status.label)}</span>${status.due?`<span>Due ${fmtDate(status.due)}</span>`:''}${materialBadge}</div></div>${statusChip(!deps.ready?'Blocked':status.label,traffic)}</div>${src?`<div class="muted">Safety source: ${esc(src.reference||'')} ${esc(src.title)}</div>`:''}${!deps.ready?`<div class="pending-use-warning">${esc(trainingDependencyMessage(t))}</div>`:materials.length&&status.code!=='COMPLETED'&&!materialOpened?`<div class="request-note">Open the current approved safety document first. The sign-off button will then become the next action.</div>`:''}<div class="row action-bar">${deps.ready?requiredBtn:''}${mainAction}${adminException}${supportAction}${status.code==='COMPLETED'&&isStandardUser()?'':btn(status.code==='COMPLETED'?'Training record':'View training','ghost',`data-view-training="${t.id}"`)}</div></div>`
+  }).join(''):'<div class="success-note">Nothing is currently assigned to you.</div>';
+  renderMyAwareness();
+  renderMyPpe();
+}
+
+function documentIndexCount(kind){
+  if(kind==='TOOLBOX_TALK')return state.training.filter(t=>t.status!=='ARCHIVED'&&trainingKind(t)==='TOOLBOX_TALK'&&(isManager()||['APPROVED','LEGACY'].includes(trainingApprovalStatus(t)))).length;
+  return state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type===kind&&(isManager()||approvedCurrentVersion(d.id))).length;
+}
+function documentRegisterCount(){
+  return ['RISK_ASSESSMENT','COSHH','SSW','SDS'].reduce((n,k)=>n+registerDocumentRows(k).length,0)+documentIndexCount('TOOLBOX_TALK');
+}
+function pendingApprovalEntries(){
+  return state.versions.filter(v=>versionApprovalStatus(v)==='PENDING').map(v=>({v,d:state.documents.find(d=>d.id===v.document_id)})).filter(x=>x.d&&x.d.status!=='ARCHIVED').sort((a,b)=>new Date(a.v.created_at||0)-new Date(b.v.created_at||0));
+}
+function renderDocumentApprovalOverview(){
+  const wrap=$('documentApprovalOverview'),stats=$('documentApprovalStats'),panel=$('pendingApprovalPanel');if(!wrap||!stats||!panel||!isManager())return;
+  wrap.hidden=false;
+  const q=clean($('documentSearch')?.value).toLowerCase(),type=$('documentTypeFilter')?.value||'',status=$('documentStatusFilter')?.value||'';
+  const pendingFocus=status==='PENDING';
+  const overviewHead=wrap.querySelector('.approval-overview-card > .row-between');
+  if(overviewHead)overviewHead.hidden=pendingFocus;
+  stats.hidden=pendingFocus;
+  const searchOk=d=>!q||`${d.reference||''} ${d.title||''} ${documentDisplayTitle(d)} ${originalBulkSourceName(approvedCurrentVersion(d.id)||pendingApprovalVersion(d.id)||latestVersion(d.id))}`.toLowerCase().includes(q);
+  const docs=state.documents.filter(d=>d.status!=='ARCHIVED'&&searchOk(d)&&(!type||d.doc_type===type)&&matchesDocumentStatusFilter(d,status));
+  const approved=docs.filter(d=>approvedCurrentVersion(d.id)).length;
+  let pending=pendingApprovalEntries().filter(({d})=>searchOk(d)&&(!type||d.doc_type===type));
+  let pendingTbts=state.training.filter(t=>t.status!=='ARCHIVED'&&trainingKind(t)==='TOOLBOX_TALK'&&trainingApprovalStatus(t)==='PENDING'&&(!q||trainingSearchText(t).includes(q))&&(!type||type==='TOOLBOX_TALK'));
+  if(status&&!['ACTIVE','PENDING'].includes(status)){pending=[];pendingTbts=[]}
+  const pendingTotal=pending.length+pendingTbts.length;
+  const reviewAction=docs.filter(d=>{const v=approvedCurrentVersion(d.id);return !!v&&(d.review_required||(!v.review_date?false:v.review_date>=todayISO()&&v.review_date<=daysFromNow(30)))}).length;
+  const red=docs.filter(d=>documentTraffic(d)==='red').length;
+  stats.innerHTML=[
+    {label:'Approved/current',value:approved,traffic:'green'},
+    {label:'Pending approval',value:pendingTotal,traffic:pendingTotal?'amber':'green'},
+    {label:'Review action',value:reviewAction,traffic:reviewAction?'amber':'green'},
+    {label:'Overdue / not approved',value:red,traffic:red?'red':'green'}
+  ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot" aria-hidden="true"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('');
+  const documentCards=pending.map(({d,v})=>{const current=approvedCurrentVersion(d.id),replacement=!!current&&current.id!==v.id;return `<div class="item-card document-status-card traffic-amber"><div class="row-between"><div><h4>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</h4><div class="meta"><span class="badge due">${esc(versionApprovalLabel(v,d))}</span><span>v${esc(v.version_label||'—')}</span><span>Issue ${fmtDate(v.issue_date)}</span>${d.doc_type==='SDS'?'':`<span>Review ${fmtDate(v.review_date)}</span>`}</div></div>${statusChip('Pending approval','amber')}</div>${replacement?`<div class="request-note">Current v${esc(current.version_label||'—')} remains in use until this replacement is approved.</div>`:'<div class="pending-use-warning">No approved version is currently in use.</div>'}<div class="row action-bar">${btn('Open pending file','secondary',`data-open-doc="${v.id}"`)}${btn(d.doc_type==='SDS'?'Review & accept':'Review & approve','primary',`data-approve-version="${v.id}"`)}${isAdmin()&&documentLooksUnused(d)?moreActions(btn('Delete unused','danger',`data-delete-unused-doc="${d.id}"`)):''}</div></div>`});
+  const tbtCards=pendingTbts.map(t=>{const f=latestTrainingFile(t.id);return `<div class="item-card training-catalogue-card traffic-amber"><div class="row-between"><div><h4>${esc(trainingReference(t)&&!t.name.toUpperCase().includes(trainingReference(t))?trainingReference(t)+' - '+t.name:t.name)}</h4><div class="meta"><span class="badge">Toolbox Talk</span><span class="badge due">Pending approval</span><span>${esc(deliveryText(t.delivery_method||'INSTRUCTOR_LED'))}</span><span>Review ${fmtDate(t.review_date)}</span></div></div>${statusChip('Pending approval','amber')}</div><div class="request-note">Open and review the exact Toolbox Talk PDF, then digitally approve it before assignment.</div><div class="row action-bar">${f?btn('Open pending file','secondary',`data-open-training-file="${f.id}"`):''}${btn('Review & approve','primary',`data-approve-training="${t.id}"`)}</div></div>`});
+  const cards=[...documentCards,...tbtCards];
+  panel.innerHTML=`<div class="pending-approval-head"><div><h4>${pendingFocus?'Pending approval':'Pending approval queue'}</h4><p class="muted">${pendingFocus?'Items matching the filters are shown here first. ':'This queue follows the Search, Type and Status filters above. '}Pending documents and Toolbox Talks are not authorised for use or assignment until approved.</p></div><span class="badge ${pendingTotal?'due':'complete'}">${pendingTotal} pending</span></div>${cards.length?`<div class="card-list pending-approval-list">${cards.join('')}</div>`:'<div class="success-note">No items matching the current filters are waiting for approval.</div>'}`;
+}
+
+function renderDocumentIndexGrid(){
+  const grid=$('documentIndexGrid'),ctx=$('documentIndexContext');if(!grid||!ctx)return;
+  const selected=state.documentIndex||'ALL';
+  grid.hidden=selected!=='ALL';ctx.hidden=selected==='ALL';
+  const registerCard=`<button type="button" class="document-index-card document-register-card" data-doc-index="REGISTER"><span class="document-index-name">Register</span><strong>${documentRegisterCount()}</strong><span class="muted">Approved/current controlled items</span><span class="register-open-label">Open register</span></button>`;
+  grid.innerHTML=registerCard+Object.entries(documentIndexDefs).map(([kind,d])=>`<button type="button" class="document-index-card" data-doc-index="${kind}"><span class="document-index-name">${esc(d.short)}</span><strong>${documentIndexCount(kind)}</strong><span class="muted">Open index</span></button>`).join('');
+  if(selected==='REGISTER'){$('documentIndexTitle').textContent='Register';$('documentIndexDescription').textContent='Live master register of approved/current RA, COSHH Risk Assessment, SSW, MSDS/Safety Data Sheet and Toolbox Talk items.'}
+  else if(selected!=='ALL'&&documentIndexDefs[selected]){$('documentIndexTitle').textContent=documentIndexDefs[selected].title;$('documentIndexDescription').textContent=documentIndexDefs[selected].description}
+}
+function registerDocumentRows(kind,q=''){
+  return state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type===kind&&approvedCurrentVersion(d.id)).filter(d=>!q||`${d.reference||''} ${documentDisplayTitle(d)} ${originalBulkSourceName(approvedCurrentVersion(d.id))}`.toLowerCase().includes(q)).sort((a,b)=>String(a.reference||documentDisplayTitle(a)).localeCompare(String(b.reference||documentDisplayTitle(b)),undefined,{numeric:true}));
+}
+function registerToolboxRows(q=''){
+  return state.training.filter(t=>t.status!=='ARCHIVED'&&trainingKind(t)==='TOOLBOX_TALK'&&['APPROVED','LEGACY'].includes(trainingApprovalStatus(t))).filter(t=>!q||trainingSearchText(t).includes(q)).sort((a,b)=>String(trainingReference(a)||a.name).localeCompare(String(trainingReference(b)||b.name),undefined,{numeric:true}));
+}
+function registerSectionHtml(kind,label,q=''){
+  if(kind==='TOOLBOX_TALK'){
+    const rows=registerToolboxRows(q);
+    return `<section class="register-section"><div class="register-section-heading"><h3>${esc(label)}</h3><span class="badge">${rows.length}</span></div>${rows.length?`<div class="register-list">${rows.map(t=>{const f=latestTrainingFile(t.id);return `<div class="register-row"><div class="register-main"><strong>${esc(trainingReference(t)||'—')}</strong><span>${esc(t.name)}</span></div><div class="register-meta"><span>Training-controlled</span><span>File ${f?fmtDate(f.created_at):'—'}</span><span>Review ${fmtDate(t.review_date)}</span></div></div>`}).join('')}</div>`:'<div class="empty compact-empty">No current items registered.</div>'}</section>`;
+  }
+  const rows=registerDocumentRows(kind,q);
+  return `<section class="register-section"><div class="register-section-heading"><h3>${esc(label)}</h3><span class="badge complete">${rows.length}</span></div>${rows.length?`<div class="register-list">${rows.map(d=>{const v=approvedCurrentVersion(d.id),title=documentDisplayTitle(d);return `<div class="register-row traffic-register-green"><div class="register-main"><strong>${esc(d.reference||'—')}</strong><span>${esc(title)}</span></div><div class="register-meta"><span class="badge complete">${esc(versionApprovalLabel(v,d))}</span><span>v${esc(v?.version_label||'—')}</span><span>Issue ${fmtDate(v?.issue_date)}</span>${kind==='SDS'?'':`<span>Review ${fmtDate(v?.review_date)}</span>`}</div></div>`}).join('')}</div>`:'<div class="empty compact-empty">No approved/current items registered.</div>'}</section>`;
+}
+function renderDocumentRegister(q='',type=''){
+  let sections=[['RISK_ASSESSMENT','Risk Assessments'],['COSHH','COSHH Risk Assessments'],['SSW','Safe Systems of Work'],['SDS','MSDS / Safety Data Sheets'],['TOOLBOX_TALK','Toolbox Talks']];
+  if(type)sections=sections.filter(([k])=>k===type);
+  const body=sections.length?sections.map(([k,l])=>registerSectionHtml(k,l,q)).join(''):'<div class="empty">This document type is not part of the controlled Register.</div>';
+  $('documentsList').innerHTML=`<div class="register-toolbar"><div><strong>Approved / Current Document Register</strong><div class="muted">Generated live from authorised/current Safety Tracker records only.${type?' Filtered to '+esc(type==='TOOLBOX_TALK'?'Toolbox Talk':docTypeLabel(type))+'.':''}</div></div>${btn('Download register PDF','secondary','data-download-register')}</div>`+body;
+}
+function documentRegisterPdf(){
+  const rows=[];
+  for(const [kind,label] of [['RISK_ASSESSMENT','Risk Assessments'],['COSHH','COSHH Risk Assessments'],['SSW','Safe Systems of Work'],['SDS','MSDS / Safety Data Sheets']]){
+    for(const d of registerDocumentRows(kind)){const v=approvedCurrentVersion(d.id);rows.push({section:label,reference:d.reference||'',title:documentDisplayTitle(d),version:v?.version_label||'',approval:versionApprovalLabel(v,d),issue_date:fmtDate(v?.issue_date),review_date:kind==='SDS'?'—':fmtDate(v?.review_date)});}
+  }
+  for(const t of registerToolboxRows()){rows.push({section:'Toolbox Talks',reference:trainingReference(t)||'',title:t.name||'',version:'',approval:'Training-controlled',issue_date:'',review_date:fmtDate(t.review_date)});}
+  pdfTable('Safety Tracker Approved / Current Document Register',rows,`safety-document-register-${todayISO()}.pdf`);
+}
+function latestTrainingFile(trainingId){return state.trainingFiles.filter(f=>f.training_session_id===trainingId).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null}
+function trainingApprovalStatus(t){return String(t?.approval_status||'NOT_REQUIRED').toUpperCase()}
+function trainingApprovalLabel(t){const s=trainingApprovalStatus(t);if(s==='APPROVED'||s==='LEGACY')return 'Approved';if(s==='PENDING')return 'Pending approval';if(s==='REJECTED')return 'Returned for changes';return s.replaceAll('_',' ')}
+function trainingFileHasBeenOpened(fileId,userId=state.user?.id){return state.documentActivity.some(a=>a.user_id===userId&&a.training_file_id===fileId&&a.action==='OPENED')}
+async function openTrainingFile(fileId){const f=state.trainingFiles.find(x=>x.id===fileId);if(!f?.storage_path)return toast('Stored Toolbox Talk PDF not found.');const t=state.training.find(x=>x.id===f.training_session_id);if(!isManager()&&(!t||t.status==='ARCHIVED'||!['APPROVED','LEGACY'].includes(trainingApprovalStatus(t))))return toast('Only approved/current Toolbox Talks are available.');let popup=null;try{popup=window.open('about:blank','_blank')}catch{}try{let blob=state.offline||!navigator.onLine?await cachedSafetyBlob('training',f.id):null;if(!blob&&!state.offline&&navigator.onLine){if(isManager()){const {data:{session}}=await sb.auth.getSession();const token=session?.access_token;if(token){const r=await fetch(`${CFG.supabaseUrl}/functions/v1/safety-file-open`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':CFG.supabaseKey},body:JSON.stringify({training_file_id:f.id})});if(r.ok)blob=await r.blob()}}if(!blob){const r=await sb.storage.from('safety-files').download(f.storage_path);if(r.error||!r.data)throw new Error(r.error?.message||'Stored Toolbox Talk PDF not found.');blob=r.data}await cacheSafetyBlob('training',f.id,blob)}if(!blob)throw new Error('This Toolbox Talk has not yet been saved for offline use. Open it once while connected, then it will be available offline.');const url=URL.createObjectURL(blob);if(popup&&!popup.closed){popup.opener=null;popup.location.href=url}else{window.location.href=url}setTimeout(()=>URL.revokeObjectURL(url),120000);if(!state.offline&&navigator.onLine)await logDocumentActivity('OPENED',{...activityTrainingFileSnapshot(f),source_context:'TOOLBOX_TALK_APPROVAL'});renderDocuments();renderTraining();}catch(e){try{popup?.close()}catch{}console.error('openTrainingFile failed',e);toast(e?.message||'Could not open this Toolbox Talk PDF.')}}
+async function downloadTrainingFile(fileId){const f=state.trainingFiles.find(x=>x.id===fileId);if(!f?.storage_path)return toast('Stored Toolbox Talk PDF not found.');const t=state.training.find(x=>x.id===f.training_session_id);if(!isManager()&&(!t||t.status==='ARCHIVED'||!['APPROVED','LEGACY'].includes(trainingApprovalStatus(t))))return toast('Only approved/current Toolbox Talks are available.');const r=await sb.storage.from('safety-files').download(f.storage_path);if(r.error||!r.data)return toast(r.error?.message||'Download failed.');downloadBlob(r.data,f.file_name||'toolbox-talk.pdf');await logDocumentActivity('DOWNLOADED',{...activityTrainingFileSnapshot(f),source_context:'TOOLBOX_TALK'});}
+function showTrainingApproval(id){if(!isManager())return;const t=state.training.find(x=>x.id===id);if(!t||trainingKind(t)!=='TOOLBOX_TALK')return;const st=trainingApprovalStatus(t);if(st!=='PENDING')return toast(st==='APPROVED'?'This Toolbox Talk is already approved.':'This Toolbox Talk is not pending approval.');const f=latestTrainingFile(t.id);if(!f)return toast('No Toolbox Talk PDF is attached.');const opened=trainingFileHasBeenOpened(f.id),rows=audienceRowsFor('TRAINING',t.id);openModal('Review & approve Toolbox Talk',`<div class="section-card training-catalogue-card traffic-amber"><h3>${esc(trainingReference(t)?trainingReference(t)+' - '+t.name:t.name)}</h3><div class="meta"><span class="badge due">Pending approval</span><span>${esc(deliveryText(t.delivery_method||'INSTRUCTOR_LED'))}</span><span>Review ${fmtDate(t.review_date)}</span></div><div class="${opened?'success-note':'pending-use-warning'}">${opened?'Exact Toolbox Talk PDF opened ✓':'Open the exact Toolbox Talk PDF before approval.'}</div><div class="row">${btn('Open Toolbox Talk PDF','secondary',`data-open-training-file="${f.id}"`)}</div></div>${genericAudienceHtml('tbtApprovalAudience',rows,{heading:'Who needs this Toolbox Talk?',help:'Confirm the assignment audience before approval. Department rules include future users automatically.'})}<label>Approval note (optional)<textarea id="trainingApprovalNote" placeholder="Record any checks or conditions."></textarea></label>${signatureBlock('trainingApproval')}<label class="check-row"><input id="trainingApprovalAck" type="checkbox"> I confirm I have reviewed this Toolbox Talk and approve it for controlled use and training assignment.</label><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Approve Toolbox Talk','primary',`data-confirm-training-approval="${t.id}"`)}</div>`);setupSignaturePad('trainingApprovalSignaturePad','trainingApprovalClearSignature');wireGenericAudience('tbtApprovalAudience',true)}
+async function confirmTrainingApproval(id){if(!isManager())return;const t=state.training.find(x=>x.id===id),f=latestTrainingFile(id);if(!t||!f)return;if(trainingApprovalStatus(t)!=='PENDING')return toast('This Toolbox Talk is no longer pending approval.');if(!trainingFileHasBeenOpened(f.id))return toast('Open the exact Toolbox Talk PDF before approving it.');if(!$('trainingApprovalAck')?.checked)return toast('Tick the approval confirmation first.');const audience=genericAudienceSelection('tbtApprovalAudience',true);if(!audienceSelectionValid(audience))return toast('Choose Everyone, at least one Department, or at least one specific person before approval.');const sig=signatureData('trainingApprovalSignaturePad'),name=clean($('trainingApprovalSignatureName')?.value),note=clean($('trainingApprovalNote')?.value);if(!sig||!name)return toast('Digital signature and signature name are required.');const ar=await sb.rpc('set_training_session_audience_v239',{p_training_session_id:id,p_everyone:audience.everyone,p_department_ids:audience.departmentIds,p_user_ids:audience.userIds,p_due_days:audience.dueDays});if(ar.error)return toast(ar.error.message);const r=await sb.rpc('approve_training_session',{p_training_session_id:id,p_signature_data:sig,p_signature_name:name,p_approval_note:note||null});if(r.error)return toast(r.error.message);closeModal();await refresh('Toolbox Talk approved and its audience has been assigned automatically.')}
+
+function trainingOpenCutoff(a){
+  const c=latestTrainingCompletion(a)?.evidence;
+  const ts=c?.signed_at||c?.completed_at||null;
+  return ts?new Date(ts).getTime():0;
+}
+function requiredTrainingMaterials(a,t){
+  if(!a||!t)return [];
+  const out=[];
+  if(t.source_document_id){
+    const d=state.documents.find(x=>x.id===t.source_document_id);
+    const v=state.versions.find(x=>x.id===t.source_document_version_id)||approvedCurrentVersion(t.source_document_id)||currentVersion(t.source_document_id);
+    if(d)out.push({kind:'DOCUMENT',document:d,version:v||null,available:!!(v&&isVersionApproved(v)&&v.status==='CURRENT'),label:`${d.reference||docTypeLabel(d.doc_type)} - ${documentDisplayTitle(d)}`});
+  }else{
+    const f=latestTrainingFile(t.id);
+    if(f)out.push({kind:'TRAINING_FILE',file:f,available:true,label:f.file_name||t.name});
+  }
+  return out;
+}
+function requiredTrainingMaterial(a,t){return requiredTrainingMaterials(a,t)[0]||null}
+function trainingMaterialOpenedSince(m,a){
+  if(!m||m.available===false)return false;
+  const cutoff=trainingOpenCutoff(a),uid=state.user?.id;
+  return state.documentActivity.some(x=>x.user_id===uid&&x.action==='OPENED'&&new Date(x.occurred_at||0).getTime()>cutoff&&((m.kind==='DOCUMENT'&&m.version&&x.document_version_id===m.version.id)||(m.kind==='TRAINING_FILE'&&x.training_file_id===m.file.id)));
+}
+function requiredTrainingMaterialOpened(a,t){const mats=requiredTrainingMaterials(a,t);return !mats.length||mats.every(m=>trainingMaterialOpenedSince(m,a))}
+function requiredTrainingMaterialLabel(a,t){const missing=requiredTrainingMaterials(a,t).filter(m=>!trainingMaterialOpenedSince(m,a));return missing.length?missing.map(m=>m.available===false?`${m.label} (not approved/current)`:m.label).join('; '):'required training file'}
+async function openRequiredTrainingMaterial(assignmentId){
+  const a=state.trainingAssignments.find(x=>x.id===assignmentId),t=state.training.find(x=>x.id===a?.training_session_id);if(!a||!t)return;
+  if(t.source_document_version_id&&!trainingSourceApproved(t))return toast('This controlled source is pending approval and cannot be used for Training yet.');
+  const mats=requiredTrainingMaterials(a,t);if(!mats.length)return toast('No required training file is attached to this assignment.');
+  const m=mats.find(x=>!trainingMaterialOpenedSince(x,a))||mats[0];if(m.available===false)return toast(`Required document is not approved/current yet: ${m.label}`);
+  if(m.kind==='DOCUMENT'){if(!m.version?.storage_path)return toast('Stored PDF not found.');await openDocument(m.version.id)}else{if(!m.file?.storage_path)return toast('Stored training file not found.');await openTrainingFile(m.file.id)}
+  renderMySafety();
+}
+function renderToolboxTalkDocumentIndex(q,status){
+  const matchesStatus=t=>{const active=t.status!=='ARCHIVED',approval=trainingApprovalStatus(t),reviewOver=t.review_date&&t.review_date<todayISO(),reviewDue=t.review_date&&t.review_date>=todayISO()&&t.review_date<=daysFromNow(30);if(!status)return true;if(status==='ACTIVE')return active;if(status==='ARCHIVED')return !active;if(status==='PENDING')return active&&approval==='PENDING';if(status==='APPROVED')return active&&['APPROVED','LEGACY'].includes(approval);if(status==='REVIEW_REQUIRED')return active&&(t.review_required||reviewDue);if(status==='OVERDUE')return active&&!!reviewOver;return true};
+  const rows=state.training.filter(t=>trainingKind(t)==='TOOLBOX_TALK'&&(isManager()||['APPROVED','LEGACY'].includes(trainingApprovalStatus(t)))&&(isManager()||t.status!=='ARCHIVED')&&(!q||trainingSearchText(t).includes(q))&&matchesStatus(t)).sort((a,b)=>trafficPriority(trainingCatalogueTraffic(a))-trafficPriority(trainingCatalogueTraffic(b))||String(trainingReference(a)||a.name).localeCompare(String(trainingReference(b)||b.name),undefined,{numeric:true}));
+  $('documentsList').innerHTML=rows.length?rows.map(t=>{
+    const f=latestTrainingFile(t.id),assigns=state.trainingAssignments.filter(a=>a.training_session_id===t.id&&a.active!==false),active=t.status!=='ARCHIVED',approval=trainingApprovalStatus(t),approved=['APPROVED','LEGACY'].includes(approval),pending=approval==='PENDING',traffic=!active?'neutral':pending?'amber':approved?trainingOperationalTraffic(t):'red';
+    const approvalBadge=approved?'<span class="badge complete">Approved</span>':pending?'<span class="badge due">Pending approval</span>':`<span class="badge overdue">${esc(trainingApprovalLabel(t))}</span>`;
+    const msg=!active?'Archived Toolbox Talk — retained for history and not available for new assignments.':pending?'Pending management approval — open and review the exact PDF, then digitally approve it before assignment.':approved?'Approved Toolbox Talk — available for assignment, attendance and sign-off.':'Toolbox Talk is not approved for training use.';
+    const more=`${f?btn('Download','ghost',`data-download-training-file="${f.id}"`):''}${btn('Activity','ghost',`data-training-file-activity="${t.id}"`)}${btn('View training','ghost',`data-view-training="${t.id}"`)}${isManager()?btn(active?'Archive':'Restore / activate','ghost',`data-archive-training="${t.id}"`):''}`;
+    return `<div class="item-card training-catalogue-card traffic-${traffic}"><div class="row-between"><div><h3>${esc(trainingReference(t)&&!t.name.toUpperCase().includes(trainingReference(t))?trainingReference(t)+' - '+t.name:t.name)}</h3><div class="meta"><span class="badge">Toolbox Talk</span>${approvalBadge}<span>${esc(deliveryText(t.delivery_method||'INSTRUCTOR_LED'))}</span><span>Review ${fmtDate(t.review_date)}</span><span>${assigns.length} assigned</span></div></div>${statusChip(!active?'Archived':pending?'Pending approval':approved?'Approved/current':'Not approved',traffic)}</div><div class="muted">${msg}</div>${t.review_required&&t.review_reason?`<div class="request-note">${esc(t.review_reason)}</div>`:''}<div class="row action-bar">${f?btn(active&&pending?'Open pending file':'Open file',pending?'secondary':'primary',`data-open-training-file="${f.id}"`):''}${isManager()&&active&&pending?btn('Review & approve','primary',`data-approve-training="${t.id}"`):''}${isManager()&&active&&approved?btn('Audience','secondary',`data-assign-training="${t.id}"`):''}${moreActions(more)}</div></div>`
+  }).join(''):'<div class="empty">No Toolbox Talks match this filter.</div>';
+}
+
+function documentLooksUnused(d){
+  if(!d)return false;
+  const versions=state.versions.filter(v=>v.document_id===d.id);
+  if(versions.some(v=>versionApprovalStatus(v)!=='PENDING'||v.approval_at||v.approval_by||v.approval_signature_data))return false;
+  if(state.documentReviews.some(r=>r.document_id===d.id||versions.some(v=>v.id===r.document_version_id)))return false;
+  const sourceSessions=state.training.filter(t=>t.source_document_id===d.id);
+  if(sourceSessions.some(t=>t.auto_managed!==true))return false;
+  const sourceIds=new Set(sourceSessions.map(t=>t.id));
+  if(state.trainingAssignments.some(a=>sourceIds.has(a.training_session_id)))return false;
+  if(state.trainingSignoffs.some(x=>sourceIds.has(x.training_session_id)))return false;
+  if(state.trainingExceptions.some(x=>sourceIds.has(x.training_session_id)))return false;
+  if(state.trainingFiles.some(f=>sourceIds.has(f.training_session_id)))return false;
+  const assignmentIds=new Set(state.trainingAssignments.filter(a=>sourceIds.has(a.training_session_id)).map(a=>a.id));
+  if(state.trainingConfirmations.some(c=>assignmentIds.has(c.assignment_id)))return false;
+  if(state.trainingDocumentLinks.some(l=>l.document_id===d.id&&!sourceIds.has(l.training_session_id)))return false;
+  if(state.historicalDocAssignments.some(a=>a.document_id===d.id))return false;
+  if(state.documentActivity.some(a=>a.document_id===d.id&&!['OPENED','DOWNLOADED'].includes(a.action)))return false;
+  return true;
+}
+function matchesDocumentStatusFilter(d,status){
+  const approved=approvedCurrentVersion(d.id),pending=pendingApprovalVersion(d.id),over=approved?.review_date&&approved.review_date<todayISO(),due=approved?.review_date&&approved.review_date>=todayISO()&&approved.review_date<=daysFromNow(30);
+  if(!status)return true;if(status==='ACTIVE')return d.status!=='ARCHIVED';if(status==='ARCHIVED')return d.status==='ARCHIVED';if(status==='UNUSED')return documentLooksUnused(d);if(d.status==='ARCHIVED')return false;if(status==='APPROVED')return !!approved;if(status==='PENDING')return !!pending;if(status==='REVIEW_REQUIRED')return !!(d.review_required||due);if(status==='OVERDUE')return !!over;return true;
+}
+function renderDocuments(){
+  if(!$('documentsList'))return;
+  const q=clean($('documentSearch').value).toLowerCase(),filterType=$('documentTypeFilter').value,status=$('documentStatusFilter').value;
+  renderDocumentApprovalOverview();
+  if(status==='PENDING'&&isManager()){
+    state.documentIndex='ALL';
+    if($('documentIndexGrid'))$('documentIndexGrid').hidden=true;
+    if($('documentIndexContext'))$('documentIndexContext').hidden=true;
+    $('documentsList').innerHTML='';
+    $('documentsList').hidden=true;
+    return;
+  }
+  $('documentsList').hidden=false;
+  renderDocumentIndexGrid();
+  const selected=state.documentIndex||'ALL';
+  if(selected==='REGISTER')return renderDocumentRegister(q,filterType);
+  if(selected==='TOOLBOX_TALK'||(selected==='ALL'&&filterType==='TOOLBOX_TALK'))return renderToolboxTalkDocumentIndex(q,status);
+  const type=selected!=='ALL'?selected:filterType;
+  const rows=state.documents.filter(d=>{const approved=approvedCurrentVersion(d.id),pending=pendingApprovalVersion(d.id),display=documentDisplayTitle(d),src=originalBulkSourceName(approved||pending||currentVersion(d.id)||latestVersion(d.id));if(!isManager()&&(!approved||d.status==='ARCHIVED'))return false;return (!q||`${d.reference||''} ${d.title||''} ${display} ${src}`.toLowerCase().includes(q))&&(!type||d.doc_type===type)&&matchesDocumentStatusFilter(d,status)}).sort((a,b)=>trafficPriority(documentTraffic(a))-trafficPriority(documentTraffic(b))||String(a.reference||documentDisplayTitle(a)).localeCompare(String(b.reference||documentDisplayTitle(b)),undefined,{numeric:true}));
+  $('documentsList').innerHTML=rows.length?rows.map(d=>{
+    const approved=approvedCurrentVersion(d.id),pending=pendingApprovalVersion(d.id),displayV=approved||pending||currentVersion(d.id)||latestVersion(d.id),over=approved?.review_date&&approved.review_date<todayISO(),soon=approved?.review_date&&approved.review_date>=todayISO()&&approved.review_date<=daysFromNow(30),traffic=documentTraffic(d);
+    const flag=over?'<span class="badge overdue">Review overdue</span>':d.review_required?'<span class="badge due">Controlled review required</span>':soon?'<span class="badge due">Review due soon</span>':'';
+    const approvalBadges=`${approved?`<span class="badge complete">${esc(versionApprovalLabel(approved,d))} · v${esc(approved.version_label||'—')}</span>`:''}${pending?`<span class="badge due">${esc(versionApprovalLabel(pending,d))} · v${esc(pending.version_label||'—')}</span>`:''}${!approved&&!pending?'<span class="badge overdue">No approved/current version</span>':''}`;
+    const sourceName=d.doc_type==='SDS'?originalBulkSourceName(displayV):'';
+    const userVersion=approved,managerPendingOnly=isManager()&&!userVersion&&pending;
+    const openButton=userVersion?btn('Open current','primary',`data-open-doc="${userVersion.id}"`):(managerPendingOnly?btn('Open pending','secondary',`data-open-doc="${pending.id}"`):'');
+    const approvalButton=isManager()&&pending?btn(d.doc_type==='SDS'?'Review & accept':'Review & approve','primary',`data-approve-version="${pending.id}"`):'';
+    const audienceButton=isManager()&&approved&&documentUsesFormalTraining(d)?btn('Training audience','secondary',`data-edit-doc-audience="${d.id}"`):'';
+    const newVersionButton=isManager()?(pending?btn('Awaiting approval','ghost','disabled'):btn('New version','secondary',`data-new-version="${d.id}"`)):'';
+    const more=`${userVersion?btn('Download','ghost',`data-download-doc="${userVersion.id}"`):''}${userVersion&&!documentUsesFormalTraining(d)?btn('Mark read / reviewed','ghost',`data-mark-doc-reviewed="${userVersion.id}"`):''}${btn('Activity','ghost',`data-doc-activity="${d.id}"`)}${btn('Details','ghost',`data-doc-details="${d.id}"`)}${isManager()&&approved&&d.doc_type!=='SDS'?btn('Controlled review','ghost',`data-review-doc="${d.id}"`):''}${isManager()?btn(d.status==='ARCHIVED'?'Restore':'Archive','ghost',`data-toggle-doc="${d.id}"`):''}${isAdmin()&&documentLooksUnused(d)?btn('Delete unused','danger',`data-delete-unused-doc="${d.id}"`):''}`;
+    const statusText=d.status==='ARCHIVED'?'Archived':over?'Review overdue':!approved&&!pending?'Not approved':pending?'Action required':d.review_required||soon?'Review due':'Current';
+    return `<div class="item-card document-status-card traffic-${traffic}"><div class="row-between"><div><h3>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</h3><div class="meta"><span class="badge">${esc(docTypeLabel(d.doc_type))}</span>${approvalBadges}<span>Issue ${fmtDate(displayV?.issue_date)}</span>${d.doc_type==='SDS'?'':`<span>Review ${fmtDate((approved||displayV)?.review_date)}</span>`}${flag}</div>${sourceName?`<div class="muted">Source file: ${esc(sourceName)}</div>`:''}${isManager()&&approved&&documentUsesFormalTraining(d)?`<div class="muted">Training audience: ${esc(documentAudienceSummary(d.id))}</div>`:''}</div>${statusChip(statusText,traffic)}</div>${!approved&&pending?'<div class="pending-use-warning">NOT APPROVED FOR USE — management review/approval required.</div>':''}${approved&&pending?`<div class="request-note">Approved/current v${esc(approved.version_label||'—')} remains in use while v${esc(pending.version_label||'—')} waits for approval.</div>`:''}${d.review_required&&d.review_reason?`<div class="request-note">${esc(d.review_reason)}</div>`:''}<div class="row action-bar">${approvalButton||openButton}${approvalButton?openButton:''}${audienceButton}${newVersionButton}${moreActions(more)}</div></div>`;
+  }).join(''):'<div class="empty">No controlled documents found in this index.</div>';
+}
+
+function trainingSearchText(t){const src=sourceForTraining(t);return `${t.name||''} ${t.reference||''} ${t.description||''} ${src?.reference||''} ${src?documentDisplayTitle(src):''}`.toLowerCase()}
+function trainingCatalogueTraffic(t){if(t.status==='ARCHIVED')return 'neutral';if(trainingKind(t)==='TOOLBOX_TALK'){const a=trainingApprovalStatus(t);if(a==='PENDING')return 'amber';if(!['APPROVED','LEGACY'].includes(a))return 'red'}if(!trainingSourceApproved(t))return 'amber';if(t.review_date&&t.review_date<todayISO())return 'red';if(t.review_required||(t.review_date&&t.review_date>=todayISO()&&t.review_date<=daysFromNow(30)))return 'amber';return 'green'}
+function renderTraining(){
+  if(!$('trainingList'))return;const q=clean($('trainingSearch').value).toLowerCase(),type=$('trainingTypeFilter').value,status=$('trainingStatusFilter').value;
+  const all=state.training.filter(t=>!t.auto_managed&&trainingKind(t)!=='TOOLBOX_TALK');
+  const rows=all.filter(t=>(!q||trainingSearchText(t).includes(q))&&(!type||trainingKind(t)===type)&&(!status||t.status===status)).sort((a,b)=>trafficPriority(trainingOperationalTraffic(a))-trafficPriority(trainingOperationalTraffic(b))||String(trainingReference(a)||a.name).localeCompare(String(trainingReference(b)||b.name),undefined,{numeric:true}));
+  const statsEl=$('trainingStats');
+  if(statsEl){
+    const active=all.filter(t=>t.status!=='ARCHIVED'),red=active.filter(t=>trainingOperationalTraffic(t)==='red').length,amber=active.filter(t=>trainingOperationalTraffic(t)==='amber').length,green=active.filter(t=>trainingOperationalTraffic(t)==='green').length,archived=all.filter(t=>t.status==='ARCHIVED').length;
+    statsEl.innerHTML=[
+      {label:'Compliant / current',value:green,traffic:'green'},
+      {label:'Action required',value:amber,traffic:amber?'amber':'green'},
+      {label:'Overdue / blocked',value:red,traffic:red?'red':'green'},
+      {label:'Archived',value:archived,traffic:'neutral'}
+    ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('');
+  }
+  $('trainingList').innerHTML=rows.length?rows.map(t=>{
+    const assigns=state.trainingAssignments.filter(a=>a.training_session_id===t.id&&a.active!==false),statuses=assigns.map(a=>assignmentStatus(a,t)),complete=statuses.filter(s=>s.code==='COMPLETED').length,overdue=statuses.filter(s=>s.code==='OVERDUE').length,deps=trainingDependencyState(t),traffic=trainingOperationalTraffic(t),flag=t.review_required?'<span class="badge due">Review required</span>':t.review_date&&t.review_date<todayISO()?'<span class="badge overdue">Review overdue</span>':'';
+    const label=t.status==='ARCHIVED'?'Archived':overdue?'Overdue assignments':traffic==='red'?'Blocked / overdue':traffic==='amber'?'Action required':'Current';
+    const more=isManager()?`${btn('Edit','ghost',`data-edit-training="${t.id}"`)}${btn(t.status==='ARCHIVED'?'Restore':'Archive','ghost',`data-archive-training="${t.id}"`)}`:'';
+    return `<div class="item-card training-catalogue-card traffic-${traffic}"><div class="row-between"><div><h3>${esc(trainingReference(t)&&!t.name.toUpperCase().includes(trainingReference(t))?trainingReference(t)+' - '+t.name:t.name)}</h3><div class="meta"><span class="badge">${esc(kindLabel(trainingKind(t)))}</span><span>${esc(deliveryText(t.delivery_method||defaultTrainingDelivery(trainingKind(t))))}</span><span>${esc(renewalText(t.renewal_value,t.renewal_unit,false))}</span><span>Review ${fmtDate(t.review_date)}</span>${flag}</div></div>${statusChip(label,traffic)}</div>${!deps.ready?`<div class="pending-use-warning">${esc(trainingDependencyMessage(t))}</div>`:''}${t.review_required&&t.review_reason?`<div class="request-note">${esc(t.review_reason)}</div>`:''}<div class="meta compliance-progress"><span><strong>${complete}</strong> / ${assigns.length} complete</span>${overdue?`<span class="badge overdue">${overdue} overdue</span>`:assigns.length>complete?`<span class="badge due">${assigns.length-complete} outstanding</span>`:'<span class="badge complete">All complete</span>'}</div><div class="row action-bar">${btn('View','secondary',`data-view-training="${t.id}"`)}${isManager()&&deps.ready?btn('Audience','primary',`data-assign-training="${t.id}"`):''}${moreActions(more)}</div></div>`
+  }).join(''):'<div class="empty">No standalone training matches this filter.</div>';
+}
+
+function renewalFields(prefix,value=null,unit=null,sourceAware=false){const p=value&&unit?`${Number(value)}|${unit}`:'';const known=['6|MONTHS','12|MONTHS','24|MONTHS'];const preset=known.includes(p)?p:(p?'CUSTOM':'');const noneLabel=sourceAware?'On change only':'One-off only';return `<label>Refresher frequency<select id="${prefix}RenewalPreset"><option value="" ${!preset?'selected':''}>${noneLabel}</option><option value="6|MONTHS" ${preset==='6|MONTHS'?'selected':''}>Every 6 months</option><option value="12|MONTHS" ${preset==='12|MONTHS'?'selected':''}>Every 12 months</option><option value="24|MONTHS" ${preset==='24|MONTHS'?'selected':''}>Every 24 months</option><option value="CUSTOM" ${preset==='CUSTOM'?'selected':''}>Custom</option></select></label><div id="${prefix}CustomRenewal" class="full" ${preset==='CUSTOM'?'':'hidden'}><div class="form-grid"><label>Every<input id="${prefix}RenewalValue" type="number" min="1" value="${preset==='CUSTOM'?esc(value||''):''}"></label><label>Unit<select id="${prefix}RenewalUnit"><option ${unit==='DAYS'?'selected':''}>DAYS</option><option ${unit==='MONTHS'||!unit?'selected':''}>MONTHS</option><option ${unit==='YEARS'?'selected':''}>YEARS</option></select></label></div></div>`}
+function getRenewal(prefix){const p=$(prefix+'RenewalPreset')?.value||'';if(!p)return {value:null,unit:null};if(p==='CUSTOM')return {value:Number($(prefix+'RenewalValue')?.value)||null,unit:$(prefix+'RenewalUnit')?.value||'MONTHS'};const [v,u]=p.split('|');return {value:Number(v),unit:u}}
+function setRenewalSelection(prefix,r){const sel=$(prefix+'RenewalPreset');if(!sel)return;const key=r?.value&&r?.unit?`${Number(r.value)}|${r.unit}`:'';sel.value=['6|MONTHS','12|MONTHS','24|MONTHS'].includes(key)?key:(key?'CUSTOM':'');if(sel.value==='CUSTOM'){if($(prefix+'RenewalValue'))$(prefix+'RenewalValue').value=r.value||'';if($(prefix+'RenewalUnit'))$(prefix+'RenewalUnit').value=r.unit||'MONTHS'}if($(prefix+'CustomRenewal'))$(prefix+'CustomRenewal').hidden=sel.value!=='CUSTOM'}
+function wireRenewal(prefix){$(prefix+'RenewalPreset')?.addEventListener('change',()=>{$(prefix+'CustomRenewal').hidden=$(prefix+'RenewalPreset').value!=='CUSTOM'})}
+
+function showNewDocument(){
+  if(!isManager())return;const review=plusYear(todayISO());
+  openModal('New controlled document',`<div class="form-grid"><label>Title<input id="docTitle"></label><label>Reference<input id="docRef" placeholder="e.g. RA-045"></label><label>Type<select id="docType"><option value="RISK_ASSESSMENT">Risk Assessment</option><option value="COSHH">COSHH Risk Assessment</option><option value="SSW">Safe System of Work</option><option value="SDS">MSDS / Safety Data Sheet</option><option value="POLICY">Policy</option><option value="PROCEDURE">Procedure</option><option value="OTHER">Other</option></select></label><label>Version<input id="docVersion" value="1"></label><label>Issue date<input id="docIssue" type="date" value="${todayISO()}"></label><label>Review date<input id="docReview" type="date" value="${review}"></label><div id="docTrainingRenewalWrap" class="full"><div class="form-grid">${renewalFields('doc',12,'MONTHS',true)}</div></div><label class="full">PDF file<input id="docFile" type="file" accept="application/pdf,.pdf" required></label><label class="full">Notes<textarea id="docNotes"></textarea></label></div><div class="hint-box">New and revised controlled documents are uploaded as <strong>Pending approval</strong>. They are not authorised for use or new Training until a Manager/Admin opens the exact PDF and digitally approves/accepts it.</div><div id="newDocAudienceWrap">${genericAudienceHtml('newDoc',[],{heading:'Who will require this?',help:'Set the audience now so it cannot be forgotten. The rule is stored immediately; training activates only after approval.'})}</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save document','primary','data-create-document')}</div>`);
+  wireRenewal('doc');wireGenericAudience('newDoc',true);let lastDocType=$('docType').value;const sync=()=>{const type=$('docType').value,s=type==='SDS';$('docReview').disabled=s;if(s)$('docReview').value='';else if(!$('docReview').value)$('docReview').value=plusYear($('docIssue').value||todayISO());$('docTrainingRenewalWrap').hidden=!sourceDocTypes.has(type);if($('newDocAudienceWrap'))$('newDocAudienceWrap').hidden=!sourceDocTypes.has(type);if(type!==lastDocType&&sourceDocTypes.has(type)){setRenewalSelection('doc',defaultSourceRenewal(type));lastDocType=type}else if(type!==lastDocType){lastDocType=type}};$('docType').addEventListener('change',sync);$('docIssue').addEventListener('change',()=>{if($('docType').value!=='SDS')$('docReview').value=plusYear($('docIssue').value||todayISO())});$('docFile').addEventListener('change',async()=>{const f=$('docFile').files[0];if(!f)return;try{const text=await pdfTextFromBlob(f),detected=classifySafetyPdfText(text);if(['COSHH','SDS','RISK_ASSESSMENT','SSW'].includes(detected)){if($('docType').value!==detected){$('docType').value=detected;sync();toast(`Detected ${docTypeLabel(detected)} from PDF content.`)}if(detected==='SDS'&&!clean($('docTitle').value)){const n=extractSdsProductName(text);if(n)$('docTitle').value=n}}}catch(e){console.warn('Document type detection',e)}});sync();
+}
+function safeFileName(s){return clean(s).replace(/[<>:"/\\|?*]+/g,'-').slice(0,120)||'document'}
+async function pdfTextFromBlob(blob){if(!blob||!window.pdfjsLib)return '';const pdf=await pdfjsLib.getDocument({data:(await blob.arrayBuffer()).slice(0)}).promise;const out=[];for(let p=1;p<=pdf.numPages;p++){const pg=await pdf.getPage(p),c=await pg.getTextContent();out.push((c.items||[]).map(i=>i.str||'').join(' '))}return clean(out.join(' '))}
+async function sha256Text(text){const bytes=new TextEncoder().encode(String(text||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase());const hash=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function hashPdf(blob){try{const text=await pdfTextFromBlob(blob);return text?await sha256Text(text):null}catch(e){console.warn('PDF hash',e);return null}}
+function nextVersionLabel(docId){const nums=state.versions.filter(v=>v.document_id===docId).map(v=>Number(v.version_label)).filter(Number.isFinite);return nums.length?String(Math.max(...nums)+1):'1'}
+function existingDocMatch(type,ref,title){if(clean(ref)){const r=clean(ref).toUpperCase();return state.documents.find(d=>d.status!=='ARCHIVED'&&clean(d.reference).toUpperCase()===r)||null}if(type==='SDS'){const ranked=state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type==='SDS').map(d=>({d,score:productNameMatchScore(title,documentDisplayTitle(d))})).filter(x=>x.score>=0.88).sort((a,b)=>b.score-a.score);if(ranked.length&&(!ranked[1]||ranked[0].score-ranked[1].score>=0.08||ranked[0].score===1))return ranked[0].d}return null}
+async function storedHashForVersion(v){if(!v)return null;if(v.content_text_sha256)return v.content_text_sha256;if(!v.storage_path)return null;try{const {data,error}=await sb.storage.from('safety-files').download(v.storage_path);if(error||!data)return null;const h=await hashPdf(data);if(h){const r=await sb.from('document_versions').update({content_text_sha256:h}).eq('id',v.id);if(!r.error)v.content_text_sha256=h}return h}catch{return null}}
+async function createDocumentRecord(){
+  if(!isManager())return;const title=clean($('docTitle').value),ref=clean($('docRef').value).toUpperCase()||null,type=$('docType').value,file=$('docFile').files[0],newAudience=sourceDocTypes.has(type)?genericAudienceSelection('newDoc',true):null;if(!title)return toast('Title is required.');if(!file)return toast('Choose the PDF file.');if(newAudience&&!audienceSelectionValid(newAudience))return toast('Choose Everyone, at least one Department, or at least one specific person before creating this document.');
+  const existing=existingDocMatch(type,ref,title);if(existing){const result=await publishFileAsNewVersion(existing,file,$('docIssue').value,$('docReview').value,$('docNotes').value,true);if(result){closeModal();await refresh(`Replacement version uploaded as Pending ${type==='SDS'?'acceptance':'approval'}. The approved/current version remains in use.`)}return}
+  const renewal=getRenewal('doc');const payload={title,reference:ref,doc_type:type,delivery_method:type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',status:'ACTIVE',default_renewal_value:sourceDocTypes.has(type)?renewal.value:null,default_renewal_unit:sourceDocTypes.has(type)?renewal.unit:null,resign_on_new_version:false,created_by:state.user.id};
+  const {data:d,error}=await sb.from('documents').insert(payload).select().single();if(error)return toast(error.message);const h=await hashPdf(file),ver=clean($('docVersion').value)||'1',name=`${safeFileName(ref||title)}-v${safeFileName(ver)}.pdf`,path=`documents/${d.id}/${crypto.randomUUID()}-${name}`;const up=await sb.storage.from('safety-files').upload(path,file,{contentType:'application/pdf'});if(up.error){await sb.from('documents').delete().eq('id',d.id);return toast(up.error.message)}const vr=await sb.from('document_versions').insert({document_id:d.id,version_label:ver,issue_date:$('docIssue').value||todayISO(),review_date:type==='SDS'?null:($('docReview').value||plusYear(todayISO())),delivery_method:payload.delivery_method,storage_path:path,file_name:name,notes:clean($('docNotes').value)||null,status:'CURRENT',approval_status:'PENDING',content_text_sha256:h,created_by:state.user.id}).select().single();if(vr.error){await sb.storage.from('safety-files').remove([path]);await sb.from('documents').delete().eq('id',d.id);return toast(vr.error.message)}if(newAudience){const ar=await sb.rpc('set_document_training_audience_v230',{p_document_id:d.id,p_everyone:newAudience.everyone,p_department_ids:newAudience.departmentIds,p_user_ids:newAudience.userIds,p_due_days:newAudience.dueDays});if(ar.error){await sb.storage.from('safety-files').remove([path]);await sb.from('documents').delete().eq('id',d.id);return toast(ar.error.message)}}closeModal();await refresh(`Controlled document uploaded as Pending ${type==='SDS'?'acceptance':'approval'}. Audience saved now; assignments activate after approval.`)
+}
+async function publishFileAsNewVersion(d,file,issue,review,notes,autoIncrement=true){
+  const existingPending=pendingApprovalVersion(d.id);if(existingPending){toast(`Version ${existingPending.version_label||''} is already pending ${d.doc_type==='SDS'?'acceptance':'approval'}. Resolve it before uploading another version.`);return false}
+  const old=currentVersion(d.id),baseline=old||latestVersion(d.id),newHash=await hashPdf(file),oldHash=await storedHashForVersion(baseline);if(newHash&&oldHash&&newHash===oldHash){toast('This PDF matches the latest stored version. No new version was created.');return false}
+  const ver=nextVersionLabel(d.id),name=`${safeFileName(d.reference||d.title)}-v${safeFileName(ver)}.pdf`,path=`documents/${d.id}/${crypto.randomUUID()}-${name}`;const up=await sb.storage.from('safety-files').upload(path,file,{contentType:'application/pdf'});if(up.error){toast(up.error.message);return false}
+  const ins=await sb.from('document_versions').insert({document_id:d.id,version_label:ver,issue_date:issue||todayISO(),review_date:d.doc_type==='SDS'?null:(review||plusYear(issue||todayISO())),delivery_method:d.doc_type==='SSW'?'INSTRUCTOR_LED':'SELF_TRAINING',storage_path:path,file_name:name,notes:clean(notes)||'Replacement controlled version uploaded pending approval.',status:old?'SUPERSEDED':'CURRENT',approval_status:'PENDING',content_text_sha256:newHash,created_by:state.user.id}).select().single();if(ins.error){await sb.storage.from('safety-files').remove([path]);toast(ins.error.message);return false}return true
+}
+function showNewVersion(id){
+  const d=state.documents.find(x=>x.id===id);if(!d)return;const pending=pendingApprovalVersion(id);if(pending)return toast(`v${pending.version_label||''} is already pending ${d.doc_type==='SDS'?'acceptance':'approval'}. Complete that decision first.`);const approved=approvedCurrentVersion(id),base=approved||currentVersion(id)||latestVersion(id);
+  openModal('Upload replacement version',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="form-grid"><label>New version<input value="${esc(nextVersionLabel(id))}" readonly></label><label>Issue date<input id="newVerIssue" type="date" value="${todayISO()}"></label><label>Review date<input id="newVerReview" type="date" value="${d.doc_type==='SDS'?'':plusYear(todayISO())}" ${d.doc_type==='SDS'?'disabled':''}></label><label class="full">PDF file<input id="newVerFile" type="file" accept="application/pdf,.pdf"></label><label class="full">Notes<textarea id="newVerNotes"></textarea></label></div><div class="hint-box">The replacement will be stored as <strong>Pending ${d.doc_type==='SDS'?'acceptance':'approval'}</strong>. ${approved?`Approved/current v${esc(approved.version_label||'—')} remains in use until the replacement is approved.`:'There is currently no approved version in use.'} Existing training/sign-off evidence is retained.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Upload pending version','primary',`data-publish-version="${id}"`)}</div>`);$('newVerIssue').addEventListener('change',()=>{if(d.doc_type!=='SDS')$('newVerReview').value=plusYear($('newVerIssue').value||todayISO())})
+}
+async function publishVersionFromModal(id){const d=state.documents.find(x=>x.id===id),file=$('newVerFile').files[0];if(!file)return toast('Choose the new PDF file.');const ok=await publishFileAsNewVersion(d,file,$('newVerIssue').value,$('newVerReview').value,$('newVerNotes').value,true);if(!ok)return;closeModal();await refresh(`New version uploaded as Pending ${d.doc_type==='SDS'?'acceptance':'approval'}. No retraining is triggered until it is approved/current.`)}
+async function openDocument(versionId){const v=state.versions.find(x=>x.id===versionId);if(!v?.storage_path)return toast('Stored PDF not found.');if(!isManager()&&(!isVersionApproved(v)||v.status!=='CURRENT'))return toast('Only the approved current version is available for use.');let popup=null;try{popup=window.open('about:blank','_blank')}catch{}try{let blob=state.offline||!navigator.onLine?await cachedSafetyBlob('document',v.id):null;let edgeError='';if(!blob&&!state.offline&&navigator.onLine){if(isManager()){const {data:{session}}=await sb.auth.getSession();const token=session?.access_token;if(token){const r=await fetch(`${CFG.supabaseUrl}/functions/v1/safety-file-open`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':CFG.supabaseKey},body:JSON.stringify({version_id:v.id})});if(r.ok){blob=await r.blob()}else{try{const j=await r.json();edgeError=j?.error||''}catch{edgeError=await r.text()}}}}if(!blob){const r=await sb.storage.from('safety-files').download(v.storage_path);if(r.error||!r.data)throw new Error(r.error?.message||edgeError||'Stored file could not be opened.');blob=r.data}await cacheSafetyBlob('document',v.id,blob)}if(!blob)throw new Error('This safety PDF has not yet been saved for offline use. Open it once while connected, then it will be available offline.');const url=URL.createObjectURL(blob);try{if(popup&&!popup.closed){popup.opener=null;popup.location.href=url}else{window.location.href=url}}catch{window.location.href=url}setTimeout(()=>URL.revokeObjectURL(url),120000);if(!state.offline&&navigator.onLine){await logDocumentActivity('OPENED',{...activityVersionSnapshot(v),source_context:versionApprovalStatus(v)==='PENDING'?'VERSION_APPROVAL':'DOCUMENT_LIBRARY'});if($('approvalOpenStatus')&&$('approvalOpenStatus').dataset.versionId===v.id){$('approvalOpenStatus').textContent='Opened ✓';$('approvalOpenStatus').className='badge complete';}}}catch(e){try{popup?.close()}catch{}console.error('openDocument failed',e);toast(e?.message||'Could not open this PDF.')}}
+function showDocDetails(id){const d=state.documents.find(x=>x.id===id),versions=state.versions.filter(v=>v.document_id===id).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));openModal('Document details',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="meta"><span class="badge">${esc(docTypeLabel(d.doc_type))}</span><span>Status ${esc(d.status)}</span><span>Training ${esc(renewalText(d.default_renewal_value,d.default_renewal_unit,sourceDocTypes.has(d.doc_type)))}</span></div><h4>Version history</h4><div class="card-list">${versions.map(v=>{const approved=isVersionApproved(v),pending=versionApprovalStatus(v)==='PENDING',rejected=versionApprovalStatus(v)==='REJECTED',usable=approved&&v.status==='CURRENT',traffic=pending?'amber':rejected?'red':usable?'green':'neutral',canOpen=isManager()||usable;return `<div class="item-card compact document-status-card traffic-${traffic}"><div class="row-between"><span><strong>v${esc(v.version_label)}</strong> · ${esc(v.status)}</span><span class="badge ${pending?'due':rejected?'overdue':approved?'complete':''}">${esc(versionApprovalLabel(v,d))}</span></div><div class="meta"><span>Issue ${fmtDate(v.issue_date)}</span><span>Review ${fmtDate(v.review_date)}</span><span>${esc(v.file_name||'')}</span>${v.approval_at?`<span>Decision ${fmtDateTime(v.approval_at)}</span>`:''}${v.approval_signature_name?`<span>Signed ${esc(v.approval_signature_name)}</span>`:''}</div>${v.approval_note?`<div class="request-note">${esc(v.approval_note)}</div>`:''}<div class="row">${v.storage_path&&canOpen?btn('Open','ghost',`data-open-doc="${v.id}"`)+btn('Download','ghost',`data-download-doc="${v.id}"`)+(usable&&!documentUsesFormalTraining(d)?btn('Mark read / reviewed','ghost',`data-mark-doc-reviewed="${v.id}"`):''):''}${isManager()&&pending?btn(d.doc_type==='SDS'?'Review & accept':'Review & approve','primary',`data-approve-version="${v.id}"`):''}</div></div>`}).join('')}</div>`)}
+function showToggleDocument(id){
+  const d=state.documents.find(x=>x.id===id);if(!d||!isManager())return;
+  const restoring=d.status==='ARCHIVED';
+  openModal(restoring?'Restore document':'Archive document',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="${restoring?'hint-box':'danger-note'}">${restoring?'Restoring will make the document active again. If it has an approved/current trainable version, its Training item will become available again.':'Archiving removes this item from the active Documents and Training workflow. Controlled versions, access history and completed training evidence are retained.'}</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn(restoring?'Restore':'Archive',restoring?'primary':'danger',`data-confirm-toggle-doc="${id}"`)}</div>`);
+}
+async function toggleDocument(id){
+  const d=state.documents.find(x=>x.id===id);if(!d||!isManager())return;
+  const restoring=d.status==='ARCHIVED',archive=!restoring;
+  let error=null;
+  const rpc=await sb.rpc('set_document_archive_state_v219',{p_document_id:id,p_archive:archive});
+  if(rpc.error){
+    console.warn('Archive RPC failed; attempting direct update for backwards compatibility.',rpc.error);
+    const direct=await sb.from('documents').update({status:archive?'ARCHIVED':'ACTIVE'}).eq('id',id).select('id').maybeSingle();
+    error=direct.error;
+  }
+  if(error)return toast(error.message||'Archive action failed. Run the v2.1.9 SQL migration and try again.');
+  closeModal();
+  if(archive){
+    await refresh('Document archived. Active links were removed; versions, access history and training evidence were retained.');
+    return;
+  }
+  await loadAll();
+  const v=currentVersion(id);
+  if(v&&isVersionApproved(v)){
+    const prior=state.training.filter(t=>t.auto_managed===true&&t.source_document_id===id&&t.source_document_version_id===v.id&&t.status==='ARCHIVED').sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0];
+    if(prior)await sb.from('training_sessions').update({status:'ACTIVE'}).eq('id',prior.id);
+  }
+  await loadAll();
+  const result=await runSafetySync({scan:'full',rebuildLinks:true});
+  await refresh(`Document restored. Declared links were re-read and rebuilt${result.missing?`; ${result.missing} unresolved reference${result.missing===1?'':'s'} flagged`:''}.`);
+}
+
+function suggestedDocumentLinks(docId){
+  const d=state.documents.find(x=>x.id===docId);if(!d)return [];
+  const candidates=state.documents.filter(x=>x.id!==docId&&x.status!=='ARCHIVED'&&!pairExists(docId,x.id));
+  const out=[];
+  for(const x of candidates){
+    let score=0,reason='';
+    if((d.doc_type==='COSHH'&&x.doc_type==='SSW')||(d.doc_type==='SSW'&&x.doc_type==='COSHH')){
+      score=productNameMatchScore(documentDisplayTitle(d),documentDisplayTitle(x));
+      if(score>=0.72)reason='Strong COSHH ↔ SSW title/task match';
+    }else if((d.doc_type==='SDS'&&x.doc_type==='COSHH')||(d.doc_type==='COSHH'&&x.doc_type==='SDS')){
+      score=productNameMatchScore(documentDisplayTitle(d),documentDisplayTitle(x));
+      if(score>=0.82)reason='Strong SDS/MSDS ↔ COSHH product-name match';
+    }
+    if(reason)out.push({doc:x,score,reason});
+  }
+  return out.sort((a,b)=>b.score-a.score).slice(0,8);
+}
+function showDocumentLinks(docId){
+  const d=state.documents.find(x=>x.id===docId),links=linksForDocument(docId),available=state.documents.filter(x=>x.id!==docId&&x.status!=='ARCHIVED').sort((a,b)=>String(a.reference||a.title).localeCompare(String(b.reference||b.title),undefined,{numeric:true})),suggested=suggestedDocumentLinks(docId);
+  openModal('Document links',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="section-card"><h4>Current links</h4>${links.length?links.map(l=>{const o=otherDocForLink(l,docId),st=documentApprovalSummary(o);return `<div class="item-card compact traffic-${st.traffic}"><div class="row-between"><span><strong>${esc(o?.reference||docTypeLabel(o?.doc_type))}</strong> · ${esc(documentDisplayTitle(o)||'Unknown')}</span><span class="badge">${esc(linkTypeLabel(l.link_type))}</span></div><div class="meta"><span class="badge ${st.ready?'complete':'due'}">${esc(st.label)}</span></div>${isManager()?`<div class="row">${btn('Remove','danger',`data-remove-doc-link="${l.id}|${docId}"`)}</div>`:''}</div>`}).join(''):'<div class="muted">No document links yet.</div>'}</div>${isManager()&&suggested.length?`<div class="section-card"><h4>Suggested links</h4><div class="muted">Suggestions are not applied automatically. Confirm only relationships that genuinely apply.</div>${suggested.map(x=>{const st=documentApprovalSummary(x.doc);return `<div class="item-card compact traffic-${st.traffic}"><div class="row-between"><span><strong>${esc(x.doc.reference||docTypeLabel(x.doc.doc_type))}</strong> · ${esc(documentDisplayTitle(x.doc))}</span><span class="badge due">Suggested ${Math.round(x.score*100)}%</span></div><div class="meta"><span>${esc(x.reason)}</span><span>${esc(st.label)}</span></div><div class="row">${btn('Add suggested link','secondary',`data-add-doc-link="${docId}|${x.doc.id}"`)}</div></div>`}).join('')}</div>`:''}${isManager()?`<div class="section-card"><label>Search by reference or full title<input id="docLinkSearch" placeholder="e.g. RA-044, WD-40, SSW-019"></label><div class="muted" style="margin-top:.45rem">Links can be created while either document is pending. Training remains blocked until every Required linked SSW/COSHH document has an approved/current version.</div><div id="docLinkChoices" class="card-list link-results">${available.map(x=>{const st=documentApprovalSummary(x);return `<div class="item-card compact link-choice" data-search="${esc(`${x.doc_type} ${x.reference||''} ${documentDisplayTitle(x)}`.toLowerCase())}"><div class="row-between"><span><strong>${esc(x.reference||docTypeLabel(x.doc_type))}</strong> · ${esc(documentDisplayTitle(x))}</span><span class="badge ${st.ready?'complete':'due'}">${esc(st.label)}</span></div><div class="row">${pairExists(docId,x.id)?'<span class="muted">Already linked</span>':btn('Add link','primary',`data-add-doc-link="${docId}|${x.id}"`)}</div></div>`}).join('')}</div></div>`:''}`);const input=$('docLinkSearch');input?.addEventListener('input',()=>{const q=clean(input.value).toLowerCase();document.querySelectorAll('.link-choice').forEach(el=>el.hidden=!!q&&!el.dataset.search.includes(q))})
+}
+async function addDocumentLink(payload){const [aId,bId]=payload.split('|'),a=state.documents.find(x=>x.id===aId),b=state.documents.find(x=>x.id===bId);if(!a||!b)return;if(pairExists(aId,bId))return toast('These documents are already linked.');const rel=inferLinkType(a,b),r=await sb.from('document_links').insert({source_document_id:rel.source.id,target_document_id:rel.target.id,link_type:rel.type,created_by:state.user.id}).select().single();if(r.error)return toast(r.error.message);await loadAll();await syncSourceTrainings();await refresh('Documents linked. Pending documents are visible now; Training remains blocked until all Required documents are approved/current.');showDocumentLinks(aId)}
+async function removeDocumentLink(payload){const [id,docId]=payload.split('|'),existing=state.documentLinks.find(l=>l.id===id);if(!existing)return;const aId=existing.source_document_id,bId=existing.target_document_id,r=await sb.from('document_links').delete().eq('id',id);if(r.error)return toast(r.error.message);const affected=state.training.filter(t=>t.auto_managed===true&&t.status!=='ARCHIVED'&&(t.source_document_id===aId||t.source_document_id===bId));for(const t of affected){const other=t.source_document_id===aId?bId:aId;await sb.from('training_document_links').delete().eq('training_session_id',t.id).eq('document_id',other).neq('link_role','SOURCE')}await refresh('Document link removed.');showDocumentLinks(docId)}
+
+function sourcePickerOptions(kind,selected=''){return state.documents.filter(d=>d.status!=='ARCHIVED'&&d.doc_type===kind&&approvedCurrentVersion(d.id)).sort((a,b)=>String(a.reference||a.title).localeCompare(String(b.reference||b.title),undefined,{numeric:true})).map(d=>{const v=currentVersion(d.id);return `<option value="${d.id}" ${d.id===selected?'selected':''}>${esc(`${d.reference||''} · ${d.title} · v${v?.version_label||'—'}`)}</option>`}).join('')}
+function genericDocPicker(prefix,checkedIds=[]){const docs=state.documents.filter(d=>d.status!=='ARCHIVED'&&approvedCurrentVersion(d.id)).sort((a,b)=>String(a.reference||a.title).localeCompare(String(b.reference||b.title),undefined,{numeric:true}));return `<div class="full"><label>Link relevant controlled documents<input id="${prefix}DocSearch" placeholder="Search reference or title"></label><div id="${prefix}DocChoices" class="checkbox-list">${docs.map(d=>`<label class="check-row doc-choice" data-search="${esc(`${d.doc_type} ${d.reference||''} ${documentDisplayTitle(d)}`.toLowerCase())}"><input type="checkbox" class="${prefix}-doc-link" value="${d.id}" ${checkedIds.includes(d.id)?'checked':''}><span><strong>${esc(d.reference||docTypeLabel(d.doc_type))}</strong> · ${esc(documentDisplayTitle(d))} <span class="muted">(${esc(docTypeLabel(d.doc_type))})</span></span></label>`).join('')}</div></div>`}
+function wireDocPicker(prefix){$(prefix+'DocSearch')?.addEventListener('input',e=>{const q=clean(e.target.value).toLowerCase();document.querySelectorAll(`#${prefix}DocChoices .doc-choice`).forEach(x=>x.hidden=!!q&&!x.dataset.search.includes(q))})}
+function showNewTraining(){
+  openModal('Upload standalone training',`<div class="hint-box"><strong>Use this for training that does not come from a controlled RA, COSHH RA, SSW or Toolbox Talk.</strong><br>Examples: policies, inductions, refresher training, general H&S briefings, equipment familiarisation and one-off training.</div><div class="form-grid"><label>Training type<select id="trainType">${standaloneTrainingKinds.map(k=>`<option value="${k}">${esc(kindLabel(k))}</option>`).join('')}</select></label><label>Training name<input id="trainName" placeholder="e.g. Fire Safety Policy Briefing"></label><label>Reference (optional)<input id="trainReference" placeholder="e.g. POL-001"></label><label>Training method<select id="trainDelivery"><option value="SELF_TRAINING">Self-training</option><option value="INSTRUCTOR_LED">Instructor-led</option></select></label><label>Review date<input id="trainReview" type="date" value="${plusYear(todayISO())}"></label>${renewalFields('train')}<label class="full">Details / instructions<textarea id="trainDesc" placeholder="What the person needs to know or what the instructor should cover."></textarea></label><label class="full">Training material / policy file<input id="trainFiles" type="file" accept="application/pdf,.pdf" multiple><span class="muted">Self-training requires at least one PDF. Instructor-led training may also have supporting PDFs.</span></label></div>${genericAudienceHtml('newTrain',[],{heading:'Who needs this training?',help:'Choose Everyone, Departments and/or specific people now. Future users joining a selected department are assigned automatically.'})}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Create & assign training','primary','data-save-training')}</div>`);
+  wireRenewal('train');wireGenericAudience('newTrain',true);
+}
+async function ensureTrainingDocLink(trainingId,docId,role='RELATED'){if(!trainingId||!docId)return 0;const ex=state.trainingDocumentLinks.find(l=>l.training_session_id===trainingId&&l.document_id===docId);if(ex){const rank={RELATED:1,REQUIRED:2,SOURCE:3},desired=(rank[role]||1)>(rank[ex.link_role]||1)?role:ex.link_role;if(desired!==ex.link_role){const r=await sb.from('training_document_links').update({link_role:desired}).eq('id',ex.id);if(!r.error){ex.link_role=desired;return 1}}return 0}const r=await sb.from('training_document_links').insert({training_session_id:trainingId,document_id:docId,link_role:role,created_by:state.user.id}).select().single();if(r.error){console.warn('Training link',r.error);return 0}state.trainingDocumentLinks.push(r.data);return 1}
+async function saveTraining(){
+  if(!isManager())return;
+  const type=$('trainType').value,name=clean($('trainName').value),delivery=$('trainDelivery').value,audience=genericAudienceSelection('newTrain',true),files=[...$('trainFiles').files];
+  if(!standaloneTrainingKinds.includes(type))return toast('Choose a standalone Training type. Controlled safety documents are managed from Documents.');
+  if(!name)return toast('Training name is required.');
+  if(!audienceSelectionValid(audience))return toast('Choose Everyone, at least one Department, or at least one specific person before creating this training.');
+  if(delivery==='SELF_TRAINING'&&!files.length)return toast('Self-training needs at least one PDF for the user to open and read before sign-off.');
+  const r=getRenewal('train'),payload={name,session_type:type,delivery_method:delivery,description:clean($('trainDesc').value)||null,delivered_date:null,trainer_name:delivery==='INSTRUCTOR_LED'?(state.profile?.display_name||null):null,trainer_user_id:delivery==='INSTRUCTOR_LED'?state.user.id:null,review_date:$('trainReview').value||plusYear(todayISO()),default_due_date:null,renewal_value:r.value,renewal_unit:r.unit,status:'ACTIVE',created_by:state.user.id,reference:clean($('trainReference').value).toUpperCase()||null,source_kind:type,source_document_id:null,source_document_version_id:null,auto_managed:false,review_required:false,review_reason:null};
+  const ins=await sb.from('training_sessions').insert(payload).select().single();if(ins.error)return toast(ins.error.message);const t=ins.data;
+  for(const f of files){const path=`training/${t.id}/${crypto.randomUUID()}-${safeFileName(f.name)}`,up=await sb.storage.from('safety-files').upload(path,f,{contentType:f.type||'application/pdf'});if(up.error){await sb.from('training_sessions').delete().eq('id',t.id);return toast(`Training file upload failed: ${up.error.message}`)}const fr=await sb.from('training_files').insert({training_session_id:t.id,file_name:f.name,storage_path:path,uploaded_by:state.user.id,content_text_sha256:f.type==='application/pdf'?await hashPdf(f):null});if(fr.error)return toast(fr.error.message)}
+  const ar=await sb.rpc('set_training_session_audience_v239',{p_training_session_id:t.id,p_everyone:audience.everyone,p_department_ids:audience.departmentIds,p_user_ids:audience.userIds,p_due_days:audience.dueDays});if(ar.error)return toast(ar.error.message);
+  closeModal();await refresh('Standalone training created and assigned to the selected audience.');
+}
+function showTrainingDetails(id){
+  const t=state.training.find(x=>x.id===id),assigns=state.trainingAssignments.filter(a=>a.training_session_id===id&&a.active!==false),files=state.trainingFiles.filter(f=>f.training_session_id===id),src=sourceForTraining(t),deps=trainingDependencyState(t);
+  openModal('Training details',`<div><h3>${esc(t.name)}</h3><div class="meta"><span class="badge">${esc(kindLabel(trainingKind(t)))}</span><span>${esc(deliveryText(t.delivery_method||defaultTrainingDelivery(trainingKind(t))))}</span><span>${esc(renewalText(t.renewal_value,t.renewal_unit,t.auto_managed&&sourceDocTypes.has(trainingKind(t))))}</span><span>Review ${fmtDate(t.review_date)}</span>${deps.ready?'<span class="badge complete">Live</span>':'<span class="badge due">Waiting for source approval</span>'}</div></div>${src?`<div class="request-note"><strong>Controlled source:</strong> ${esc(src.reference||'')} ${esc(documentDisplayTitle(src))} · version ${esc(state.versions.find(v=>v.id===t.source_document_version_id)?.version_label||approvedCurrentVersion(src.id)?.version_label||'—')}</div>`:''}${!deps.ready?`<div class="pending-use-warning">${esc(trainingDependencyMessage(t))}</div>`:''}${t.description?`<p>${esc(t.description)}</p>`:''}<div class="section-card"><h4>Active assignments</h4>${assigns.length?assigns.map(a=>{const s=assignmentStatus(a,t);return `<div class="item-card compact"><div class="row-between"><strong>${esc(personName(a.user_id))}</strong><span class="badge ${s.badge}">${esc(s.label)}</span></div><div class="meta"><span>Due ${fmtDate(s.due)}</span><span>${esc(deliveryText(s.method))}</span>${s.exception?`<span class="badge complete">Admin exception ${fmtDateTime(s.exception.completed_at)}</span>`:''}</div>${isAdmin()&&deps.ready&&a.user_id===state.user?.id&&s.method==='INSTRUCTOR_LED'&&s.code!=='COMPLETED'&&!s.ready?`<div class="row">${btn('Complete as exception','danger',`data-training-exception="${a.id}"`)}</div>`:''}</div>`}).join(''):'<span class="muted">No active assignees.</span>'}</div>${files.length?`<div class="section-card"><h4>Training files</h4>${files.map(f=>`<div class="row-between"><span>${esc(f.file_name)}</span><div class="row">${btn('Open','ghost',`data-open-training-file="${f.id}"`)}${btn('Download','ghost',`data-download-training-file="${f.id}"`)}</div></div>`).join('')}</div>`:''}`)
+}
+async function setTrainingLinkRole(payload){
+  if(!isManager())return;const [linkId,role,trainingId]=payload.split('|');
+  const r=await sb.rpc('set_training_link_role_v2211',{p_training_link_id:linkId,p_link_role:role});if(r.error)return toast(r.error.message||'Could not change linked-document requirement. Run the v2.2.11 SQL migration.');
+  await loadAll();showTrainingDetails(trainingId);renderMySafety();renderTraining();toast(role==='REQUIRED'?'Linked document is now required reading.':'Linked document is now supporting only.');
+}
+function showAssignTraining(id){
+  if(!isManager())return;const t=state.training.find(x=>x.id===id);if(!t)return;
+  const src=t.source_document_id?state.documents.find(d=>d.id===t.source_document_id):null;
+  if(t.auto_managed&&src)return showDocumentAudience(src.id);
+  const rows=audienceRowsFor('TRAINING',id);
+  openModal('Training audience',`<p><strong>${esc(t.name)}</strong></p>${genericAudienceHtml('editTrainAudience',rows,{heading:'Who needs this training?',help:'Choose Everyone, Departments and/or specific people. Future users joining a selected department are assigned automatically.'})}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save audience','primary',`data-save-training-audience="${id}"`)}</div>`);
+  wireGenericAudience('editTrainAudience',true);
+}
+async function saveTrainingAudience(id){if(!isManager())return;const t=state.training.find(x=>x.id===id);if(!t)return;const a=genericAudienceSelection('editTrainAudience',true);if(!audienceSelectionValid(a))return toast('Choose Everyone, at least one Department, or at least one specific person.');const r=await sb.rpc('set_training_session_audience_v239',{p_training_session_id:id,p_everyone:a.everyone,p_department_ids:a.departmentIds,p_user_ids:a.userIds,p_due_days:a.dueDays});if(r.error)return toast(r.error.message);closeModal();await refresh(`Training audience updated. ${Number(r.data||0)} assignment change${Number(r.data||0)===1?'':'s'} applied.`)}
+
+function showEditTraining(id){const t=state.training.find(x=>x.id===id);openModal('Edit training',`<div class="form-grid"><label class="full">Training name<input id="editTrainName" value="${esc(t.name)}" ${t.auto_managed?'readonly':''}></label><label>Type<input value="${esc(kindLabel(trainingKind(t)))}" readonly></label><label>Delivery<select id="editTrainDelivery" ${t.auto_managed?'disabled':''}><option value="SELF_TRAINING" ${t.delivery_method==='SELF_TRAINING'?'selected':''}>Self-training</option><option value="INSTRUCTOR_LED" ${t.delivery_method==='INSTRUCTOR_LED'?'selected':''}>Instructor-led</option></select></label><label>Review date<input id="editTrainReview" type="date" value="${esc(t.review_date||'')}"></label>${renewalFields('editTrain',t.renewal_value,t.renewal_unit,t.auto_managed&&sourceDocTypes.has(trainingKind(t)))}<label class="full">Details<textarea id="editTrainDesc" ${t.auto_managed?'readonly':''}>${esc(t.description||'')}</textarea></label><label class="check-row full"><input id="editApplyAssignments" type="checkbox" checked> Apply refresher frequency to active assignees.</label>${t.review_required?'<label class="check-row full"><input id="editClearReview" type="checkbox"> Reviewed — clear review flag.</label>':''}</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save','primary',`data-save-training-edit="${id}"`)}</div>`);wireRenewal('editTrain')}
+async function saveTrainingEdit(id){const t=state.training.find(x=>x.id===id),r=getRenewal('editTrain'),payload={review_date:$('editTrainReview').value||null,renewal_value:r.value,renewal_unit:r.unit};if(!t.auto_managed){payload.name=clean($('editTrainName').value)||t.name;payload.delivery_method=$('editTrainDelivery').value;payload.description=clean($('editTrainDesc').value)||null}if($('editClearReview')?.checked){payload.review_required=false;payload.review_reason=null}const up=await sb.from('training_sessions').update(payload).eq('id',id);if(up.error)return toast(up.error.message);if(t.auto_managed&&t.source_document_id){const du=await sb.from('documents').update({default_renewal_value:r.value,default_renewal_unit:r.unit}).eq('id',t.source_document_id);if(du.error)return toast(du.error.message);const d=state.documents.find(x=>x.id===t.source_document_id);if(d){d.default_renewal_value=r.value;d.default_renewal_unit=r.unit}}if($('editApplyAssignments').checked)for(const a of state.trainingAssignments.filter(a=>a.training_session_id===id&&a.active!==false)){const x=await sb.from('training_assignments').update({renewal_value:r.value,renewal_unit:r.unit}).eq('id',a.id);if(x.error)return toast(x.error.message)}closeModal();await refresh('Training updated.')}
+function showArchiveTraining(id){const t=state.training.find(x=>x.id===id);if(!t||!isManager())return;const restoring=t.status==='ARCHIVED';openModal(restoring?'Restore training':'Archive training',`<p><strong>${esc(t.name)}</strong></p><div class="${restoring?'hint-box':'danger-note'}">${restoring?'The training record will return to the active Training list.':'The training record will be hidden from active Training. Existing assignments, attendance, sign-offs, signatures and audit evidence are retained.'}</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn(restoring?'Restore':'Archive',restoring?'primary':'danger',`data-confirm-archive-training="${id}"`)}</div>`)}
+async function archiveTraining(id){const t=state.training.find(x=>x.id===id);if(!t||!isManager())return;const archive=t.status!=='ARCHIVED';let error=null;const rpc=await sb.rpc('set_training_archive_state_v219',{p_training_session_id:id,p_archive:archive});if(rpc.error){console.warn('Training archive RPC failed; attempting direct update.',rpc.error);const direct=await sb.from('training_sessions').update({status:archive?'ARCHIVED':'ACTIVE'}).eq('id',id).select('id').maybeSingle();error=direct.error}if(error)return toast(error.message||'Training archive action failed. Run the v2.1.9 SQL migration and try again.');closeModal();await refresh(`Training ${archive?'archived':'restored'}. Historical evidence was retained.`)}
+
+async function showDeleteUnusedDocument(id){
+  if(!isAdmin())return;const d=state.documents.find(x=>x.id===id);if(!d)return;
+  const r=await sb.rpc('document_delete_check_v227',{p_document_id:id});if(r.error)return toast(r.error.message||'Could not verify delete eligibility. Run the v2.2.7 SQL migration.');
+  const check=r.data||{};if(!check.safe)return toast(`This document must be archived, not deleted: ${(check.reasons||[]).join('; ')||'compliance evidence exists'}`);
+  const paths=Array.isArray(check.storage_paths)?check.storage_paths:[];
+  openModal('Delete unused document permanently',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong></p><div class="danger-note"><strong>Permanent deletion</strong><br>This document has never been approved/accepted and has no protected training or review evidence. The database record and ${paths.length} stored file${paths.length===1?'':'s'} will be removed. This cannot be undone.</div><label class="check-row"><input id="deleteUnusedAck" type="checkbox"> I confirm this is an incorrect/test/unused document and should be permanently deleted.</label><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Delete permanently','danger',`data-confirm-delete-unused-doc="${id}"`)}</div>`);
+}
+async function deleteUnusedDocument(id){
+  if(!isAdmin())return;if(!$('deleteUnusedAck')?.checked)return toast('Tick the confirmation first.');
+  const r=await sb.rpc('delete_unused_document_v227',{p_document_id:id});if(r.error)return toast(r.error.message||'Permanent delete was blocked.');
+  const paths=Array.isArray(r.data?.storage_paths)?r.data.storage_paths:[];let storageWarning='';
+  if(paths.length){const rm=await sb.storage.from('safety-files').remove(paths);if(rm.error)storageWarning=' Database record deleted; the file is now an orphan and can be removed from Storage Cleanup.'}
+  closeModal();await refresh(`Unused document permanently deleted.${storageWarning}`);
+}
+async function scanStorageCleanup(){
+  if(!isAdmin())return;const status=$('storageCleanupStatus'),list=$('storageCleanupList');if(status){status.hidden=false;status.textContent='Scanning Safety Tracker storage…'}
+  const r=await sb.rpc('list_orphaned_storage_v226');if(r.error){if(status)status.textContent=r.error.message||'Storage scan failed. Run the v2.2.6 SQL migration.';return}
+  const rows=r.data||[];state.storageOrphans=rows;if(status)status.textContent=`${rows.length} orphaned file${rows.length===1?'':'s'} found. Only files with no live database reference are listed.`;
+  if(list)list.innerHTML=rows.length?`<div class="row">${btn(`Delete all ${rows.length} orphan${rows.length===1?'':'s'}`,'danger','data-delete-all-storage-orphans')}</div>`+rows.map(x=>`<div class="item-card compact"><div class="row-between"><div><strong>${esc(x.area||'File')}</strong><div class="muted">${esc(x.path)}</div></div><span>${x.size_bytes?Math.max(1,Math.round(Number(x.size_bytes)/1024))+' KB':''}</span></div><div class="row">${btn('Delete orphan','danger',`data-delete-storage-orphan="${encodeURIComponent(x.path)}"`)}</div></div>`).join(''):'<div class="success-note">No orphaned Safety Tracker files found.</div>';
+}
+async function deleteStorageOrphan(encoded){if(!isAdmin())return;const path=decodeURIComponent(encoded),r=await sb.storage.from('safety-files').remove([path]);if(r.error)return toast(r.error.message);toast('Orphaned file deleted.');await scanStorageCleanup()}
+function confirmDeleteAllStorageOrphans(){const n=state.storageOrphans?.length||0;if(!n)return toast('No orphaned files to delete.');openModal('Delete orphaned storage files',`<div class="danger-note"><strong>Permanent cleanup</strong><br>${n} file${n===1?'':'s'} have no document, training-file or report record pointing to them. They will be permanently removed from Safety Tracker storage.</div><label class="check-row"><input id="deleteOrphansAck" type="checkbox"> I confirm I want to remove all listed orphaned files.</label><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Delete all orphans','danger','data-confirm-delete-all-storage-orphans')}</div>`)}
+async function deleteAllStorageOrphans(){if(!isAdmin())return;if(!$('deleteOrphansAck')?.checked)return toast('Tick the confirmation first.');const paths=(state.storageOrphans||[]).map(x=>x.path);if(!paths.length)return;const r=await sb.storage.from('safety-files').remove(paths);if(r.error)return toast(r.error.message);closeModal();toast(`${paths.length} orphaned file${paths.length===1?'':'s'} deleted.`);await scanStorageCleanup()}
+function setupSignaturePad(canvasId,clearId){const canvas=$(canvasId);if(!canvas)return;const status=$(canvasId.replace('SignaturePad','SignatureStatus')),rect=canvas.getBoundingClientRect(),dpr=Math.max(1,Math.min(window.devicePixelRatio||1,3));canvas.width=Math.round(Math.max(rect.width,300)*dpr);canvas.height=Math.round(170*dpr);const ctx=canvas.getContext('2d');const reset=()=>{ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();canvas.dataset.hasInk='';if(status){status.textContent='Signature not yet captured';status.classList.remove('signature-ok')}};reset();ctx.lineWidth=2.6*dpr;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';let drawing=false,last=null,pid=null;const pt=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)}};const mark=()=>{canvas.dataset.hasInk='1';if(status){status.textContent='✓ Signature captured';status.classList.add('signature-ok')}};canvas.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;pid=e.pointerId;try{canvas.setPointerCapture(pid)}catch{}last=pt(e);ctx.beginPath();ctx.arc(last.x,last.y,2*dpr,0,Math.PI*2);ctx.fillStyle='#111';ctx.fill();mark()});canvas.addEventListener('pointermove',e=>{if(!drawing||e.pointerId!==pid)return;e.preventDefault();const p=pt(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;mark()});const end=()=>{drawing=false;last=null;pid=null};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);$(clearId)?.addEventListener('click',reset)}
+function signatureData(id){const canvas=$(id);if(!canvas||canvas.dataset.hasInk!=='1')return null;const out=document.createElement('canvas');out.width=520;out.height=156;const c=out.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,out.width,out.height);c.drawImage(canvas,0,0,out.width,out.height);return out.toDataURL('image/png')}
+function signatureBlock(prefix){const name=esc(state.profile?.display_name||state.user?.email||'');return `<div class="full signature-wrap"><label>Digital signature name<input id="${prefix}SignatureName" value="${name}"></label><div><div class="signature-label">Sign below with your finger or mouse</div><canvas id="${prefix}SignaturePad" class="signature-pad"></canvas><div id="${prefix}SignatureStatus" class="signature-status">Signature not yet captured</div></div><div class="row">${btn('Clear signature','ghost',`id="${prefix}ClearSignature"`)}</div><div class="signature-note">Your signature is stored with the compliance evidence.</div></div>`}
+function signTraining(id){
+  const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id);if(!a||!t)return;const deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));
+  const status=assignmentStatus(a,t);
+  if(!requiredTrainingMaterialOpened(a,t))return toast(`Open the required current training file before signing off: ${requiredTrainingMaterialLabel(a,t)}`);
+  if(status.method==='INSTRUCTOR_LED'&&!status.ready)return toast('Instructor confirmation is required before you can sign off.');
+  openModal('Training sign-off',`<p><strong>${esc(t.name)}</strong></p><div class="success-note">✓ Required training file opened and recorded.</div><p>I confirm I completed/attended this training, understood the relevant controls, and had the opportunity to ask questions. If anything remains unclear I will ask my manager before carrying out the task.</p>${signatureBlock('train')}<label class="check-row"><input id="trainAckCheck" type="checkbox"> I confirm this sign-off and digital signature.</label><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Sign off','primary',`data-confirm-training-sign="${id}"`)}</div>`);setupSignaturePad('trainSignaturePad','trainClearSignature')
+}
+async function confirmTrainingSign(id){
+  const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id);if(!a||!t)return;const deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));
+  if(!requiredTrainingMaterialOpened(a,t))return toast(`Open the required current training file before signing off: ${requiredTrainingMaterialLabel(a,t)}`);
+  if(!$('trainAckCheck').checked)return toast('Tick the confirmation first.');
+  const sig=signatureData('trainSignaturePad'),sigName=clean($('trainSignatureName').value);if(!sig)return toast('Please sign in the box.');if(!sigName)return toast('Enter the signature name.');
+  const c=latestTrainingConfirmation(a),statement='I confirm I completed/attended this training, understood the relevant controls, and had the opportunity to ask questions. If anything remains unclear I will ask my manager before carrying out the task.';
+  const r=await sb.from('training_signoffs').insert({training_assignment_id:id,training_session_id:t.id,user_id:state.user.id,statement_snapshot:statement,training_name_snapshot:t.name,trainer_snapshot:t.trainer_name,delivered_date_snapshot:c?.delivery_date||t.delivered_date,signature_data:sig,signature_name:sigName});
+  if(r.error)return toast(r.error.message.includes('required current training file')?'Open the required current training file before signing off.':r.error.message);
+  if(t.source_document_id){const v=state.versions.find(x=>x.id===t.source_document_version_id)||currentVersion(t.source_document_id);if(v)await logDocumentActivity('TRAINING_COMPLETED',{...activityVersionSnapshot(v),training_session_id:t.id,source_context:'TRAINING'},null,false)}else{const f=latestTrainingFile(t.id);if(f)await logDocumentActivity('TRAINING_COMPLETED',{...activityTrainingFileSnapshot(f),source_context:'TRAINING'},null,false)}
+  closeModal();await refresh('Training sign-off and digital signature recorded.')
+}
+function showTrainingException(id){
+  if(!isAdmin())return toast('Admin access is required for a training exception.');
+  const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id);
+  if(!a||!t)return;const deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));
+  if(a.user_id!==state.user?.id)return toast('A training exception can only be completed for your own assignment.');
+  const status=assignmentStatus(a,t);
+  if(status.code==='COMPLETED')return toast('This training assignment is already complete.');
+  if(status.method!=='INSTRUCTOR_LED')return toast('The exception is only available for instructor-led training.');
+  if(status.ready)return toast('Instructor attendance has already been confirmed. Use Sign attendance instead.');
+  if(!requiredTrainingMaterialOpened(a,t))return toast(`Open the required current training file before using the exception: ${requiredTrainingMaterialLabel(a,t)}`);
+  openModal('Complete training as admin exception',`<p><strong>${esc(t.name)}</strong></p><div class="success-note">✓ Required training file opened and recorded.</div><div class="hint-box"><strong>Administrator exception.</strong> Use this only for your own instructor-led assignment when an independent instructor confirmation is not available. The reason, your identity, date/time and digital signature are retained as separate compliance evidence. This does not create an instructor attendance record.</div><label>Reason for exception<textarea id="trainingExceptionReason" rows="4" minlength="10" placeholder="Enter at least 10 characters explaining why instructor confirmation is unavailable."></textarea><span id="trainingExceptionValidation" class="muted">Minimum 10 characters.</span></label>${signatureBlock('exception')}<label class="check-row"><input id="trainingExceptionAck" type="checkbox"> I confirm this is my own training assignment and the exception reason is accurate.</label><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Complete as exception','danger',`data-confirm-training-exception="${id}"`)}</div>`);
+  setupSignaturePad('exceptionSignaturePad','exceptionClearSignature');
+  const reasonBox=$('trainingExceptionReason'),validation=$('trainingExceptionValidation');reasonBox?.addEventListener('input',()=>{const n=clean(reasonBox.value).length;if(validation)validation.textContent=n>=10?`✓ Reason entered (${n} characters)`:`Minimum 10 characters (${n}/10).`});
+}
+async function confirmTrainingException(id){
+  if(!isAdmin())return toast('Admin access is required for a training exception.');
+  const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id);
+  if(!a||!t||a.user_id!==state.user?.id)return toast('This exception can only be used for your own assignment.');const deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));
+  const status=assignmentStatus(a,t);
+  if(status.code==='COMPLETED')return toast('This training assignment is already complete.');
+  if(status.method!=='INSTRUCTOR_LED'||status.ready)return toast('This assignment is not eligible for an administrator exception.');
+  if(!requiredTrainingMaterialOpened(a,t))return toast(`Open the required current training file before using the exception: ${requiredTrainingMaterialLabel(a,t)}`);
+  const reason=clean($('trainingExceptionReason')?.value),sig=signatureData('exceptionSignaturePad'),sigName=clean($('exceptionSignatureName')?.value);
+  if(reason.length<10){const v=$('trainingExceptionValidation');if(v)v.textContent=`Reason is too short (${reason.length}/10). Enter at least 10 characters.`;return toast('Exception reason must be at least 10 characters.');}
+  if(!$('trainingExceptionAck')?.checked)return toast('Tick the exception confirmation first.');
+  if(!sig)return toast('Please sign in the box.');
+  if(!sigName)return toast('Enter the signature name.');
+  const statement='Administrator training exception: I confirm this is my own instructor-led training assignment. I have reviewed/completed the required training content and controls. An independent instructor confirmation is not available for the recorded reason, so I am using the administrator exception.';
+  const r=await sb.from('training_exceptions').insert({training_assignment_id:id,training_session_id:t.id,user_id:state.user.id,reason,statement_snapshot:statement,signature_data:sig,signature_name:sigName});
+  if(r.error)return toast(r.error.message.includes('training_exceptions')?'Run the v2.1.5 SQL migration first.':r.error.message);
+  if(t.source_document_id){const v=state.versions.find(x=>x.id===t.source_document_version_id)||currentVersion(t.source_document_id);if(v)await logDocumentActivity('TRAINING_COMPLETED',{...activityVersionSnapshot(v),training_session_id:t.id,source_context:'TRAINING',metadata:{completion_mode:'ADMIN_EXCEPTION'}},null,false)}else{const f=latestTrainingFile(t.id);if(f)await logDocumentActivity('TRAINING_COMPLETED',{...activityTrainingFileSnapshot(f),source_context:'TRAINING',metadata:{completion_mode:'ADMIN_EXCEPTION'}},null,false)}
+  closeModal();await refresh('Training completed using the administrator exception.');
+}
+
+function requestInstructor(id){const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id);if(!a||!t)return;if(effectiveTrainingMethod(t,a)!=='SELF_TRAINING')return toast('This assignment is already instructor-led.');openModal('Request instructor-led training',`<p><strong>${esc(t.name)}</strong></p><div class="hint-box"><strong>Need a question answered only?</strong><br>You can ask your manager without changing this assignment. Use this option when you need extra instruction, demonstration or guided training before you can confirm competence/understanding.</div><p>This changes <strong>your assignment only</strong> from self-training to instructor-led. It does not change the master RA/COSHH training method for anyone else.</p><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Request instructor-led training','primary',`data-confirm-instructor-request="${id}"`)}</div>`)}
+async function confirmInstructorRequest(id){const a=state.trainingAssignments.find(x=>x.id===id);if(!a)return;const r=await sb.from('training_assignments').update({delivery_method_override:'INSTRUCTOR_LED'}).eq('id',id);if(r.error)return toast(r.error.message);closeModal();await refresh('Instructor-led training requested for your assignment. Your manager can now record attendance.')}
+
+function showInstructorGroupAttendance(trainingId){const t=state.training.find(x=>x.id===trainingId),deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));const assigns=state.trainingAssignments.filter(a=>a.training_session_id===trainingId&&a.active!==false&&effectiveTrainingMethod(t,a)==='INSTRUCTOR_LED');if(!assigns.length)return toast('No active instructor-led assignees.');const rows=assigns.map(a=>{const s=assignmentStatus(a,t),selectable=s.code!=='COMPLETED'&&!s.ready;return `<label class="check-row">${selectable?`<input type="checkbox" class="group-attendee" value="${a.id}">`:'<span style="width:18px"></span>'}<span style="flex:1"><strong>${esc(personName(a.user_id))}</strong><span class="muted" style="display:block">${esc(s.label)}${s.due?' · Due '+fmtDate(s.due):''}</span></span></label>`}).join('');openModal('Group training attendance',`<p><strong>${esc(t.name)}</strong></p><p class="muted">Tick only the people covered by this session. People not selected remain unchanged.</p><div class="row">${btn('Select all eligible','ghost','id="selectAllAttendees"')}${btn('Clear','ghost','id="clearAttendees"')}</div><div class="checkbox-list">${rows}</div><div class="form-grid" style="margin-top:12px"><label>Training date<input id="groupTrainingDate" type="date" value="${todayISO()}"></label><label>Status<select id="groupTrainingStatus"><option value="ATTENDED">Attended / training delivered</option><option value="ABSENT">Absent / not attended</option></select></label><label class="full">Instructor note<textarea id="groupTrainingNote"></textarea></label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save selected','primary',`data-save-group-attendance="${trainingId}"`)}</div>`);$('selectAllAttendees').addEventListener('click',()=>document.querySelectorAll('.group-attendee').forEach(x=>x.checked=true));$('clearAttendees').addEventListener('click',()=>document.querySelectorAll('.group-attendee').forEach(x=>x.checked=false))}
+async function saveGroupAttendance(trainingId){const t=state.training.find(x=>x.id===trainingId),deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));const ids=[...document.querySelectorAll('.group-attendee:checked')].map(x=>x.value);if(!ids.length)return toast('Tick at least one person.');const date=$('groupTrainingDate').value||todayISO(),status=$('groupTrainingStatus').value,note=clean($('groupTrainingNote').value)||null;for(const id of ids){const a=state.trainingAssignments.find(x=>x.id===id),r=await sb.from('training_delivery_confirmations').insert({assignment_id:id,user_id:a.user_id,confirmed_by:state.user.id,confirmation_type:'INSTRUCTOR',reason:note,delivery_date:date,attendance_status:status});if(r.error)return toast(r.error.message)}closeModal();await refresh(status==='ATTENDED'?`${ids.length} attendee${ids.length===1?'':'s'} confirmed.`:'Absence recorded.')}
+function renderInstructor(){
+  const rows=[];for(const t of activeTraining())for(const a of state.trainingAssignments.filter(a=>a.training_session_id===t.id&&a.active!==false&&effectiveTrainingMethod(t,a)==='INSTRUCTOR_LED')){const s=assignmentStatus(a,t);if(s.code!=='COMPLETED')rows.push({t,a,s,traffic:assignmentTraffic(s,trainingDependencyState(t).ready)})}
+  rows.sort((a,b)=>trafficPriority(a.traffic)-trafficPriority(b.traffic)||String(personName(a.a.user_id)).localeCompare(String(personName(b.a.user_id))));
+  const stats=$('instructorStats');if(stats){const overdue=rows.filter(x=>x.s.code==='OVERDUE').length,ready=rows.filter(x=>x.s.code==='READY_TO_SIGN').length,attendance=rows.filter(x=>x.s.code!=='READY_TO_SIGN').length;stats.innerHTML=[
+    {label:'Attendance needed',value:attendance,traffic:overdue?'red':attendance?'amber':'green'},
+    {label:'Overdue',value:overdue,traffic:overdue?'red':'green'},
+    {label:'Employee sign-off pending',value:ready,traffic:ready?'amber':'green'}
+  ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('')}
+  $('instructorList').innerHTML=rows.length?rows.map(({t,a,s,traffic})=>`<div class="item-card traffic-card traffic-${traffic}"><div class="row-between"><div><strong>${esc(personName(a.user_id))}</strong><div>${esc(t.name)}</div><div class="meta"><span>${esc(kindLabel(trainingKind(t)))}</span><span>${esc(deliveryText(s.method))}</span>${s.due?`<span>Due ${fmtDate(s.due)}</span>`:''}</div></div>${statusChip(s.label,traffic)}</div><div class="row action-bar">${s.code==='READY_TO_SIGN'?'<span class="success-note compact-note">Attendance recorded — waiting for the employee signature.</span>':btn('Record attendance','primary',`data-single-attendance="${a.id}"`)}</div></div>`).join(''):'<div class="success-note">No outstanding instructor-led training.</div>'
+}
+function showSingleAttendance(id){const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a.training_session_id),deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));openModal('Record training attendance',`<p><strong>${esc(personName(a.user_id))}</strong> · ${esc(t.name)}</p><div class="form-grid"><label>Training date<input id="singleDate" type="date" value="${todayISO()}"></label><label>Status<select id="singleStatus"><option value="ATTENDED">Attended / training delivered</option><option value="ABSENT">Absent / not attended</option></select></label><label class="full">Instructor note<textarea id="singleNote"></textarea></label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save','primary',`data-save-single-attendance="${id}"`)}</div>`)}
+async function saveSingleAttendance(id){const a=state.trainingAssignments.find(x=>x.id===id),t=state.training.find(x=>x.id===a?.training_session_id),deps=trainingDependencyState(t);if(!deps.ready)return toast(trainingDependencyMessage(t));const r=await sb.from('training_delivery_confirmations').insert({assignment_id:id,user_id:a.user_id,confirmed_by:state.user.id,confirmation_type:'INSTRUCTOR',reason:clean($('singleNote').value)||null,delivery_date:$('singleDate').value||todayISO(),attendance_status:$('singleStatus').value});if(r.error)return toast(r.error.message);closeModal();await refresh('Attendance recorded.')}
+
+function complianceRows(){const out=[];for(const t of state.training)if(t.status!=='ARCHIVED'&&(!t.source_document_version_id||trainingSourceApproved(t)))for(const a of state.trainingAssignments.filter(a=>a.training_session_id===t.id&&a.active!==false)){const s=assignmentStatus(a,t);out.push({t,a,...s,user_id:a.user_id})}return out}
+function renderCompliance(){
+  const p=$('compliancePersonFilter').value,type=$('complianceTypeFilter').value,status=$('complianceStatusFilter').value;
+  const rows=complianceRows().filter(r=>(!p||r.user_id===p)&&(!type||trainingKind(r.t)===type)&&(!status||r.code===status)).map(r=>({...r,traffic:assignmentTraffic(r,true)})).sort((a,b)=>trafficPriority(a.traffic)-trafficPriority(b.traffic)||String(personName(a.user_id)).localeCompare(String(personName(b.user_id)))||String(a.t.name||'').localeCompare(String(b.t.name||'')));
+  const counts={overdue:rows.filter(r=>r.code==='OVERDUE').length,action:rows.filter(r=>r.code!=='COMPLETED'&&r.code!=='OVERDUE').length,complete:rows.filter(r=>r.code==='COMPLETED').length};
+  $('complianceStats').innerHTML=[
+    {label:'Compliant',value:counts.complete,traffic:'green'},
+    {label:'Action required',value:counts.action,traffic:counts.action?'amber':'green'},
+    {label:'Overdue',value:counts.overdue,traffic:counts.overdue?'red':'green'},
+    {label:'Total assignments',value:rows.length,traffic:'neutral'}
+  ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('');
+  $('complianceList').innerHTML=rows.length?rows.map(r=>`<div class="item-card traffic-card traffic-${r.traffic}"><div class="row-between"><div><strong>${esc(personName(r.user_id))}</strong><div>${esc(r.t.name)}</div><div class="meta"><span>${esc(kindLabel(trainingKind(r.t)))}</span><span>${esc(deliveryText(r.method))}</span>${r.due?`<span>Due ${fmtDate(r.due)}</span>`:''}</div></div>${statusChip(r.label,r.traffic)}</div></div>`).join(''):'<div class="empty">No matching compliance rows.</div>'
+}
+
+function profileAccessLabel(p){return p?.report_only===true?'Report Viewer':(p?.role||'user')}
+function renderPeople(){
+  const stats=$('peopleStats');if(stats){const rows=state.people,active=rows.filter(p=>p.active!==false).length,disabled=rows.filter(p=>p.active===false).length,noDept=rows.filter(p=>p.active!==false&&p.report_only!==true&&!userDepartmentId(p.id)).length;stats.innerHTML=[
+    {label:'Active',value:active,traffic:'green'},
+    {label:'No department',value:noDept,traffic:noDept?'amber':'green'},
+    {label:'Disabled',value:disabled,traffic:'neutral'},
+    {label:'Total',value:rows.length,traffic:'neutral'}
+  ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('')}
+  const ordered=[...state.people].sort((a,b)=>(a.active===false)-(b.active===false)||String(a.display_name||a.email).localeCompare(String(b.display_name||b.email)));
+  $('peopleList').innerHTML=ordered.length?ordered.map(p=>{const needsDept=p.active!==false&&p.report_only!==true&&!userDepartmentId(p.id),traffic=p.active===false?'neutral':needsDept?'amber':'green',dept=userDepartmentName(p.id),more=isAdmin()&&p.id!==state.user?.id?`${btn('Resend access','ghost',`data-resend-user="${p.id}"`)}${btn(p.active===false?'Enable':'Disable',p.active===false?'primary':'danger',`data-toggle-user="${p.id}"`)}`:'';return `<div class="item-card traffic-card traffic-${traffic}"><div class="row-between"><div><strong>${esc(p.display_name||p.email)}</strong><div class="meta"><span>${esc(p.email||'')}</span><span class="badge">${esc(profileAccessLabel(p))}</span><span class="badge ${needsDept?'due':''}">${esc(dept)}</span>${p.report_only===true?'<span>Reports/download only</span>':''}</div></div>${statusChip(p.active===false?'Disabled':needsDept?'Active · department needed':'Active',traffic)}</div>${isAdmin()?`<div class="row action-bar">${btn('Edit user','secondary',`data-set-role="${p.id}"`)}${moreActions(more)}</div>`:''}</div>`}).join(''):'<div class="empty">No users found.</div>'
+}
+function showInviteUser(){
+  const deptOpts=activeDepartments().map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('');
+  openModal('Invite user',`<div class="form-grid"><label>Name<input id="inviteName"></label><label>Email<input id="inviteEmail" type="email"></label><label>Role / access<select id="inviteRole"><option value="user">User</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="report_viewer">Report Viewer — reports/download only</option></select></label><label>Department<select id="inviteDepartment"><option value="">No department</option>${deptOpts}</select></label><div class="hint-box full"><strong>Department:</strong> users automatically receive current training targeted to their department. Company-wide documents use the Everyone audience. Report Viewers receive no Training, Safety Awareness or PPE assignments.</div></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Send invite','primary','data-send-invite')}</div>`)
+}
+async function edgeAction(body){const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('Session expired. Sign out and sign back in.');const res=await fetch(`${CFG.supabaseUrl}/functions/v1/invite-user`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':CFG.supabaseKey},body:JSON.stringify(body)}),raw=await res.text();let out={};try{out=raw?JSON.parse(raw):{}}catch{out={error:raw}}if(!res.ok)throw new Error(out.error||out.message||`HTTP ${res.status}`);return out}
+async function setReportOnlyAccess(userId,enabled){const r=await sb.rpc('set_report_only_access_v224',{p_user_id:userId,p_enabled:!!enabled});if(r.error)throw r.error;return true}
+async function findProfileByEmail(email){for(let i=0;i<8;i++){const r=await sb.from('profiles').select('*').ilike('email',email).limit(1);if(!r.error&&r.data?.[0])return r.data[0];await new Promise(res=>setTimeout(res,400))}return null}
+async function sendInvite(){
+  const email=clean($('inviteEmail').value).toLowerCase(),name=clean($('inviteName').value),requested=$('inviteRole').value,departmentId=$('inviteDepartment')?.value||null;
+  if(!email)return toast('Email is required.');
+  const baseRole=requested==='report_viewer'?'user':requested;
+  try{
+    const out=await edgeAction({action:'invite',email,display_name:name,role:baseRole,redirect_to:`${location.origin}${location.pathname}?invite=1`});
+    let userId=out?.user_id||out?.user?.id||out?.id||null;
+    if(!userId){
+      for(let i=0;i<5&&!userId;i++){const p=await findProfileByEmail(email);userId=p?.id||null;if(!userId)await new Promise(resolve=>setTimeout(resolve,300))}
+    }
+    if(requested==='report_viewer'){
+      if(!userId)throw new Error('Invitation was created but the new profile was not available yet. Open People and set Role / department to Report Viewer once it appears.');
+      await setReportOnlyAccess(userId,true)
+    }
+    if(requested!=='report_viewer'){
+      if(!userId&&departmentId)throw new Error('Invitation was sent, but the profile is still being created so the Department could not be applied yet. Open People in a moment and set the Department.');
+      if(userId){const dr=await sb.rpc('set_user_department_v230',{p_user_id:userId,p_department_id:departmentId||null});
+      if(dr.error)throw dr.error;}
+    }
+    closeModal();toast(`Invitation sent to ${email}${requested==='report_viewer'?' as Report Viewer':departmentId?' with department assignment':''}.`);setTimeout(()=>refresh(),500)
+  }catch(e){toast(`Invite failed: ${e.message}`)}
+}
+function showSetRole(id){
+  const p=state.people.find(x=>x.id===id),selected=p?.report_only===true?'report_viewer':p?.role,currentDept=userDepartmentId(id)||'',own=id===state.user?.id;
+  const deptOpts=activeDepartments().map(d=>`<option value="${d.id}" ${currentDept===d.id?'selected':''}>${esc(d.name)}</option>`).join('');
+  openModal('Edit user',`<div class="form-grid"><label>Name<input id="editUserName" value="${esc(p?.display_name||'')}" maxlength="120"></label><label>Email<input id="editUserEmail" type="email" value="${esc(p?.email||'')}"></label><label>Role / access<select id="roleSelect"><option value="user" ${selected==='user'?'selected':''}>User</option><option value="manager" ${selected==='manager'?'selected':''}>Manager</option><option value="admin" ${selected==='admin'?'selected':''}>Admin</option><option value="report_viewer" ${selected==='report_viewer'?'selected':''}>Report Viewer — reports/download only</option></select></label><label>Department<select id="roleDepartment"><option value="">No department</option>${deptOpts}</select></label></div><div class="hint-box">${own?'<strong>Your own account:</strong> you can edit your name, email and Department here, but you cannot demote, disable or change your own access level. ':''}Changing department immediately recalculates department-based training requirements. Previous sign-offs/evidence are retained. Changing someone to Report Viewer deactivates current Training, Safety Awareness and PPE assignments but keeps previous evidence/sign-offs.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save changes','primary',`data-save-role="${id}"`)}</div>`)
+}
+async function saveRole(id){
+  const requested=$('roleSelect').value,departmentId=$('roleDepartment')?.value||null,p=state.people.find(x=>x.id===id),currentAccess=p?.report_only===true?'report_viewer':p?.role,own=id===state.user?.id;
+  const displayName=clean($('editUserName')?.value),email=clean($('editUserEmail')?.value).toLowerCase();
+  try{
+    if(!displayName)throw new Error('Name is required.');
+    if(!email||!/^\S+@\S+\.\S+$/.test(email))throw new Error('A valid email address is required.');
+    if(own&&requested!==currentAccess)throw new Error('You can edit your own details and Department, but you cannot change your own role/access level.');
+    if(displayName!==clean(p?.display_name)||email!==clean(p?.email).toLowerCase())await edgeAction({action:'update_user',user_id:id,display_name:displayName,email});
+    if(requested==='report_viewer'){
+      if(!own)await edgeAction({action:'set_role',user_id:id,role:'user'});
+      await setReportOnlyAccess(id,true);
+      const dr=await sb.rpc('set_user_department_v230',{p_user_id:id,p_department_id:null});if(dr.error)throw dr.error
+    }else{
+      await setReportOnlyAccess(id,false);
+      if(!own||requested!==currentAccess)await edgeAction({action:'set_role',user_id:id,role:requested});
+      const dr=await sb.rpc('set_user_department_v230',{p_user_id:id,p_department_id:departmentId||null});if(dr.error)throw dr.error
+    }
+    closeModal();await refresh(own?'Your user details and department have been updated.':requested==='report_viewer'?'User updated with Report Viewer access.':'User details, role and department updated.')
+  }catch(e){toast(e.message)}
+}
+function showResendUser(id){const p=state.people.find(x=>x.id===id);if(!p||id===state.user?.id)return;openModal('Resend access email',`<p>Send a fresh Safety Tracker access/password setup email to:</p><p><strong>${esc(p.display_name||p.email)}</strong><br><span class="muted">${esc(p.email||'')}</span></p><div class="hint-box">This sends a new secure password setup/recovery link to the live Safety Tracker. It does not remove any training history or assignments.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Send email','primary',`data-confirm-resend-user="${id}"`)}</div>`)}
+async function resendUserAccess(id){try{const out=await edgeAction({action:'resend_access',user_id:id});closeModal();toast(out?.message||'Access email sent.')}catch(e){toast(`Could not resend access email: ${e.message}`)}}
+async function toggleUser(id){const p=state.people.find(x=>x.id===id);try{await edgeAction({action:p.active===false?'enable':'disable',user_id:id});await refresh('User updated.')}catch(e){toast(e.message)}}
+
+
+function renderDepartments(){
+  const box=$('departmentList');if(!box)return;
+  const rows=[...state.departments].sort((a,b)=>{if((a.active!==false)!==(b.active!==false))return a.active===false?1:-1;return String(a.name||'').localeCompare(String(b.name||''))});
+  box.innerHTML=rows.length?rows.map(d=>{const members=state.userDepartments.filter(x=>x.department_id===d.id).length,used=state.documentAudiences.filter(x=>x.target_type==='DEPARTMENT'&&x.department_id===d.id).length;return `<div class="item-card compact"><div class="row-between"><div><strong>${esc(d.name)}</strong><div class="meta"><span>${members} user${members===1?'':'s'}</span><span>${used} document audience${used===1?'':'s'}</span><span class="badge ${d.active===false?'neutral':'complete'}">${d.active===false?'Archived':'Active'}</span></div></div><div class="row">${btn('Rename','secondary',`data-edit-department="${d.id}"`)}${btn(d.active===false?'Restore':'Archive',d.active===false?'primary':'ghost',`data-toggle-department="${d.id}"`)}</div></div></div>`}).join(''):'<div class="empty">No departments yet. Create your first department.</div>';
+}
+function showDepartmentEditor(id=''){
+  if(!isAdmin())return;const d=id?state.departments.find(x=>x.id===id):null;
+  openModal(d?'Rename department':'New department',`<label>Department name<input id="departmentName" maxlength="80" value="${esc(d?.name||'')}" placeholder="e.g. Maintenance"></label><div class="hint-box">Departments are managed here, so you can add or rename them without changing the app. Archived departments remain in historical assignment records.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn(d?'Save name':'Create department','primary',`data-save-department="${d?.id||''}"`)}</div>`)
+}
+async function saveDepartment(id=''){
+  if(!isAdmin())return;const name=clean($('departmentName')?.value);if(!name)return toast('Department name is required.');
+  const r=await sb.rpc('save_department_v230',{p_department_id:id||null,p_name:name});if(r.error)return toast(r.error.message);closeModal();await refresh(id?'Department renamed.':'Department created.')
+}
+async function toggleDepartment(id){
+  if(!isAdmin())return;const d=state.departments.find(x=>x.id===id);if(!d)return;
+  const active=d.active===false;const r=await sb.rpc('set_department_active_v230',{p_department_id:id,p_active:active});if(r.error)return toast(r.error.message);await refresh(active?'Department restored.':'Department archived. Existing users and historical rules are retained.')
+}
+function approvalTrainingScheduleHtml(d){
+  if(!documentUsesFormalTraining(d))return '';
+  const delivery=d.delivery_method||sourceDelivery(d.doc_type),rv=d.default_renewal_value||null,ru=d.default_renewal_unit||null;
+  return `<div id="approvalTrainingSchedule" class="section-card"><h4>Training schedule</h4><p class="muted">Approval is the point where the training requirement becomes live. Confirm how it will be delivered and how often it must be refreshed.</p><div class="form-grid"><label>Training method<select id="approvalTrainingDelivery"><option value="SELF_TRAINING" ${delivery==='SELF_TRAINING'?'selected':''}>Self-training</option><option value="INSTRUCTOR_LED" ${delivery==='INSTRUCTOR_LED'?'selected':''}>Instructor-led</option></select></label>${renewalFields('approvalTraining',rv,ru,true)}</div></div>`;
+}
+function approvalAudienceHtml(d){
+  if(!documentUsesFormalTraining(d))return '';
+  const a=audienceTargetsForDocument(d.id),deptRows=activeDepartments().map(x=>`<label class="check-row"><input type="checkbox" class="approval-department-choice" value="${x.id}" ${a.departmentIds.has(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="muted">No active departments. Create them in Admin → Departments.</span>';
+  const peopleRows=activePeople().map(p=>`<label class="check-row"><input type="checkbox" class="approval-person-choice" value="${p.id}" ${a.userIds.has(p.id)?'checked':''}>${esc(p.display_name||p.email)} <span class="muted">· ${esc(userDepartmentName(p.id))}</span></label>`).join('');
+  return `<div id="approvalAudienceSection" class="section-card approval-audience-card"><div class="row-between"><div><h4>Automatic training audience</h4><p class="muted">Choose who requires training when this version is approved. Department and person selections are combined. Everyone covers all current and future active users.</p></div></div><label class="check-row audience-everyone"><input id="approvalAssignEveryone" type="checkbox" ${a.everyone?'checked':''}> <strong>Everyone</strong> — company-wide requirement</label><div class="form-grid"><label>Completion due after assignment<input id="approvalAssignDueDays" type="number" min="1" max="365" value="${a.dueDays||14}"><span class="muted">days</span></label></div><div class="audience-grid"><div><h5>Departments</h5><div class="checkbox-list">${deptRows}</div></div><div><h5>Specific people</h5><div class="checkbox-list">${peopleRows||'<span class="muted">No active users.</span>'}</div></div></div><div id="approvalAudienceSummary" class="hint-box"></div></div>`;
+}
+function approvalAudienceSelection(){
+  const everyone=!!$('approvalAssignEveryone')?.checked,departmentIds=[...document.querySelectorAll('.approval-department-choice:checked')].map(x=>x.value),userIds=[...document.querySelectorAll('.approval-person-choice:checked')].map(x=>x.value),dueDays=Math.max(1,Math.min(365,Number($('approvalAssignDueDays')?.value||14)));
+  return {everyone,departmentIds,userIds,dueDays};
+}
+function updateApprovalAudienceSummary(){
+  const box=$('approvalAudienceSummary');if(!box)return;const a=approvalAudienceSelection(),people=activePeople(),ids=new Set();
+  document.querySelectorAll('.approval-department-choice,.approval-person-choice').forEach(x=>x.disabled=a.everyone);
+  if(a.everyone)people.forEach(p=>ids.add(p.id));else{people.forEach(p=>{const dep=userDepartmentId(p.id);if((dep&&a.departmentIds.includes(dep))||a.userIds.includes(p.id))ids.add(p.id)})}
+  const bits=[];if(a.everyone)bits.push('Everyone');else{if(a.departmentIds.length)bits.push(`${a.departmentIds.length} department${a.departmentIds.length===1?'':'s'}`);if(a.userIds.length)bits.push(`${a.userIds.length} specific person${a.userIds.length===1?'':'s'}`)}
+  box.innerHTML=ids.size?`<strong>${ids.size} active user${ids.size===1?'':'s'} will be assigned automatically.</strong> ${esc(bits.join(' + '))}`:'<strong>No automatic training audience selected.</strong> You can still use manual Training assignments later.';
+}
+function wireApprovalAudience(){
+  const section=$('approvalAudienceSection');if(!section)return;
+  const decision=$('approvalDecision'),toggle=()=>{section.hidden=decision?decision.value!=='APPROVED':false};decision?.addEventListener('change',toggle);toggle();
+  section.addEventListener('change',updateApprovalAudienceSummary);updateApprovalAudienceSummary();
+}
+function showDocumentAudience(id){
+  if(!isManager())return;
+  const d=state.documents.find(x=>x.id===id),v=approvedCurrentVersion(id);if(!d||!v)return toast('Only an approved/current document can have an automatic training audience.');
+  if(!documentUsesFormalTraining(d))return toast('Automatic training audiences apply to approved Risk Assessments, COSHH Risk Assessments and SSW documents.');
+  openModal('Edit training audience',`<div class="section-card"><h3>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</h3><div class="meta"><span class="badge complete">Approved/current · v${esc(v.version_label||'—')}</span></div><div class="hint-box"><strong>This does not change the approved document.</strong> It only changes who is required to complete the linked training. Existing completed sign-offs/evidence are retained.</div></div>${approvalTrainingScheduleHtml(d)}${approvalAudienceHtml(d)}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save training audience','primary',`data-save-doc-audience="${d.id}"`)}</div>`);
+  wireApprovalAudience();
+}
+async function saveDocumentAudience(id){
+  if(!isManager())return;
+  const d=state.documents.find(x=>x.id===id),v=approvedCurrentVersion(id);if(!d||!v)return toast('Approved/current document not found.');
+  const audience=approvalAudienceSelection();
+  const r=await sb.rpc('set_document_training_audience_v230',{p_document_id:id,p_everyone:audience.everyone,p_department_ids:audience.departmentIds,p_user_ids:audience.userIds,p_due_days:audience.dueDays});
+  if(r.error)return toast(r.error.message);
+  const sr=await sb.rpc('sync_training_audience_assignments_v230',{p_document_id:id,p_user_id:null});if(sr.error)return toast(`Audience saved, but assignment sync failed: ${sr.error.message}`);
+  closeModal();await refresh(`Training audience updated. ${Number(sr.data||0)} assignment change${Number(sr.data||0)===1?'':'s'} applied.`);
+}
+
+function approvalContextLabel(v){return ({INITIAL_ISSUE:'Initial issue',REVISED_VERSION:'Revised version',POST_INCIDENT_REVIEW:'Following incident / near miss',SCHEDULED_REVIEW_CHANGE:'Change from scheduled review',AUDIT_OR_OTHER_CHANGE:'Audit / other change',OTHER:'Other'})[v]||String(v||'').replaceAll('_',' ')}
+function showVersionApproval(versionId){
+  if(!isManager())return;
+  const v=state.versions.find(x=>x.id===versionId),d=state.documents.find(x=>x.id===v?.document_id);if(!v||!d)return;
+  if(versionApprovalStatus(v)!=='PENDING')return toast('This version is no longer pending approval.');
+  const opened=hasOpenedVersion(v.id),current=approvedCurrentVersion(d.id),isSds=d.doc_type==='SDS';
+  openModal(isSds?'Review & accept document':'Review & approve document',`<div class="document-status-card traffic-amber section-card"><div class="row-between"><div><h3>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</h3><div class="meta"><span class="badge due">${esc(versionApprovalLabel(v,d))}</span><span>v${esc(v.version_label||'—')}</span><span>Issue ${fmtDate(v.issue_date)}</span>${isSds?'':`<span>Review ${fmtDate(v.review_date)}</span>`}</div></div><span id="approvalOpenStatus" data-version-id="${v.id}" class="badge ${opened?'complete':'due'}">${opened?'Opened ✓':'Not opened'}</span></div>${current&&current.id!==v.id?`<div class="request-note">Approved/current v${esc(current.version_label||'—')} remains in use until this decision is approved.</div>`:'<div class="pending-use-warning">This version is not authorised for use or Training yet.</div>'}<div class="row">${btn('Open pending file','secondary',`data-open-doc="${v.id}"`)}</div></div><div class="form-grid"><label>Approval context<select id="approvalContext"><option value="${current?'REVISED_VERSION':'INITIAL_ISSUE'}">${current?'Revised version':'Initial issue'}</option><option value="POST_INCIDENT_REVIEW">Following incident / near miss</option><option value="SCHEDULED_REVIEW_CHANGE">Change from scheduled review</option><option value="AUDIT_OR_OTHER_CHANGE">Audit / other change</option><option value="OTHER">Other</option></select></label><label>Decision<select id="approvalDecision"><option value="APPROVED">${isSds?'Accept for records / use':'Approve for use'}</option><option value="REJECTED">Return for changes</option></select></label><label class="full">Decision notes<textarea id="approvalNote" placeholder="Record checks made, any conditions, or reason for return."></textarea></label>${signatureBlock('approval')}<label class="check-row full"><input id="approvalAck" type="checkbox"> I confirm this ${isSds?'acceptance':'approval'} decision and digital signature.</label></div>${approvalTrainingScheduleHtml(d)}${approvalAudienceHtml(d)}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn(isSds?'Save acceptance decision':'Save approval decision','primary',`data-save-version-approval="${v.id}"`)}</div>`);
+  setupSignaturePad('approvalSignaturePad','approvalClearSignature');wireApprovalAudience();wireRenewal('approvalTraining');
+}
+async function saveVersionApproval(versionId){
+  if(!isManager())return;
+  const v=state.versions.find(x=>x.id===versionId),d=state.documents.find(x=>x.id===v?.document_id);if(!v||!d)return;
+  if(versionApprovalStatus(v)!=='PENDING')return toast('This version is no longer pending approval.');
+  if(!hasOpenedVersion(v.id))return toast('Open the exact pending PDF before approving or accepting it.');
+  if(!$('approvalAck')?.checked)return toast('Tick the confirmation first.');
+  const decision=$('approvalDecision')?.value,context=$('approvalContext')?.value,note=clean($('approvalNote')?.value),sig=signatureData('approvalSignaturePad'),sigName=clean($('approvalSignatureName')?.value),audience=documentUsesFormalTraining(d)?approvalAudienceSelection():null;
+  if(!sig||!sigName)return toast('Digital signature and signature name are required.');
+  if(decision==='REJECTED'&&note.length<5)return toast('Add a short reason for returning the document for changes.');
+  let r;
+  if(decision==='APPROVED'&&audience){
+    const trainingRenewal=getRenewal('approvalTraining'),trainingDelivery=$('approvalTrainingDelivery')?.value||d.delivery_method||sourceDelivery(d.doc_type);
+    r=await sb.rpc('decide_document_version_with_training_schedule_v250',{p_document_version_id:v.id,p_decision:decision,p_context:context,p_note:note||null,p_signature_data:sig,p_signature_name:sigName,p_everyone:audience.everyone,p_department_ids:audience.departmentIds,p_user_ids:audience.userIds,p_due_days:audience.dueDays,p_delivery_method:trainingDelivery,p_renewal_value:trainingRenewal.value,p_renewal_unit:trainingRenewal.unit});
+  }else{
+    r=await sb.rpc('decide_document_version_v221',{p_document_version_id:v.id,p_decision:decision,p_context:context,p_note:note||null,p_signature_data:sig,p_signature_name:sigName});
+  }
+  if(r.error)return toast(r.error.message);
+  await logDocumentActivity('CONTROLLED_REVIEW',{...activityVersionSnapshot(v),source_context:'VERSION_APPROVAL'},{decision,context,approval_context:approvalContextLabel(context),note:note||null},false);
+  closeModal();await loadAll();
+  if(decision==='APPROVED'){
+    toast(`${d.doc_type==='SDS'?'Document accepted':'Version approved'}. Updating current links and Training…`);
+    try{
+      await runSafetySync({scan:'full',rebuildLinks:true});
+      if(documentUsesFormalTraining(d)){const sr=await sb.rpc('sync_training_audience_assignments_v230',{p_document_id:d.id,p_user_id:null});if(sr.error)console.warn('Audience assignment sync',sr.error)}
+    }catch(e){console.warn('Post-approval sync',e)}
+    await refresh(`${d.doc_type==='SDS'?'Accepted':'Approved'} v${v.version_label||''} is now current.${documentUsesFormalTraining(d)?' Automatic department/person assignments have been recalculated.':' Any required source Training has been updated.'}`);
+  }else await refresh('Version returned for changes. Any previously approved/current version remains in use.');
+}
+function showDocumentReview(id){const d=state.documents.find(x=>x.id===id),v=approvedCurrentVersion(id);if(!v)return toast('Only an approved/current version can have a controlled review. Pending versions use Review & approve.');openModal('Controlled document review',`<p><strong>${esc(d.reference?d.reference+' - '+documentDisplayTitle(d):documentDisplayTitle(d))}</strong> · v${esc(v.version_label)}</p><div class="hint-box">This is the formal management review of the controlled document. It is separate from employee training and file-access records.</div><div class="form-grid"><label>Reason for review<select id="reviewReason"><option value="SCHEDULED_REVIEW">Scheduled review</option><option value="INCIDENT_NEAR_MISS">Incident / near miss</option><option value="PROCESS_EQUIPMENT_CHANGE">Process / equipment change</option><option value="AUDIT_FINDING">Audit finding</option><option value="LEGISLATION_GUIDANCE_CHANGE">Legislation / guidance change</option><option value="OTHER">Other</option></select></label><label>Outcome<select id="reviewOutcome"><option value="NO_CHANGE">No change needed</option><option value="NEW_VERSION_REQUIRED">New version required</option><option value="OTHER_ACTION">Other action required</option></select></label><label id="nextReviewWrap">Next review date<input id="nextReviewDate" type="date" value="${plusYear(todayISO())}"></label><label class="full">Review note<textarea id="reviewNote" placeholder="Record what was checked, findings and actions."></textarea></label>${signatureBlock('review')}<label class="check-row full"><input id="reviewAck" type="checkbox"> I confirm this controlled review and digital signature.</label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save controlled review','primary',`data-save-doc-review="${id}"`)}</div>`);const sync=()=>{$('nextReviewWrap').hidden=$('reviewOutcome').value!=='NO_CHANGE'};$('reviewOutcome').addEventListener('change',sync);sync();setupSignaturePad('reviewSignaturePad','reviewClearSignature')}
+function controlledReviewReasonLabel(v){return ({SCHEDULED_REVIEW:'Scheduled review',INCIDENT_NEAR_MISS:'Incident / near miss',PROCESS_EQUIPMENT_CHANGE:'Process / equipment change',AUDIT_FINDING:'Audit finding',LEGISLATION_GUIDANCE_CHANGE:'Legislation / guidance change',OTHER:'Other'})[v]||v||'Controlled review'}
+async function saveDocumentReview(id){if(!$('reviewAck').checked)return toast('Tick the confirmation first.');const d=state.documents.find(x=>x.id===id),v=approvedCurrentVersion(id),outcome=$('reviewOutcome').value,reason=$('reviewReason').value,note=clean($('reviewNote').value),next=$('nextReviewDate').value||null,sig=signatureData('reviewSignaturePad'),sigName=clean($('reviewSignatureName').value);if(!sig)return toast('Please sign in the box.');if(!sigName)return toast('Enter the signature name.');if(outcome==='NO_CHANGE'&&!next)return toast('Choose the next review date.');const storedNote=`Review reason: ${controlledReviewReasonLabel(reason)}${note?`
+${note}`:''}`;const r=await sb.rpc('record_document_review',{p_document_version_id:v.id,p_outcome:outcome,p_review_note:storedNote,p_next_review_date:next,p_signature_data:sig,p_signature_name:sigName});if(r.error)return toast(r.error.message);if(outcome==='NO_CHANGE')await sb.from('documents').update({review_required:false,review_reason:null}).eq('id',d.id);await logDocumentActivity('CONTROLLED_REVIEW',{...activityVersionSnapshot(v),source_context:'CONTROLLED_REVIEW'},{reason,outcome,next_review_date:next,review_note:note||null},false);closeModal();await refresh(outcome==='NEW_VERSION_REQUIRED'?'Controlled review recorded. The current version remains in use until a replacement version is published.':'Controlled review recorded.');}
+
+function productWords(s){return productMatchTokens(s).filter(x=>x.length>2)}
+function similarity(a,b){return productNameMatchScore(a,b)}
+function refsInText(t){return [...new Set((String(t||'').match(refRx)||[]).map(canonicalRef))]}
+async function copyAssignment(a,newTrainingId,seen){if(seen.has(a.user_id))return 0;seen.add(a.user_id);const payload={training_session_id:newTrainingId,user_id:a.user_id,due_date:daysFromNow(14),renewal_value:a.renewal_value,renewal_unit:a.renewal_unit,assigned_by:state.user.id,active:true,assignment_origin:a.assignment_origin||'MANUAL'};if('delivery_method_override' in a)payload.delivery_method_override=a.delivery_method_override||null;const r=await sb.from('training_assignments').insert(payload);return r.error?0:1}
+async function createSourceTraining(d,v,prior=null){const dr={value:d.default_renewal_value||null,unit:d.default_renewal_unit||null};const payload={name:`${d.reference?d.reference+' - ':''}${d.title}`,session_type:d.doc_type,delivery_method:d.delivery_method||sourceDelivery(d.doc_type),description:`Controlled document training. Source: ${d.reference||''} - ${d.title}. Automatically managed by Safety Tracker v${APP_VERSION}.`,delivered_date:null,trainer_name:null,trainer_user_id:state.user.id,review_date:v.review_date||plusYear(v.issue_date||todayISO()),default_due_date:daysFromNow(14),renewal_value:dr.value,renewal_unit:dr.unit,status:'ACTIVE',created_by:state.user.id,reference:d.reference||null,source_kind:d.doc_type,source_document_id:d.id,source_document_version_id:v.id,auto_managed:true,review_required:false,review_reason:null};const ins=await sb.from('training_sessions').insert(payload).select().single();if(ins.error){console.warn('createSourceTraining',ins.error);return {changes:0,training:null}}const t=ins.data;state.training.push(t);let changes=1;const seen=new Set();if(prior){for(const a of state.trainingAssignments.filter(a=>a.training_session_id===prior.id&&a.active!==false)){changes+=await copyAssignment(a,t.id,seen);await sb.from('training_assignments').update({active:false}).eq('id',a.id);changes++}await sb.from('training_sessions').update({status:'ARCHIVED'}).eq('id',prior.id);prior.status='ARCHIVED';changes++}return {changes,training:t}}
+async function syncSourceTrainings(){
+  let changes=0;
+  for(const d of state.documents.filter(d=>d.status!=='ARCHIVED'&&sourceDocTypes.has(d.doc_type))){
+    const v=approvedCurrentVersion(d.id);if(!v)continue;
+    let active=state.training.find(t=>t.auto_managed===true&&t.source_document_id===d.id&&t.status!=='ARCHIVED');
+    if(!active||active.source_document_version_id!==v.id){const r=await createSourceTraining(d,v,active||null);changes+=r.changes;active=r.training||active}
+    if(!active)continue;
+    const dr={value:d.default_renewal_value||null,unit:d.default_renewal_unit||null};
+    const desired={name:`${d.reference?d.reference+' - ':''}${d.title}`,session_type:d.doc_type,reference:d.reference||null,source_kind:d.doc_type,source_document_id:d.id,source_document_version_id:v.id,delivery_method:d.delivery_method||sourceDelivery(d.doc_type),review_date:v.review_date||plusYear(v.issue_date||todayISO()),renewal_value:dr.value,renewal_unit:dr.unit,auto_managed:true};
+    if(Object.entries(desired).some(([k,val])=>String(active[k]??'')!==String(val??''))){const u=await sb.from('training_sessions').update(desired).eq('id',active.id);if(!u.error){Object.assign(active,desired);changes++}}
+    for(const a of state.trainingAssignments.filter(a=>a.training_session_id===active.id&&a.active!==false)){
+      if(String(a.renewal_value??'')!==String(dr.value??'')||String(a.renewal_unit??'')!==String(dr.unit??'')){
+        const u=await sb.from('training_assignments').update({renewal_value:dr.value,renewal_unit:dr.unit}).eq('id',a.id);
+        if(!u.error){a.renewal_value=dr.value;a.renewal_unit=dr.unit;changes++;}
+      }
+    }
+  }
+  const aud=await sb.rpc('sync_training_audience_assignments_v230',{p_document_id:null,p_user_id:null});
+  if(aud.error)console.warn('sync_training_audience_assignments_v230',aud.error);else changes+=Number(aud.data||0);
+  return changes;
+}
+async function normaliseDefaults(){let changes=0;for(const v of state.versions.filter(v=>v.status==='CURRENT')){const d=state.documents.find(x=>x.id===v.document_id),patch={};if(!v.issue_date)patch.issue_date=v.created_at?new Date(v.created_at).toISOString().slice(0,10):todayISO();if(d?.doc_type!=='SDS'&&!v.review_date)patch.review_date=plusYear(v.issue_date||patch.issue_date||todayISO());if(Object.keys(patch).length){const r=await sb.from('document_versions').update(patch).eq('id',v.id);if(!r.error){Object.assign(v,patch);changes++}}}for(const t of activeTraining()){const patch={};if(!t.review_date)patch.review_date=plusYear(t.created_at?new Date(t.created_at).toISOString().slice(0,10):todayISO());if(t.session_type==='TOOLBOX_TALK'){if(!t.source_kind)patch.source_kind='TOOLBOX_TALK';if(!t.reference){const m=String(t.name||'').match(/\bTBT-\d{3}\b/i);if(m)patch.reference=m[0].toUpperCase()}}if(Object.keys(patch).length){const r=await sb.from('training_sessions').update(patch).eq('id',t.id);if(!r.error){Object.assign(t,patch);changes++}}}return changes}
+async function deleteRowsByIds(table,ids){let removed=0;for(let i=0;i<ids.length;i+=100){const chunk=ids.slice(i,i+100);if(!chunk.length)continue;const r=await sb.from(table).delete().in('id',chunk);if(r.error)throw r.error;removed+=chunk.length}return removed}
+async function clearLinkSyncFlags(){let changes=0;for(const d of state.documents.filter(x=>x.review_required&&String(x.review_reason||'').startsWith('[LINK_SYNC]'))){const r=await sb.from('documents').update({review_required:false,review_reason:null}).eq('id',d.id);if(!r.error){d.review_required=false;d.review_reason=null;changes++}}for(const t of activeTraining().filter(x=>x.review_required&&String(x.review_reason||'').startsWith('[LINK_SYNC]'))){const r=await sb.from('training_sessions').update({review_required:false,review_reason:null}).eq('id',t.id);if(!r.error){t.review_required=false;t.review_reason=null;changes++}}return changes}
+async function rebuildLinkTables(progress=()=>{}){let changes=0;progress('Clearing existing document-to-document links…');changes+=await deleteRowsByIds('document_links',state.documentLinks.map(x=>x.id).filter(Boolean));state.documentLinks=[];progress('Clearing existing Training-to-document links…');changes+=await deleteRowsByIds('training_document_links',state.trainingDocumentLinks.map(x=>x.id).filter(Boolean));state.trainingDocumentLinks=[];changes+=await clearLinkSyncFlags();return changes}
+async function flagMissingDocumentRefs(d,refs){if(!refs.length||d.review_required)return 0;const reason=`[LINK_SYNC] Referenced controlled document${refs.length===1?'':'s'} not found: ${refs.join(', ')}. Check the reference or upload the missing document.`;const r=await sb.from('documents').update({review_required:true,review_reason:reason}).eq('id',d.id);if(r.error)return 0;d.review_required=true;d.review_reason=reason;return 1}
+async function flagMissingTrainingRefs(t,refs){if(!refs.length||t.review_required)return 0;const reason=`[LINK_SYNC] Referenced controlled document${refs.length===1?'':'s'} not found: ${refs.join(', ')}. Check the reference or upload the missing document.`;const r=await sb.from('training_sessions').update({review_required:true,review_reason:reason}).eq('id',t.id);if(r.error)return 0;t.review_required=true;t.review_reason=reason;return 1}
+async function scanDocumentRefs(d,v){if(!v?.storage_path)return {changes:0,missing:0};let changes=0,missing=0;try{const {data,error}=await sb.storage.from('safety-files').download(v.storage_path);if(error||!data)return {changes:0,missing:0};const text=await pdfTextFromBlob(data);for(const match of declaredDocumentMatches(text,d)){const o=match.doc;if(o&&!pairExists(d.id,o.id)){const rel=inferLinkType(d,o),r=await sb.from('document_links').insert({source_document_id:rel.source.id,target_document_id:rel.target.id,link_type:rel.type,created_by:state.user.id}).select().single();if(!r.error){state.documentLinks.push(r.data);changes++}}}for(const ref of declaredRefsForLinking(text,d)){const t=referencedTrainingByRef(ref);if(t&&canonicalRef(t.reference||trainingReference(t)).startsWith('TBT-'))changes+=await ensureTrainingDocLink(t.id,d.id,'RELATED')}const unresolved=missingDeclaredRefs(text,d);missing+=unresolved.length;changes+=await flagMissingDocumentRefs(d,unresolved);await sb.from('document_versions').update({links_scanned_at:new Date().toISOString()}).eq('id',v.id)}catch(e){console.warn('scanDocumentRefs',e)}return {changes,missing}}
+async function scanTrainingRefs(t,f){if(!f?.storage_path)return {changes:0,missing:0};let changes=0,missing=0;try{const {data,error}=await sb.storage.from('safety-files').download(f.storage_path);if(error||!data)return {changes:0,missing:0};const text=await pdfTextFromBlob(data);for(const match of declaredDocumentMatches(text,null)){const d=match.doc;if(d)changes+=await ensureTrainingDocLink(t.id,d.id,'RELATED')}const unresolved=missingDeclaredRefs(text,null);missing+=unresolved.length;changes+=await flagMissingTrainingRefs(t,unresolved);await sb.from('training_files').update({links_scanned_at:new Date().toISOString()}).eq('id',f.id)}catch(e){console.warn('scanTrainingRefs',e)}return {changes,missing}}
+function linkScanVersions(docId){
+  // If an approved/current version exists, it remains the operative source of
+  // Training relationships while any replacement is still pending. For a
+  // brand-new pending-only document, scan the pending file immediately so its
+  // relationships are visible before approval.
+  const approved=approvedCurrentVersion(docId);
+  if(approved?.storage_path)return [approved];
+  return pendingApprovalVersions(docId).filter(v=>v?.storage_path);
+}
+async function scanFiles(mode='recent',progress=()=>{}){let changes=0,scanned=0,missing=0;const cutoff=Date.now()-20*60*1000;for(const d of state.documents.filter(d=>d.status!=='ARCHIVED')){for(const v of linkScanVersions(d.id)){const recent=new Date(v.created_at||0).getTime()>=cutoff;if(mode!=='full'&&(!recent||v.links_scanned_at))continue;progress(`Reading links stated in ${d.reference||d.title}${versionApprovalStatus(v)==='PENDING'?' (pending version)':''}`);const r=await scanDocumentRefs(d,v);changes+=r.changes;missing+=r.missing;scanned++}}const latest=new Map();for(const f of state.trainingFiles){const x=latest.get(f.training_session_id);if(!x||new Date(f.created_at||0)>new Date(x.created_at||0))latest.set(f.training_session_id,f)}for(const t of activeTraining()){const f=latest.get(t.id);if(!f?.storage_path)continue;const recent=new Date(f.created_at||0).getTime()>=cutoff;if(mode!=='full'&&(!recent||f.links_scanned_at))continue;progress(`Reading links stated in training file ${t.name}`);const r=await scanTrainingRefs(t,f);changes+=r.changes;missing+=r.missing;scanned++}return {changes,scanned,missing}}
+function latestReviewTime(docId){const ids=new Set(state.versions.filter(v=>v.document_id===docId).map(v=>v.id));return state.documentReviews.filter(r=>ids.has(r.document_version_id)).sort((a,b)=>new Date(b.reviewed_at||0)-new Date(a.reviewed_at||0))[0]?.reviewed_at||null}
+async function propagateReviewFlags(){let changes=0;for(const l of state.documentLinks.filter(l=>['SDS_TO_COSHH','COSHH_TO_SSW','RA_TO_SSW'].includes(l.link_type))){const source=state.documents.find(d=>d.id===l.source_document_id),target=state.documents.find(d=>d.id===l.target_document_id),sv=approvedCurrentVersion(source?.id),tv=approvedCurrentVersion(target?.id);if(!source||!target||!sv||!tv)continue;const base=Math.max(new Date(tv.created_at||0).getTime(),new Date(latestReviewTime(target.id)||0).getTime());if(new Date(sv.created_at||0).getTime()>base&&!target.review_required){const reason=`${source.reference||source.title} has a newer controlled version. Review ${target.reference||target.title} and linked training.`;const r=await sb.from('documents').update({review_required:true,review_reason:reason}).eq('id',target.id);if(!r.error){target.review_required=true;target.review_reason=reason;changes++}}}for(const t of activeTraining().filter(t=>!t.auto_managed)){const newer=linkedTrainingDocs(t.id).filter(x=>{const v=approvedCurrentVersion(x.doc.id);return v&&new Date(v.created_at||0)>new Date(t.created_at||0)});if(newer.length&&!t.review_required){const reason=`Linked controlled document${newer.length===1?' has':'s have'} changed since this training was created: ${newer.slice(0,3).map(x=>x.doc.reference||x.doc.title).join(', ')}.`;const r=await sb.from('training_sessions').update({review_required:true,review_reason:reason}).eq('id',t.id);if(!r.error){t.review_required=true;t.review_reason=reason;changes++}}}return changes}
+async function runSafetySync({scan='recent',progress=()=>{},rebuildLinks=false}={}){if(state.syncBusy)return {changes:0,scanned:0,missing:0};state.syncBusy=true;let changes=0;try{progress('Applying issue/review date defaults…');changes+=await normaliseDefaults();if(scan==='full'||rebuildLinks){progress('Repairing Risk Assessment titles from each first page…');const raAligned=await repairRaTitles({silent:true,refreshAfter:false,progress});changes+=raAligned.changed;progress('Aligning SDS/MSDS names from manufacturer Section 1.1…');const aligned=await repairSdsTitles({silent:true,refreshAfter:false,progress});changes+=aligned.changed}progress('Synchronising approved RA/COSHH/SSW Training records…');changes+=await syncSourceTrainings();return {changes,scanned:0,missing:0}}finally{state.syncBusy=false}}
+async function forceSyncFromUI(){if(!isAdmin())return;const b=$('forceSyncBtn'),s=$('forceSyncStatus');b.disabled=true;s.hidden=false;s.textContent='Starting Force Sync & Review…';try{await loadAll();const r=await runSafetySync({scan:'full',progress:m=>s.textContent=m});await loadAll();s.textContent=`Force Sync & Review complete. Controlled titles/defaults were checked and approved RA/COSHH/SSW Training records were synchronised. ${r.changes} database update${r.changes===1?'':'s'}.`;renderDocuments();renderTraining();renderAdmin();toast('Force Sync & Review complete.')}catch(e){console.error(e);s.textContent=`Force Sync failed: ${e.message||e}`;toast('Force Sync failed.')}finally{b.disabled=false}}
+
+function uniqueById(rows){const seen=new Set();return rows.filter(x=>x&&x.id&&!seen.has(x.id)&&seen.add(x.id))}
+function documentVersionsForEvidence(doc,scope){const rows=state.versions.filter(v=>v.document_id===doc.id);if(scope==='FULL')return [...rows].sort((a,b)=>{if(a.status==='CURRENT'&&b.status!=='CURRENT')return -1;if(b.status==='CURRENT'&&a.status!=='CURRENT')return 1;return new Date(b.created_at||0)-new Date(a.created_at||0)});const v=approvedCurrentVersion(doc.id);return v?[v]:[]}
+function evidencePersonOptions(){return [...state.people].sort((a,b)=>personName(a.id).localeCompare(personName(b.id))).map(p=>`<option value="${p.id}">${esc(personName(p.id))}${p.active===false?' (inactive)':''}</option>`).join('')}
+function evidenceDocumentPickerRows(preselected=[]){const sel=new Set(preselected);return state.documents.filter(d=>d.status!=='ARCHIVED').sort((a,b)=>String(a.reference||documentDisplayTitle(a)).localeCompare(String(b.reference||documentDisplayTitle(b)),undefined,{numeric:true})).map(d=>{const v=approvedCurrentVersion(d.id)||pendingApprovalVersion(d.id)||latestVersion(d.id),status=v?versionApprovalLabel(v,d):'No version';return `<label class="check-row evidence-choice" data-evidence-search="${esc(`${d.reference||''} ${documentDisplayTitle(d)} ${docTypeLabel(d.doc_type)} ${status}`.toLowerCase())}"><input type="checkbox" class="evidence-doc-choice" value="${d.id}" ${sel.has(d.id)?'checked':''}><span><strong>${esc(d.reference||docTypeLabel(d.doc_type))}</strong> · ${esc(documentDisplayTitle(d))}<br><span class="muted">${esc(docTypeLabel(d.doc_type))} · ${esc(status)}</span></span></label>`}).join('')}
+function evidenceTrainingPickerRows(preselected=[]){const sel=new Set(preselected);return state.training.filter(t=>t.status!=='ARCHIVED'&&!t.source_document_id).sort((a,b)=>String(trainingReference(a)||a.name).localeCompare(String(trainingReference(b)||b.name),undefined,{numeric:true})).map(t=>`<label class="check-row evidence-choice" data-evidence-search="${esc(`${trainingReference(t)||''} ${t.name} ${kindLabel(trainingKind(t))}`.toLowerCase())}"><input type="checkbox" class="evidence-training-choice" value="${t.id}" ${sel.has(t.id)?'checked':''}><span><strong>${esc(trainingReference(t)||kindLabel(trainingKind(t)))}</strong> · ${esc(t.name)}<br><span class="muted">Standalone ${esc(kindLabel(trainingKind(t)))}</span></span></label>`).join('')}
+function wireEvidenceSearch(){const q=$('evidenceItemSearch');if(!q)return;q.addEventListener('input',()=>{const s=clean(q.value).toLowerCase();document.querySelectorAll('.evidence-choice').forEach(x=>x.hidden=!!s&&!String(x.dataset.evidenceSearch||'').includes(s))})}
+function showEvidencePackPicker(preselectedDocs=[],preselectedTraining=[]){if(!isManager())return;openModal('Person evidence pack',`<div class="hint-box">Select the person, then choose the documents and training records needed for this report. Links are not required. Safety Tracker will collect the matching training/sign-off/access evidence and append the selected controlled PDFs.</div><div class="form-grid"><label class="full">Person<select id="evidencePerson"><option value="">Select person…</option>${evidencePersonOptions()}</select></label><label>History<select id="evidenceScope"><option value="CURRENT">Current approved version only</option><option value="FULL">Full version history</option></select></label><label>From date (optional)<input id="evidenceStart" type="date"></label><label>To date (optional)<input id="evidenceEnd" type="date"></label><label class="full">Search documents / items<input id="evidenceItemSearch" placeholder="Search reference, title or type"></label></div><div class="section-card"><h4>Controlled documents</h4><div class="checkbox-list evidence-picker-list">${evidenceDocumentPickerRows(preselectedDocs)}</div></div><div class="section-card"><h4>Standalone training / Toolbox Talks</h4><div class="checkbox-list evidence-picker-list">${evidenceTrainingPickerRows(preselectedTraining)||'<span class="muted">No standalone training items.</span>'}</div></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Create evidence pack','primary','data-generate-evidence-selected')}</div>`);wireEvidenceSearch()}
+function showDocumentEvidencePack(docId){showEvidencePackPicker([docId],[])}
+function showTrainingEvidencePack(trainingId){const t=state.training.find(x=>x.id===trainingId);if(!t||!isManager())return;if(t.source_document_id)showEvidencePackPicker([t.source_document_id],[]);else showEvidencePackPicker([],[trainingId])}
+function evidenceSessionsForDocuments(docs,scope){const ids=new Set(docs.map(d=>d.id));return state.training.filter(t=>ids.has(t.source_document_id)&&t.auto_managed===true&&(scope==='FULL'||t.source_document_version_id===approvedCurrentVersion(t.source_document_id)?.id))}
+function evidenceRowsForPerson(sessions,personId){const sessionIds=new Set(sessions.map(t=>t.id));const assignments=state.trainingAssignments.filter(a=>a.user_id===personId&&sessionIds.has(a.training_session_id));const assignmentIds=new Set(assignments.map(a=>a.id));const signoffs=state.trainingSignoffs.filter(s=>s.user_id===personId&&(assignmentIds.has(s.training_assignment_id)||sessionIds.has(s.training_session_id)));const exceptions=state.trainingExceptions.filter(x=>x.user_id===personId&&(assignmentIds.has(x.training_assignment_id)||sessionIds.has(x.training_session_id)));const confirmations=state.trainingConfirmations.filter(c=>c.user_id===personId&&assignmentIds.has(c.assignment_id));return {assignments,signoffs,exceptions,confirmations}}
+function evidenceDateInRange(value,start,end){if(!value)return true;const t=new Date(value).getTime();if(start&&t<new Date(start+'T00:00:00').getTime())return false;if(end&&t>new Date(end+'T23:59:59.999').getTime())return false;return true}
+function addEvidenceTable(doc,title,head,body){let y=doc.lastAutoTable?.finalY||28;if(y>255){doc.addPage();y=18}doc.setFontSize(11);doc.text(title,14,y+7);doc.autoTable({head:[head],body:body.length?body:[['None recorded',...Array(Math.max(0,head.length-1)).fill('')]],startY:y+10,styles:{fontSize:7,cellPadding:1.6},headStyles:{fontSize:7},margin:{left:14,right:14}})}
+function makeEvidenceSummaryPdf(ctx,failed){const {jsPDF}=window.jspdf;const out=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});out.setFontSize(17);out.text('Safety Tracker - Person Evidence Pack',14,16);out.setFontSize(9);out.text(`Generated ${new Date().toLocaleString('en-GB')} · Safety Tracker v${APP_VERSION}`,14,23);out.setFontSize(10);out.text(`Person: ${personName(ctx.personId)}`,14,31);out.text(`Selected items: ${ctx.documents.length+ctx.toolboxTalks.length}`,14,37);out.text(`History: ${ctx.scope==='FULL'?'Full history':'Current approved versions only'}`,14,43);out.text(`Evidence period: ${ctx.startDate?fmtDate(ctx.startDate):'Any date'} to ${ctx.endDate?fmtDate(ctx.endDate):'Any date'}`,14,49);out.setFontSize(8);out.text('This pack records evidence held in Safety Tracker. An OPENED event proves access to a file, not comprehension or competence on its own.',14,56,{maxWidth:180});
+  const docRows=[];for(const x of ctx.documents){for(const v of documentVersionsForEvidence(x.doc,ctx.scope))docRows.push([x.role,x.doc.reference||docTypeLabel(x.doc.doc_type),documentDisplayTitle(x.doc),v.version_label||'',`${v.status||''} / ${versionApprovalStatus(v)}`,fmtDate(v.issue_date),fmtDate(v.review_date)])}for(const x of ctx.toolboxTalks){const f=latestTrainingFile(x.training.id);docRows.push([x.role,trainingReference(x.training)||'Training',x.training.name,'—',x.training.status||'',f?fmtDate(f.created_at):'—',fmtDate(x.training.review_date)])}out.autoTable({head:[['Selection','Reference','Item','Version','Status','Issue/file date','Review']],body:docRows.length?docRows:[['Selected','','No file details available','','','','']],startY:63,styles:{fontSize:6.6,cellPadding:1.4},headStyles:{fontSize:6.6},margin:{left:14,right:14}});
+  const assignmentRows=ctx.evidence.assignments.map(a=>{const t=state.training.find(x=>x.id===a.training_session_id),st=t?assignmentStatus(a,t):null;return [trainingReference(t)||'',t?.name||'',t?deliveryText(effectiveTrainingMethod(t,a)):'',st?.label||'',fmtDate(a.due_date),renewalText(a.renewal_value,a.renewal_unit,t?.auto_managed&&sourceDocTypes.has(trainingKind(t)))]});addEvidenceTable(out,'Training assignments',['Ref','Training','Delivery','Status','Due','Refresher'],assignmentRows);
+  const eventRows=[];for(const s of ctx.evidence.signoffs){const t=state.training.find(x=>x.id===s.training_session_id);eventRows.push([fmtDateTime(s.signed_at),'Training sign-off',trainingReference(t)||'',s.training_name_snapshot||t?.name||'',s.signature_name||''])}for(const x of ctx.evidence.exceptions){const t=state.training.find(y=>y.id===x.training_session_id);eventRows.push([fmtDateTime(x.completed_at),'ADMIN EXCEPTION',trainingReference(t)||'',t?.name||'',`${x.signature_name||''}${x.reason?' - '+x.reason:''}`])}for(const c of ctx.evidence.confirmations){const a=state.trainingAssignments.find(x=>x.id===c.assignment_id),t=state.training.find(x=>x.id===a?.training_session_id);eventRows.push([fmtDateTime(c.created_at||c.delivery_date),'Instructor confirmation',trainingReference(t)||'',t?.name||'',`${c.attendance_status||''}${c.reason?' - '+c.reason:''}`])}eventRows.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));addEvidenceTable(out,'Completion / instructor evidence',['Date/time','Evidence','Ref','Training','Signature / details'],eventRows);
+  const actRows=ctx.activities.map(a=>[fmtDateTime(a.occurred_at),activityActionLabel(a.action),a.document_reference||'',a.document_title||a.file_name||'',a.version_label||'',a.source_context||'']);addEvidenceTable(out,'Document access / review history',['Date/time','Action','Ref','Document/file','Version','Context'],actRows);
+  const approvalRows=(ctx.versionApprovals||[]).map(x=>{const v=x.version,d=x.doc;return [fmtDateTime(v.approval_at),d?.reference||'',v.version_label||'',versionApprovalStatus(v),approvalContextLabel(v.approval_context),v.approval_note||'',v.approval_signature_name||'',personName(v.approval_by)||'']});addEvidenceTable(out,'Version approval / acceptance history',['Date/time','Ref','Version','Decision','Context','Notes','Signed name','Reviewer'],approvalRows);
+  const crRows=(ctx.controlledReviews||[]).map(r=>{const v=state.versions.find(x=>x.id===r.document_version_id),d=state.documents.find(x=>x.id===v?.document_id);return [fmtDateTime(r.reviewed_at||r.created_at),d?.reference||'',v?.version_label||'',r.outcome||'',r.review_note||'',fmtDate(r.next_review_date),r.signature_name||'',personName(r.reviewed_by||r.user_id)||'']});addEvidenceTable(out,'Controlled document review history',['Date/time','Ref','Version','Outcome','Reason / notes','Next review','Signed name','Reviewer'],crRows);
+  if(failed.length)addEvidenceTable(out,'Files not appended',['File','Reason'],failed.map(x=>[x.label,x.reason]));
+  const signed=[...ctx.evidence.signoffs.map(x=>({...x,_date:x.signed_at,_kind:'Training sign-off'})),...ctx.evidence.exceptions.map(x=>({...x,_date:x.completed_at,_kind:'Admin exception'})),...(ctx.controlledReviews||[]).map(x=>({...x,_date:x.reviewed_at||x.created_at,_kind:'Controlled document review'})),...(ctx.versionApprovals||[]).map(x=>({...x.version,_date:x.version.approval_at,_kind:x.doc?.doc_type==='SDS'?'Version acceptance':'Version approval',_doc:x.doc}))].filter(x=>x.signature_data||x.approval_signature_data);for(const ev of signed){const t=state.training.find(x=>x.id===ev.training_session_id),rv=state.versions.find(x=>x.id===ev.document_version_id),rd=state.documents.find(x=>x.id===rv?.document_id);out.addPage();out.setFontSize(14);out.text('Digital signature evidence',14,18);out.setFontSize(10);const approvalEv=ev._kind==='Version approval'||ev._kind==='Version acceptance',approvalDoc=ev._doc||state.documents.find(x=>x.id===ev.document_id);const evLabel=approvalEv?`${ev._kind}: ${approvalDoc?.reference||''} ${approvalDoc?documentDisplayTitle(approvalDoc):''} v${ev.version_label||''}`:ev._kind==='Controlled document review'?`${ev._kind}: ${rd?.reference||''} ${rd?documentDisplayTitle(rd):''} v${rv?.version_label||''}`:`${ev._kind}: ${trainingReference(t)||''} ${t?.name||ev.training_name_snapshot||''}`;out.text(evLabel,14,28,{maxWidth:180});const signedPerson=approvalEv?(personName(ev.approval_by)||ev.approval_signature_name||'Reviewer'):ev._kind==='Controlled document review'?(personName(ev.reviewed_by||ev.user_id)||ev.signature_name||'Reviewer'):personName(ctx.personId);out.text(`Person: ${signedPerson} · Signed: ${fmtDateTime(ev._date)} · Name: ${approvalEv?(ev.approval_signature_name||''):(ev.signature_name||'')}`,14,38,{maxWidth:180});try{out.addImage(approvalEv?ev.approval_signature_data:ev.signature_data,'PNG',14,48,100,30)}catch(e){out.text('Signature image could not be rendered in this report.',14,55)}}return out.output('arraybuffer')}
+async function buildEvidenceContextSelected(documentIds,trainingIds,personId,scope,startDate,endDate){let documents=documentIds.map(id=>state.documents.find(x=>x.id===id)).filter(Boolean).map(doc=>({doc,role:'Selected'}));let toolboxTalks=trainingIds.map(id=>state.training.find(x=>x.id===id)).filter(Boolean).map(training=>({training,role:'Selected'}));documents=documents.filter((x,i,a)=>a.findIndex(y=>y.doc.id===x.doc.id)===i);toolboxTalks=toolboxTalks.filter((x,i,a)=>a.findIndex(y=>y.training.id===x.training.id)===i);let sessions=[...evidenceSessionsForDocuments(documents.map(x=>x.doc),scope),...toolboxTalks.map(x=>x.training)];sessions=uniqueById(sessions);const evidence=evidenceRowsForPerson(sessions,personId);evidence.signoffs=evidence.signoffs.filter(x=>evidenceDateInRange(x.signed_at,startDate,endDate));evidence.exceptions=evidence.exceptions.filter(x=>evidenceDateInRange(x.completed_at,startDate,endDate));evidence.confirmations=evidence.confirmations.filter(x=>evidenceDateInRange(x.created_at||x.delivery_date,startDate,endDate));const docIds=new Set(documents.map(x=>x.doc.id)),sessionIds=new Set(sessions.map(x=>x.id)),fileIds=new Set(toolboxTalks.flatMap(x=>{const rows=state.trainingFiles.filter(f=>f.training_session_id===x.training.id);const use=scope==='FULL'?rows:(latestTrainingFile(x.training.id)?[latestTrainingFile(x.training.id)]:[]);return use.map(f=>f.id)}));const versionIds=new Set(documents.flatMap(x=>documentVersionsForEvidence(x.doc,scope).map(v=>v.id)));const activities=state.documentActivity.filter(a=>a.user_id===personId&&(docIds.has(a.document_id)||versionIds.has(a.document_version_id)||sessionIds.has(a.training_session_id)||fileIds.has(a.training_file_id))&&evidenceDateInRange(a.occurred_at,startDate,endDate)).sort((a,b)=>new Date(a.occurred_at||0)-new Date(b.occurred_at||0));const controlledReviews=state.documentReviews.filter(r=>versionIds.has(r.document_version_id)&&evidenceDateInRange(r.reviewed_at||r.created_at,startDate,endDate)).sort((a,b)=>new Date(a.reviewed_at||a.created_at||0)-new Date(b.reviewed_at||b.created_at||0));const versionApprovals=[];for(const x of documents){for(const v of documentVersionsForEvidence(x.doc,scope))if((v.approval_at||versionApprovalStatus(v)==='REJECTED')&&evidenceDateInRange(v.approval_at||v.created_at,startDate,endDate))versionApprovals.push({doc:x.doc,version:v});}versionApprovals.sort((a,b)=>new Date(a.version.approval_at||a.version.created_at||0)-new Date(b.version.approval_at||b.version.created_at||0));return {personId,scope,startDate,endDate,primaryLabel:'incident-evidence-pack',documents,toolboxTalks,sessions,evidence,activities,controlledReviews,versionApprovals}}
+async function evidenceAttachments(ctx){const rows=[];for(const x of ctx.documents){for(const v of documentVersionsForEvidence(x.doc,ctx.scope))if(v.storage_path)rows.push({label:`${x.role}: ${x.doc.reference||docTypeLabel(x.doc.doc_type)} - ${documentDisplayTitle(x.doc)} · v${v.version_label||''}`,storage_path:v.storage_path,file_name:v.file_name||`${x.doc.reference||'document'}.pdf`})}for(const x of ctx.toolboxTalks){let files=state.trainingFiles.filter(f=>f.training_session_id===x.training.id).sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));if(ctx.scope!=='FULL')files=files.slice(0,1);for(const f of files)if(f.storage_path)rows.push({label:`${x.role}: ${trainingReference(x.training)||'Training'} - ${x.training.name}`,storage_path:f.storage_path,file_name:f.file_name||'training.pdf'})}const seen=new Set();return rows.filter(x=>!seen.has(x.storage_path)&&seen.add(x.storage_path))}
+async function generateSelectedEvidencePack(){if(!isManager())return;const personId=$('evidencePerson')?.value,scope=$('evidenceScope')?.value||'CURRENT',startDate=$('evidenceStart')?.value||'',endDate=$('evidenceEnd')?.value||'',documentIds=[...document.querySelectorAll('.evidence-doc-choice:checked')].map(x=>x.value),trainingIds=[...document.querySelectorAll('.evidence-training-choice:checked')].map(x=>x.value);if(!personId)return toast('Select the person for this evidence pack.');if(!documentIds.length&&!trainingIds.length)return toast('Select at least one relevant document or training item.');if(startDate&&endDate&&startDate>endDate)return toast('The From date must be before the To date.');if(!window.PDFLib?.PDFDocument||!window.jspdf?.jsPDF)return toast('PDF libraries did not load. Refresh the page and try again.');const actionButtons=[...document.querySelectorAll('[data-generate-evidence-selected]')];actionButtons.forEach(b=>b.disabled=true);toast('Building evidence pack…');try{const ctx=await buildEvidenceContextSelected(documentIds,trainingIds,personId,scope,startDate,endDate),attachments=await evidenceAttachments(ctx),loaded=[],failed=[];for(const a of attachments){try{const r=await sb.storage.from('safety-files').download(a.storage_path);if(r.error||!r.data)throw new Error(r.error?.message||'Download failed');loaded.push({...a,bytes:await r.data.arrayBuffer()})}catch(e){failed.push({label:a.label,reason:e.message||'Could not load PDF'})}}const summaryBytes=makeEvidenceSummaryPdf(ctx,failed),{PDFDocument,StandardFonts,rgb}=window.PDFLib,merged=await PDFDocument.create(),summary=await PDFDocument.load(summaryBytes);const sumPages=await merged.copyPages(summary,summary.getPageIndices());sumPages.forEach(p=>merged.addPage(p));const font=await merged.embedFont(StandardFonts.Helvetica),bold=await merged.embedFont(StandardFonts.HelveticaBold);for(const a of loaded){const divider=merged.addPage([595.28,841.89]);divider.drawText('Supporting controlled document',{x:48,y:770,size:18,font:bold,color:rgb(0.08,0.16,0.24)});const lines=[];let rest=a.label;while(rest.length>80){let cut=rest.lastIndexOf(' ',80);if(cut<30)cut=80;lines.push(rest.slice(0,cut));rest=rest.slice(cut).trim()}lines.push(rest);lines.forEach((line,i)=>divider.drawText(line,{x:48,y:730-i*18,size:11,font}));divider.drawText(`File: ${a.file_name}`,{x:48,y:650,size:9,font});const src=await PDFDocument.load(a.bytes,{ignoreEncryption:true}),pages=await merged.copyPages(src,src.getPageIndices());pages.forEach(p=>merged.addPage(p))}const bytes=await merged.save(),blob=new Blob([bytes],{type:'application/pdf'}),base=safeFileName(`${personName(personId)}-evidence-pack`)||'evidence-pack';downloadBlob(blob,`${base}-${scope==='FULL'?'full-history':'current'}-${todayISO()}.pdf`);closeModal();toast(`Evidence pack created: ${loaded.length} PDF${loaded.length===1?'':'s'} appended${failed.length?`, ${failed.length} could not be appended`:''}.`)}catch(e){console.error(e);toast(e.message||'Could not create evidence pack.')}finally{actionButtons.forEach(b=>b.disabled=false)}}
+async function generateEvidencePack(primaryType,primaryId){return generateSelectedEvidencePack()}
+
+// --- v2.2.2 Annual Safety Awareness -------------------------------------------------
+function awarenessItem(id){return state.awarenessItems.find(x=>x.id===id)||null}
+function awarenessAssignmentsForItem(id){return state.awarenessAssignments.filter(a=>a.awareness_item_id===id&&a.active!==false)}
+function awarenessAssignmentForUser(id,userId=state.user?.id){return state.awarenessAssignments.find(a=>a.awareness_item_id===id&&a.user_id===userId&&a.active!==false)||null}
+function awarenessEvents(id,userId=state.user?.id){return state.awarenessActivity.filter(a=>a.awareness_item_id===id&&a.user_id===userId).sort((a,b)=>new Date(b.occurred_at||0)-new Date(a.occurred_at||0))}
+function latestAwarenessAck(id,userId=state.user?.id){const item=awarenessItem(id);return awarenessEvents(id,userId).find(a=>a.action==='ACKNOWLEDGED'&&String(a.item_version_label||'')===String(item?.version_label||''))||null}
+function awarenessStatus(item,userId=state.user?.id){const asn=awarenessAssignmentForUser(item.id,userId);if(!asn)return {code:'UNASSIGNED',label:'Not assigned',traffic:'neutral',due:null};const ack=latestAwarenessAck(item.id,userId);if(!ack)return {code:'DUE',label:'Review required',traffic:'amber',due:null};const d=new Date(ack.occurred_at);d.setMonth(d.getMonth()+Number(item.review_months||12));const due=d.toISOString();if(new Date(due)<new Date())return {code:'OVERDUE',label:'Annual review overdue',traffic:'red',due};const soon=new Date();soon.setDate(soon.getDate()+30);if(new Date(due)<=soon)return {code:'DUE',label:'Due soon',traffic:'amber',due};return {code:'CURRENT',label:'Up to date',traffic:'green',due}}
+function awarenessAggregate(item){const assigns=awarenessAssignmentsForItem(item.id),stats=assigns.map(a=>awarenessStatus(item,a.user_id));if(stats.some(x=>x.code==='OVERDUE'))return {traffic:'red',label:'Overdue',assigned:assigns.length,current:stats.filter(x=>x.code==='CURRENT').length};if(stats.some(x=>x.code==='DUE'))return {traffic:'amber',label:'Action required',assigned:assigns.length,current:stats.filter(x=>x.code==='CURRENT').length};return {traffic:assigns.length?'green':'neutral',label:assigns.length?'Up to date':'Not assigned',assigned:assigns.length,current:stats.filter(x=>x.code==='CURRENT').length}}
+function guidanceHtml(text){const lines=String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);let html='',inList=false;for(const line of lines){if(/^[-•]/.test(line)){if(!inList){html+='<ul class="awareness-guidance-list">';inList=true}html+=`<li>${esc(line.replace(/^[-•]\s*/,''))}</li>`}else{if(inList){html+='</ul>';inList=false}html+=`<p>${esc(line)}</p>`}}if(inList)html+='</ul>';return html||'<p>Guidance text not available.</p>'}
+function renderMyAwareness(){const statsEl=$('myAwarenessStats'),list=$('myAwarenessList');if(!statsEl||!list)return;if(state.loadErrors.safety_awareness_items){statsEl.innerHTML='';list.innerHTML='<div class="empty">Safety Awareness needs the v2.2.2+ SQL migration.</div>';return}const items=state.awarenessItems.filter(i=>i.active!==false&&awarenessAssignmentForUser(i.id));const statuses=items.map(i=>({item:i,status:awarenessStatus(i)}));const overdue=statuses.filter(x=>x.status.code==='OVERDUE').length,due=statuses.filter(x=>x.status.code==='DUE').length,current=statuses.filter(x=>x.status.code==='CURRENT').length;statsEl.innerHTML=[['Assigned',items.length,overdue?'red':due?'amber':'green'],['Up to date',current,'green'],['Due',due,due?'amber':'green'],['Overdue',overdue,overdue?'red':'green']].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${n}</strong><span>${l}</span></div>`).join('');const action=statuses.filter(x=>x.status.code!=='CURRENT').sort((a,b)=>(a.status.code==='OVERDUE'?-1:1));list.innerHTML=action.length?action.map(({item,status})=>`<div class="item-card awareness-card traffic-${status.traffic}"><div class="row-between"><div><h4>${esc(item.code?item.code+' - '+item.title:item.title)}</h4><div class="meta"><span class="badge ${status.code==='OVERDUE'?'overdue':'due'}">${esc(status.label)}</span>${status.due?`<span>Due ${fmtDate(status.due)}</span>`:''}</div></div></div><div class="row">${btn('Open guidance','primary',`data-open-awareness="${item.id}"`)}</div></div>`).join(''):'<div class="success-note">Your annual Safety Awareness reviews are up to date.</div>'}
+function renderAwareness(){const list=$('awarenessList'),stats=$('awarenessStats');if(!list||!stats)return;if(state.loadErrors.safety_awareness_items){stats.innerHTML='';list.innerHTML='<div class="empty">Run the Safety Awareness SQL migration to enable Safety Awareness.</div>';return}const q=clean($('awarenessSearch')?.value).toLowerCase(),filter=$('awarenessStatusFilter')?.value||'';let items=state.awarenessItems.filter(i=>i.active!==false&&(!q||`${i.code||''} ${i.title||''} ${i.description||''}`.toLowerCase().includes(q)));if(!isManager())items=items.filter(i=>awarenessAssignmentForUser(i.id));items=items.filter(i=>{if(!filter)return true;const st=isManager()?awarenessAggregate(i):awarenessStatus(i);if(filter==='CURRENT')return st.traffic==='green';if(filter==='OVERDUE')return st.traffic==='red';if(filter==='DUE')return st.traffic==='amber';return true});const assigned=isManager()?state.awarenessAssignments.filter(a=>a.active!==false).length:items.length;const overdue=isManager()?state.awarenessItems.filter(i=>i.active!==false&&awarenessAggregate(i).traffic==='red').length:items.filter(i=>awarenessStatus(i).code==='OVERDUE').length;const due=isManager()?state.awarenessItems.filter(i=>i.active!==false&&awarenessAggregate(i).traffic==='amber').length:items.filter(i=>awarenessStatus(i).code==='DUE').length;stats.innerHTML=[['Topics',state.awarenessItems.filter(i=>i.active!==false).length,'green'],['Assignments',assigned,'green'],['Action required',due,due?'amber':'green'],['Overdue',overdue,overdue?'red':'green']].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${n}</strong><span>${l}</span></div>`).join('');list.innerHTML=items.length?items.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||a.title.localeCompare(b.title)).map(item=>{const own=awarenessStatus(item),agg=awarenessAggregate(item),display=isManager()?agg:own,assignedCount=isManager()?agg.assigned:1,currentCount=isManager()?agg.current:(own.code==='CURRENT'?1:0);return `<div class="item-card awareness-card traffic-${display.traffic}"><div class="row-between"><div><h3>${esc(item.code?item.code+' - '+item.title:item.title)}</h3><div class="meta"><span class="badge">Annual awareness</span><span>Version ${esc(item.version_label||'1.0')}</span><span>Review every ${Number(item.review_months||12)} months</span><span class="badge ${display.traffic==='red'?'overdue':display.traffic==='amber'?'due':display.traffic==='green'?'complete':''}">${esc(display.label)}</span></div></div>${isManager()?`<span class="badge">${currentCount}/${assignedCount} up to date</span>`:''}</div><p class="muted">${esc(item.description||'')}</p><div class="row">${btn('Open guidance','primary',`data-open-awareness="${item.id}"`)}${item.hse_url?`<a class="button-link secondary" href="${esc(item.hse_url)}" target="_blank" rel="noopener">Official HSE guidance</a>`:''}${isManager()?btn('Assign audience','secondary',`data-assign-awareness="${item.id}"`):''}</div></div>`}).join(''):'<div class="empty">No Safety Awareness topics match this filter.</div>'}
+async function logAwareness(itemId,action){const item=awarenessItem(itemId);if(!item||!state.user)return null;const asn=awarenessAssignmentForUser(itemId,state.user.id);const payload={awareness_item_id:itemId,assignment_id:asn?.id||null,user_id:state.user.id,item_version_label:item.version_label||'1.0',action,occurred_at:new Date().toISOString()};const r=await sb.from('safety_awareness_activity').insert(payload).select().single();if(!r.error&&r.data)state.awarenessActivity.push(r.data);return r.error?null:r.data}
+async function openAwareness(itemId){const item=awarenessItem(itemId);if(!item)return toast('Awareness topic not found.');await logAwareness(itemId,'OPENED');const assigned=!!awarenessAssignmentForUser(itemId),st=awarenessStatus(item);openModal(item.title,`<div class="awareness-sheet"><div class="awareness-kicker">Safety Awareness · ${esc(item.code||'Guidance')} · v${esc(item.version_label||'1.0')}</div><div class="hint-box"><strong>Purpose:</strong> refresher guidance and supporting evidence only. It does not replace formal training, task-specific risk assessment, COSHH assessment, SSW, supervision or competence requirements.</div><div class="awareness-guidance">${guidanceHtml(item.guidance_text)}</div>${item.hse_url?`<p><a class="button-link secondary" href="${esc(item.hse_url)}" target="_blank" rel="noopener">Open official HSE guidance</a></p>`:''}${assigned?`<div class="review-confirm-box"><label class="check-row"><input id="awarenessConfirm" type="checkbox"> I have read and understood this safety awareness guidance. I understand it supports, but does not replace, the relevant Risk Assessment, COSHH Assessment, Safe System of Work or formal training. If I am unsure how to carry out a task safely, I will stop and ask my manager.</label><div class="muted">This is an annual employee awareness acknowledgement, not formal training.</div></div>`:'<div class="request-note">This topic is not currently assigned to you. You can still read the guidance.</div>'}</div><div class="actions">${btn('Close','ghost','data-close-modal')}${assigned&&st.code!=='CURRENT'?btn('Confirm annual review','primary',`data-ack-awareness="${item.id}"`):assigned?'<span class="badge complete">Already up to date</span>':''}</div>`)}
+async function acknowledgeAwareness(itemId){const item=awarenessItem(itemId),asn=awarenessAssignmentForUser(itemId);if(!item||!asn)return toast('This awareness topic is not assigned to you.');if(!$('awarenessConfirm')?.checked)return toast('Tick the confirmation before completing the annual review.');const opened=awarenessEvents(itemId).some(a=>a.action==='OPENED'&&String(a.item_version_label||'')===String(item.version_label||''));if(!opened)return toast('Open the guidance before acknowledging it.');const r=await logAwareness(itemId,'ACKNOWLEDGED');if(!r)return toast('Could not record the awareness review.');closeModal();await refresh('Safety Awareness review recorded. Next review is due in 12 months.')}
+function showAwarenessAssignments(itemId){if(!isManager())return;const item=awarenessItem(itemId);if(!item)return;const rows=audienceRowsFor('AWARENESS',itemId);openModal(`Safety Awareness audience · ${item.title}`,`${genericAudienceHtml('awarenessAudience',rows,{showDue:false,heading:'Who needs this awareness review?',help:'Choose Everyone, Departments and/or specific people. Department membership is kept in sync automatically.'})}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save audience','primary',`data-save-awareness-assignments="${itemId}"`)}</div>`);wireGenericAudience('awarenessAudience',false)}
+async function saveAwarenessAssignments(itemId){if(!isManager())return;const a=genericAudienceSelection('awarenessAudience',false);if(!audienceSelectionValid(a))return toast('Choose Everyone, at least one Department, or at least one specific person.');const r=await sb.rpc('set_awareness_item_audience_v239',{p_awareness_item_id:itemId,p_everyone:a.everyone,p_department_ids:a.departmentIds,p_user_ids:a.userIds});if(r.error)return toast(r.error.message);closeModal();await refresh(`Safety Awareness audience updated. ${Number(r.data||0)} assignment change${Number(r.data||0)===1?'':'s'} applied.`)}
+
+
+
+// --- v2.2.3 configurable monthly PPE checks -----------------------------------------
+function currentMonthValue(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+function ppeMonthDate(value){return /^\d{4}-\d{2}$/.test(value||'')?`${value}-01`:null}
+function ppeDueDate(value){const m=/^(\d{4})-(\d{2})$/.exec(value||'');if(!m)return null;return new Date(Number(m[1]),Number(m[2])-1,28,23,59,59,999)}
+function ppeItem(id){return state.ppeItems.find(x=>x.id===id)||null}
+function activePpeItems(){return state.ppeItems.filter(x=>x.active!==false).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||String(a.name).localeCompare(String(b.name)))}
+function ppeAssignmentsForItem(id){return state.ppeAssignments.filter(a=>a.ppe_item_id===id&&a.active!==false)}
+function assignedPpeForUser(userId=state.user?.id){const ids=new Set(state.ppeAssignments.filter(a=>a.user_id===userId&&a.active!==false).map(a=>a.ppe_item_id));return activePpeItems().filter(i=>ids.has(i.id))}
+function ppeCheckForMonth(userId=state.user?.id,value=currentMonthValue()){const d=ppeMonthDate(value);return state.ppeChecks.filter(c=>c.user_id===userId&&String(c.check_month||'').slice(0,10)===d).sort((a,b)=>new Date(b.submitted_at||0)-new Date(a.submitted_at||0))[0]||null}
+function ppeItemsForCheck(checkId){return state.ppeCheckItems.filter(x=>x.check_id===checkId)}
+function ppeCheckStatus(userId=state.user?.id,value=currentMonthValue()){
+  const assigned=assignedPpeForUser(userId),check=ppeCheckForMonth(userId,value),due=ppeDueDate(value);
+  if(!assigned.length)return {code:'UNASSIGNED',label:'No PPE assigned',traffic:'neutral',assigned:0,check:null,due};
+  if(check){const rows=ppeItemsForCheck(check.id),issues=rows.filter(x=>['REPLACEMENT_REQUIRED','MISSING'].includes(x.result));if(issues.length)return {code:'ISSUES',label:`${issues.length} PPE issue${issues.length===1?'':'s'} reported`,traffic:'red',assigned:assigned.length,check,due,issues};return {code:'COMPLETE',label:'Monthly PPE check complete',traffic:'green',assigned:assigned.length,check,due,issues:[]};}
+  const now=new Date(),overdue=due&&now>due;return {code:overdue?'OVERDUE':'DUE',label:overdue?'Monthly PPE check overdue':'Monthly PPE check due',traffic:overdue?'red':'amber',assigned:assigned.length,check:null,due,issues:[]};
+}
+function ppeResultLabel(v){return ({GOOD:'Available & good condition',REPLACEMENT_REQUIRED:'Replacement required',MISSING:'Missing',NOT_APPLICABLE:'Not applicable'})[v]||v||'—'}
+function ppeActionLabel(v){return ({OPEN:'Open',ORDERED:'Ordered',RESOLVED:'Resolved',NOT_REQUIRED:'Not required'})[v]||v||'—'}
+function renderMyPpe(){const stats=$('myPpeStats'),list=$('myPpeList');if(!stats||!list)return;if(state.loadErrors.ppe_items){stats.innerHTML='';list.innerHTML='<div class="empty">Monthly PPE checks need the v2.2.3 SQL migration.</div>';return}const st=ppeCheckStatus(),items=assignedPpeForUser();stats.innerHTML=[['Assigned PPE',items.length,items.length?'green':'neutral'],['This month',st.code==='COMPLETE'?'Complete':st.code==='ISSUES'?'Issues':st.code==='OVERDUE'?'Overdue':'Due',st.traffic]].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${esc(n)}</strong><span>${l}</span></div>`).join('');if(!items.length){list.innerHTML='<div class="empty">No PPE is currently assigned to you.</div>';return}const issueNote=st.code==='ISSUES'?`<div class="danger-note">You reported PPE that is missing or needs replacement. Do not use damaged or unsuitable PPE. The issue is visible to Admin/Manager for action.</div>`:'';list.innerHTML=`<div class="item-card ppe-status-card traffic-${st.traffic}"><div class="row-between"><div><h4>${new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})} PPE check</h4><div class="meta"><span class="badge ${st.traffic==='red'?'overdue':st.traffic==='green'?'complete':'due'}">${esc(st.label)}</span><span>Due 28th of each month</span>${st.check?`<span>Signed ${fmtDateTime(st.check.submitted_at)}</span>`:''}</div></div></div>${issueNote}<div class="row">${st.check?btn('View check','secondary',`data-view-ppe-check="${st.check.id}"`):btn('Complete monthly PPE check','primary','data-start-ppe-check')}</div></div>`}
+function ppeManagerMonthSummary(value=currentMonthValue()){const people=activePeople().filter(p=>assignedPpeForUser(p.id).length);const rows=people.map(p=>({p,s:ppeCheckStatus(p.id,value)}));return {people,rows,complete:rows.filter(x=>x.s.code==='COMPLETE').length,issues:rows.filter(x=>x.s.code==='ISSUES').length,overdue:rows.filter(x=>x.s.code==='OVERDUE').length,due:rows.filter(x=>x.s.code==='DUE').length}}
+function renderPpe(){const list=$('ppeList'),stats=$('ppeStats'),manager=$('ppeManagerArea');if(!list||!stats)return;if(state.loadErrors.ppe_items){stats.innerHTML='';list.innerHTML='<div class="empty">Run the v2.2.3 SQL migration to enable Monthly PPE Checks.</div>';if(manager)manager.innerHTML='';return}const q=clean($('ppeSearch')?.value).toLowerCase(),filter=$('ppeStatusFilter')?.value||'',items=assignedPpeForUser(),st=ppeCheckStatus();stats.innerHTML=[['Assigned PPE',items.length,items.length?'green':'neutral'],['Monthly status',st.label,st.traffic],['Due date','28th',st.code==='OVERDUE'?'red':'green']].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${esc(n)}</strong><span>${l}</span></div>`).join('');let shown=items.filter(i=>!q||`${i.name||''} ${i.description||''}`.toLowerCase().includes(q));if(filter==='ISSUES'&&st.code!=='ISSUES')shown=[];if(filter==='DUE'&&!['DUE','OVERDUE'].includes(st.code))shown=[];if(filter==='COMPLETE'&&st.code!=='COMPLETE')shown=[];list.innerHTML=shown.length?`<div class="item-card ppe-status-card traffic-${st.traffic}"><div class="row-between"><div><h3>Your monthly PPE check</h3><div class="meta"><span class="badge ${st.traffic==='red'?'overdue':st.traffic==='green'?'complete':'due'}">${esc(st.label)}</span><span>Due ${fmtDate(st.due)}</span></div></div></div><div class="ppe-chip-list">${shown.map(i=>`<span class="badge">${esc(i.name)}</span>`).join('')}</div><div class="row">${st.check?btn('View submitted check','secondary',`data-view-ppe-check="${st.check.id}"`):btn('Complete monthly check','primary','data-start-ppe-check')}</div></div>`:'<div class="empty">No PPE items match this filter.</div>';if(manager&&isManager())renderPpeManagerArea()}
+function renderPpeManagerArea(){const el=$('ppeManagerArea');if(!el||!isManager())return;const value=currentMonthValue(),sum=ppeManagerMonthSummary(value),openIssues=state.ppeCheckItems.filter(x=>['REPLACEMENT_REQUIRED','MISSING'].includes(x.result)&&!['RESOLVED','NOT_REQUIRED'].includes(x.action_status||'OPEN'));el.innerHTML=`<div class="section-card"><div class="row-between"><div><h3>Team PPE position</h3><p class="muted">Checks are due by the 28th so replacement orders can be prepared for the start of the following month.</p></div>${isAdmin()?btn('Manage PPE catalogue','primary','data-manage-ppe-catalogue'):''}</div><div class="stats-grid">${[['People assigned PPE',sum.people.length,'green'],['Complete',sum.complete,'green'],['Issues',sum.issues,sum.issues?'red':'green'],['Outstanding / overdue',sum.due+sum.overdue,sum.overdue?'red':sum.due?'amber':'green']].map(([l,n,t])=>`<div class="stat traffic-${t}"><span class="traffic-dot"></span><strong>${n}</strong><span>${l}</span></div>`).join('')}</div><div class="card-list">${sum.rows.map(({p,s})=>`<div class="item-card compact ppe-status-card traffic-${s.traffic}"><div class="row-between"><div><strong>${esc(p.display_name||p.email)}</strong><div class="meta"><span>${s.assigned} PPE item${s.assigned===1?'':'s'}</span><span class="badge ${s.traffic==='red'?'overdue':s.traffic==='green'?'complete':'due'}">${esc(s.label)}</span></div></div>${s.check?btn('View check','secondary',`data-view-ppe-check="${s.check.id}"`):''}</div></div>`).join('')}</div></div><div class="section-card"><div class="row-between"><div><h3>PPE ordering / action list</h3><p class="muted">Missing or replacement-required PPE stays here until Admin/Manager records it as ordered, resolved or not required.</p></div></div><div class="card-list">${openIssues.length?openIssues.map(r=>{const c=state.ppeChecks.find(x=>x.id===r.check_id),person=state.people.find(x=>x.id===c?.user_id);return `<div class="item-card compact traffic-red"><div class="row-between"><div><strong>${esc(person?.display_name||person?.email||'Employee')} · ${esc(r.ppe_name_snapshot||ppeItem(r.ppe_item_id)?.name||'PPE')}</strong><div class="meta"><span>${esc(ppeResultLabel(r.result))}</span><span>${esc(r.comment||'No comment')}</span><span>${esc(ppeActionLabel(r.action_status||'OPEN'))}</span></div></div>${btn('Update action','primary',`data-update-ppe-action="${r.id}"`)}</div></div>`}).join(''):'<div class="success-note">No open PPE replacement/order actions.</div>'}</div></div>`}
+function showPpeCheck(){const items=assignedPpeForUser();if(!items.length)return toast('No PPE is assigned to you.');const existing=ppeCheckForMonth();if(existing)return viewPpeCheck(existing.id);openModal('Monthly PPE check',`<div class="hint-box"><strong>Due by the 28th each month.</strong> Check the PPE assigned to you so missing/damaged items can be ordered for the start of the following month. This does not replace the normal check before each use.</div><div class="ppe-check-grid">${items.map(i=>`<div class="ppe-check-row" data-ppe-row="${i.id}"><div><strong>${esc(i.name)}</strong><div class="muted">${esc(i.inspection_guidance||i.description||'Check that this item is available, suitable and in good condition.')}</div></div><label>Condition<select class="ppe-result"><option value="GOOD">Available & good condition</option><option value="REPLACEMENT_REQUIRED">Replacement required</option><option value="MISSING">Missing</option><option value="NOT_APPLICABLE">Not applicable</option></select></label><label>Comment<input class="ppe-comment" placeholder="Required if missing/replacement needed"></label></div>`).join('')}</div><div class="review-confirm-box"><p>I have checked the PPE assigned to me and recorded its availability and condition accurately. I will not use damaged or unsuitable PPE and will report any replacement required.</p>${signatureBlock('ppe')}<label class="check-row"><input id="ppeAck" type="checkbox"> I confirm this monthly PPE check and digital signature.</label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Submit PPE check','primary','data-submit-ppe-check')}</div>`);setupSignaturePad('ppeSignaturePad','ppeClearSignature')}
+async function submitPpeCheck(){const rows=[...document.querySelectorAll('[data-ppe-row]')].map(r=>({ppe_item_id:r.dataset.ppeRow,result:r.querySelector('.ppe-result')?.value||'GOOD',comment:clean(r.querySelector('.ppe-comment')?.value)}));for(const r of rows)if(['REPLACEMENT_REQUIRED','MISSING'].includes(r.result)&&r.comment.length<3)return toast('Add a short comment for each missing or replacement-required PPE item.');if(!$('ppeAck')?.checked)return toast('Tick the confirmation before submitting.');const canvas=$('ppeSignaturePad');if(!canvas?.dataset.hasInk)return toast('Digital signature is required.');const sigName=state.profile?.display_name||state.user?.email||'User',sig=canvas.toDataURL('image/png'),declaration='I have checked the PPE assigned to me and recorded its availability and condition accurately. I will not use damaged or unsuitable PPE and will report any replacement required.';const r=await sb.rpc('submit_monthly_ppe_check_v223',{p_check_month:ppeMonthDate(currentMonthValue()),p_signature_data:sig,p_signature_name:sigName,p_declaration:declaration,p_results:rows});if(r.error)return toast(r.error.message);closeModal();await refresh(rows.some(x=>['MISSING','REPLACEMENT_REQUIRED'].includes(x.result))?'PPE check submitted. An action has been raised for Admin/Manager.':'PPE check submitted.');}
+function viewPpeCheck(id){const c=state.ppeChecks.find(x=>x.id===id);if(!c)return;const rows=ppeItemsForCheck(id),person=state.people.find(x=>x.id===c.user_id);openModal(`PPE check · ${person?.display_name||person?.email||'Employee'}`,`<div class="meta"><span>Month ${fmtDate(c.check_month)}</span><span>Submitted ${fmtDateTime(c.submitted_at)}</span><span class="badge ${c.status==='ISSUES'?'overdue':'complete'}">${esc(c.status||'COMPLETE')}</span></div><div class="card-list">${rows.map(r=>`<div class="item-card compact ${['MISSING','REPLACEMENT_REQUIRED'].includes(r.result)?'traffic-red':'traffic-green'}"><strong>${esc(r.ppe_name_snapshot||ppeItem(r.ppe_item_id)?.name||'PPE')}</strong><div class="meta"><span>${esc(ppeResultLabel(r.result))}</span>${r.comment?`<span>${esc(r.comment)}</span>`:''}${isManager()&&['MISSING','REPLACEMENT_REQUIRED'].includes(r.result)?`<span>Action: ${esc(ppeActionLabel(r.action_status||'OPEN'))}</span>`:''}</div></div>`).join('')}</div><div class="signature-readback"><strong>Signed by:</strong> ${esc(c.signature_name||'')} · ${fmtDateTime(c.submitted_at)}</div><div class="actions">${isManager()||c.user_id===state.user?.id?btn('Download PDF','secondary',`data-download-ppe-check="${c.id}"`):''}${btn('Close','ghost','data-close-modal')}</div>`)}
+function downloadPpeCheckPdf(id){if(!window.jspdf?.jsPDF)return toast('PDF library did not load.');const c=state.ppeChecks.find(x=>x.id===id);if(!c)return;const rows=ppeItemsForCheck(id),person=state.people.find(x=>x.id===c.user_id),{jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'});doc.setFontSize(17);doc.text('Monthly PPE Check',14,16);doc.setFontSize(10);doc.text(`Employee: ${person?.display_name||person?.email||'Employee'}`,14,25);doc.text(`Month: ${fmtDate(c.check_month)} · Due: ${fmtDate(c.due_date)} · Submitted: ${fmtDateTime(c.submitted_at)}`,14,32);doc.text(`Status: ${c.status||''}`,14,39);doc.autoTable({head:[['PPE','Result','Comment','Action']],body:rows.map(r=>[r.ppe_name_snapshot||ppeItem(r.ppe_item_id)?.name||'',ppeResultLabel(r.result),r.comment||'',ppeActionLabel(r.action_status||'NOT_REQUIRED')]),startY:45,styles:{fontSize:8},margin:{left:14,right:14}});let y=(doc.lastAutoTable?.finalY||70)+10;doc.setFontSize(9);const declaration=doc.splitTextToSize(c.declaration||'',180);doc.text(declaration,14,y);y+=declaration.length*5+4;doc.text(`Signed name: ${c.signature_name||''}`,14,y);doc.text(`Signed: ${fmtDateTime(c.submitted_at)}`,14,y+6);try{if(c.signature_data)doc.addImage(c.signature_data,'PNG',14,y+10,70,22)}catch(e){}doc.save(`PPE-Check-${safeFileName(person?.display_name||person?.email||'employee')}-${String(c.check_month||'').slice(0,7)}.pdf`)}
+function showPpeCatalogue(){if(!isAdmin())return;openModal('PPE Management',`<div class="row-between"><div><p class="muted">Add, edit, archive and assign PPE without a code update.</p></div>${btn('Add PPE','primary','data-edit-ppe-item="NEW"')}</div><div class="card-list ppe-catalogue-list">${activePpeItems().map(i=>`<div class="item-card compact"><div class="row-between"><div><strong>${esc(i.name)}</strong><div class="muted">${esc(i.description||'')}</div><div class="meta"><span>${ppeAssignmentsForItem(i.id).length} assigned</span></div></div><div class="row">${btn('Assign audience','secondary',`data-assign-ppe-item="${i.id}"`)}${btn('Edit','ghost',`data-edit-ppe-item="${i.id}"`)}</div></div></div>`).join('')||'<div class="empty">No PPE items yet.</div>'}</div><div class="actions">${btn('Close','ghost','data-close-modal')}</div>`)}
+function editPpeItem(id){if(!isAdmin())return;const x=id==='NEW'?null:ppeItem(id);openModal(x?'Edit PPE':'Add PPE',`<div class="form-grid"><label>Name<input id="ppeItemName" value="${esc(x?.name||'')}"></label><label>Code<input id="ppeItemCode" value="${esc(x?.code||'')}"></label><label class="full">Description<textarea id="ppeItemDescription">${esc(x?.description||'')}</textarea></label><label class="full">Employee check guidance<textarea id="ppeItemGuidance" placeholder="What should the employee check each month?">${esc(x?.inspection_guidance||'')}</textarea></label><label>Sort order<input id="ppeItemSort" type="number" value="${Number(x?.sort_order||0)}"></label>${x?`<label class="check-row"><input id="ppeItemActive" type="checkbox" ${x.active===false?'':'checked'}> Active</label>`:''}</div>${x?'':genericAudienceHtml('newPpeAudience',[],{showDue:false,heading:'Who needs this PPE?',help:'Set the audience now so the PPE appears automatically on the correct users’ monthly checks.'})}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save PPE','primary',`data-save-ppe-item="${x?.id||''}"`)}</div>`);if(!x)wireGenericAudience('newPpeAudience',false)}
+async function savePpeItem(id){if(!isAdmin())return;const name=clean($('ppeItemName')?.value),code=clean($('ppeItemCode')?.value).toUpperCase(),description=clean($('ppeItemDescription')?.value),inspection_guidance=clean($('ppeItemGuidance')?.value),sort_order=Number($('ppeItemSort')?.value||0),active=id?!!$('ppeItemActive')?.checked:true,audience=id?null:genericAudienceSelection('newPpeAudience',false);if(!name)return toast('Enter a PPE name.');if(audience&&!audienceSelectionValid(audience))return toast('Choose Everyone, at least one Department, or at least one specific person before creating this PPE item.');const payload={name,code:code||null,description,inspection_guidance,sort_order,active,updated_at:new Date().toISOString()};let r;if(id)r=await sb.from('ppe_items').update(payload).eq('id',id).select().single();else r=await sb.from('ppe_items').insert(payload).select().single();if(r.error)return toast(r.error.message);if(!id&&audience){const ar=await sb.rpc('set_ppe_item_audience_v239',{p_ppe_item_id:r.data.id,p_everyone:audience.everyone,p_department_ids:audience.departmentIds,p_user_ids:audience.userIds});if(ar.error)return toast(ar.error.message)}closeModal();await refresh(id?'PPE catalogue updated.':'PPE item created and assigned to its selected audience.');showPpeCatalogue()}
+function showPpeAssignments(itemId){if(!isAdmin())return;const item=ppeItem(itemId);if(!item)return;const rows=audienceRowsFor('PPE',itemId);openModal(`PPE audience · ${item.name}`,`${genericAudienceHtml('ppeAudience',rows,{showDue:false,heading:'Who needs this PPE?',help:'Choose Everyone, Departments and/or specific people. Only matched PPE appears on each user’s monthly check.'})}<div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save audience','primary',`data-save-ppe-assignments="${itemId}"`)}</div>`);wireGenericAudience('ppeAudience',false)}
+async function savePpeAssignments(itemId){if(!isAdmin())return;const a=genericAudienceSelection('ppeAudience',false);if(!audienceSelectionValid(a))return toast('Choose Everyone, at least one Department, or at least one specific person.');const r=await sb.rpc('set_ppe_item_audience_v239',{p_ppe_item_id:itemId,p_everyone:a.everyone,p_department_ids:a.departmentIds,p_user_ids:a.userIds});if(r.error)return toast(r.error.message);closeModal();await refresh(`PPE audience updated. ${Number(r.data||0)} assignment change${Number(r.data||0)===1?'':'s'} applied.`);showPpeCatalogue()}
+function showPpeAction(id){if(!isManager())return;const r=state.ppeCheckItems.find(x=>x.id===id),c=state.ppeChecks.find(x=>x.id===r?.check_id),person=state.people.find(x=>x.id===c?.user_id);if(!r)return;openModal('Update PPE action',`<p><strong>${esc(person?.display_name||person?.email||'Employee')} · ${esc(r.ppe_name_snapshot||'PPE')}</strong></p><p>${esc(ppeResultLabel(r.result))}${r.comment?` · ${esc(r.comment)}`:''}</p><div class="form-grid"><label>Action status<select id="ppeActionStatus"><option value="OPEN" ${(r.action_status||'OPEN')==='OPEN'?'selected':''}>Open</option><option value="ORDERED" ${r.action_status==='ORDERED'?'selected':''}>Ordered</option><option value="RESOLVED" ${r.action_status==='RESOLVED'?'selected':''}>Resolved</option><option value="NOT_REQUIRED" ${r.action_status==='NOT_REQUIRED'?'selected':''}>Not required</option></select></label><label class="full">Manager note<textarea id="ppeActionNote">${esc(r.admin_note||'')}</textarea></label></div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save action','primary',`data-save-ppe-action="${id}"`)}</div>`)}
+async function savePpeAction(id){if(!isManager())return;const status=$('ppeActionStatus')?.value||'OPEN',note=clean($('ppeActionNote')?.value);const r=await sb.rpc('resolve_ppe_check_item_v223',{p_check_item_id:id,p_action_status:status,p_admin_note:note||null});if(r.error)return toast(r.error.message);closeModal();await refresh('PPE action updated.')}
+function ppeReportData(value){const b=monthBounds(value);if(!b)throw new Error('Select a valid month.');const checkMonth=ppeMonthDate(value),checks=state.ppeChecks.filter(c=>String(c.check_month||'').slice(0,10)===checkMonth),checkIds=new Set(checks.map(c=>c.id)),items=state.ppeCheckItems.filter(i=>checkIds.has(i.check_id)),issues=items.filter(i=>['REPLACEMENT_REQUIRED','MISSING'].includes(i.result)),openIssues=issues.filter(i=>!['RESOLVED','NOT_REQUIRED'].includes(i.action_status||'OPEN')),assignedPeople=activePeople().filter(p=>assignedPpeForUser(p.id).length),submittedIds=new Set(checks.map(c=>c.user_id)),outstanding=assignedPeople.filter(p=>!submittedIds.has(p.id));return {b,checkMonth,checks,items,issues,openIssues,assignedPeople,outstanding}}
+function monthlyPpeReportDoc(value){if(!window.jspdf?.jsPDF)throw new Error('PDF library did not load.');const data=ppeReportData(value),{jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFontSize(18);doc.text('Safety Tracker - Monthly PPE Check Report',14,14);doc.setFontSize(9);doc.text(`${data.b.label} · Due 28th · Generated ${new Date().toLocaleString('en-GB')}`,14,21);doc.autoTable({head:[['Measure','Count']],body:[['Employees assigned PPE',data.assignedPeople.length],['Checks submitted',data.checks.length],['Checks outstanding',data.outstanding.length],['PPE issues reported',data.issues.length],['Open ordering/actions',data.openIssues.length]],startY:28,theme:'grid',styles:{fontSize:8}});let y=(doc.lastAutoTable?.finalY||55)+7;doc.setFontSize(11);doc.text('PPE checks',14,y);doc.autoTable({head:[['Employee','Submitted','Signed name','Status','Issues']],body:data.checks.length?data.checks.map(c=>{const issues=data.issues.filter(i=>i.check_id===c.id);return [personName(c.user_id),fmtDateTime(c.submitted_at),c.signature_name||'',c.status||'',issues.map(i=>`${i.ppe_name_snapshot}: ${ppeResultLabel(i.result)}`).join('; ')||'None']}):[['None','','','','']],startY:y+3,styles:{fontSize:7},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Ordering / action list',14,y);doc.autoTable({head:[['Employee','PPE','Issue','Comment','Action']],body:data.issues.length?data.issues.map(i=>{const c=state.ppeChecks.find(x=>x.id===i.check_id);return [personName(c?.user_id),i.ppe_name_snapshot||ppeItem(i.ppe_item_id)?.name||'',ppeResultLabel(i.result),i.comment||'',ppeActionLabel(i.action_status||'OPEN')]}):[['None','','','','']],startY:y+3,styles:{fontSize:7},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(data.outstanding.length){if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Outstanding monthly checks',14,y);doc.autoTable({head:[['Employee','Assigned PPE']],body:data.outstanding.map(p=>[p.display_name||p.email,assignedPpeForUser(p.id).map(i=>i.name).join(', ')]),startY:y+3,styles:{fontSize:7},margin:{left:14,right:14}})}return {doc,data}}
+async function downloadMonthlyPpeReport(value){if(!isManager())return;try{const {doc,data}=monthlyPpeReportDoc(value),fileName=`PPE-Checks-${data.b.value}.pdf`,blob=doc.output('blob');if(!state.loadErrors.generated_reports){const path=`reports/ppe/${data.b.value}/${crypto.randomUUID()}-${safeFileName(fileName)}`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf',upsert:false});if(up.error)throw up.error;const ins=await sb.from('generated_reports').insert({schedule_id:null,report_type:'MONTHLY_PPE',period_start:data.b.start.toISOString().slice(0,10),period_end:data.b.end.toISOString().slice(0,10),file_name:fileName,storage_path:path,status:'ARCHIVED',summary:{ppe_checks_submitted:data.checks.length,ppe_issues:data.issues.length,ppe_open_actions:data.openIssues.length,ppe_checks_outstanding:data.outstanding.length},generated_by:state.user.id}).select().single();if(ins.error)throw ins.error;state.generatedReports.unshift(ins.data)}downloadBlob(blob,fileName);renderReportArchive();toast('Monthly PPE report downloaded and archived.')}catch(e){toast(e.message||'Could not create PPE report.')}}
+
+
+// --- v2.2.3 monthly reports ----------------------------------------------------------
+function previousMonthValue(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+function monthBounds(value){const m=/^(\d{4})-(\d{2})$/.exec(value||'');if(!m)return null;const y=Number(m[1]),mo=Number(m[2])-1,start=new Date(y,mo,1,0,0,0,0),end=new Date(y,mo+1,0,23,59,59,999);return {value,year:y,month:mo+1,start,end,startISO:start.toISOString(),endISO:end.toISOString(),label:start.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}}
+function inRange(date,b){if(!date||!b)return false;const d=new Date(date);return d>=b.start&&d<=b.end}
+function trainingCompletionEventsForRange(b){const normal=state.trainingSignoffs.filter(s=>inRange(s.signed_at,b)).map(s=>({user_id:s.user_id,training_session_id:s.training_session_id,at:s.signed_at,method:'Training sign-off',signature_name:s.signature_name||'',exception:false}));const ex=state.trainingExceptions.filter(x=>inRange(x.completed_at,b)).map(x=>({user_id:x.user_id,training_session_id:x.training_session_id,at:x.completed_at,method:'Admin exception',signature_name:x.signature_name||'',exception:true}));return [...normal,...ex].sort((a,b)=>new Date(a.at)-new Date(b.at))}
+function awarenessCompletionEventsForRange(b){return state.awarenessActivity.filter(a=>a.action==='ACKNOWLEDGED'&&inRange(a.occurred_at,b)).sort((a,b)=>new Date(a.occurred_at)-new Date(b.occurred_at))}
+function latestCompletionAt(a,asOf){const sig=state.trainingSignoffs.filter(s=>s.training_assignment_id===a.id&&new Date(s.signed_at)<=asOf).map(s=>({at:s.signed_at})),exc=state.trainingExceptions.filter(x=>x.training_assignment_id===a.id&&new Date(x.completed_at)<=asOf).map(x=>({at:x.completed_at}));return [...sig,...exc].sort((x,y)=>new Date(y.at)-new Date(x.at))[0]||null}
+function assignmentOverdueAt(a,t,asOf){if(a.active===false)return false;if(a.assigned_at&&new Date(a.assigned_at)>asOf)return false;const c=latestCompletionAt(a,asOf);if(!c){if(a.due_date)return new Date(a.due_date+'T23:59:59')<asOf;return false}if(a.renewal_value&&a.renewal_unit){const due=addRenewal(c.at,a.renewal_value,a.renewal_unit);return !!due&&new Date(due)<asOf}return false}
+function assignmentStateAt(a,t,asOf){if(a.active===false||(a.assigned_at&&new Date(a.assigned_at)>asOf))return {active:false,code:'NOT_ACTIVE'};const c=latestCompletionAt(a,asOf),method=effectiveTrainingMethod(t,a);let due=null,needs=!c;if(c&&a.renewal_value&&a.renewal_unit){due=addRenewal(c.at,a.renewal_value,a.renewal_unit);needs=!!due&&new Date(due)<=asOf}else if(!c&&a.due_date){due=new Date(a.due_date+'T23:59:59').toISOString()}if(!needs)return {active:true,code:'COMPLETED',method,due};if(due&&new Date(due)<asOf)return {active:true,code:'OVERDUE',method,due};if(method==='INSTRUCTOR_LED')return {active:true,code:'AWAITING_INSTRUCTOR',method,due};return {active:true,code:'OUTSTANDING',method,due}}
+function monthlyReportData(value){const b=monthBounds(value);if(!b)throw new Error('Select a valid month.');const completions=trainingCompletionEventsForRange(b),awareness=awarenessCompletionEventsForRange(b),approvals=state.versions.filter(v=>versionApprovalStatus(v)==='APPROVED'&&inRange(v.approval_at,b)),reviews=state.documentReviews.filter(r=>inRange(r.reviewed_at||r.created_at,b)),exceptions=completions.filter(x=>x.exception),newAssignments=state.trainingAssignments.filter(a=>a.active!==false&&inRange(a.assigned_at,b));const monthEndStates=state.trainingAssignments.map(a=>{const t=state.training.find(x=>x.id===a.training_session_id);return t&&t.status!=='ARCHIVED'?{a,t,s:assignmentStateAt(a,t,b.end)}:null}).filter(x=>x&&x.s.active),overdue=monthEndStates.filter(x=>x.s.code==='OVERDUE'),awaitingInstructor=monthEndStates.filter(x=>x.s.code==='AWAITING_INSTRUCTOR'),outstanding=monthEndStates.filter(x=>['OVERDUE','AWAITING_INSTRUCTOR','OUTSTANDING'].includes(x.s.code));const pending=pendingApprovalEntries(),approvedVersionIds=new Set(approvals.map(v=>v.id)),retrainingTriggered=state.trainingAssignments.filter(a=>{const t=state.training.find(x=>x.id===a.training_session_id);return a.active!==false&&t?.auto_managed&&approvedVersionIds.has(t.source_document_version_id)});const approvedDocs=state.documents.filter(d=>d.status!=='ARCHIVED').map(d=>({d,v:approvedCurrentVersion(d.id)})).filter(x=>x.v),reviewOverdue=approvedDocs.filter(x=>x.v.review_date&&new Date(x.v.review_date+'T23:59:59')<b.end),reviewDueSoon=approvedDocs.filter(x=>x.v.review_date&&new Date(x.v.review_date+'T23:59:59')>=b.end&&new Date(x.v.review_date+'T23:59:59')<=new Date(b.end.getTime()+30*86400000));const newVersions=approvals.filter(v=>state.versions.filter(x=>x.document_id===v.document_id).length>1),ppe=ppeReportData(value);return {b,completions,awareness,approvals,reviews,overdue,pending,exceptions,newAssignments,awaitingInstructor,outstanding,retrainingTriggered,reviewOverdue,reviewDueSoon,newVersions,ppe}}
+function monthlySafetyReportDoc(value){if(!window.jspdf?.jsPDF)throw new Error('PDF library did not load.');const data=monthlyReportData(value),{jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});const {b}=data;doc.setFontSize(18);doc.text('Safety Tracker - Monthly Safety Compliance Report',14,14);doc.setFontSize(9);doc.text(`${b.label} · Generated ${new Date().toLocaleString('en-GB')} · Safety Tracker v${APP_VERSION}`,14,21);doc.setFontSize(8);doc.text('This report is an evidence summary. Detailed person/document evidence remains available from Evidence Pack.',14,27);const summary=[['Training completed',data.completions.length],['New training assignments',data.newAssignments.length],['Awareness reviews',data.awareness.length],['PPE checks submitted',data.ppe.checks.length],['PPE issues reported',data.ppe.issues.length],['Open PPE ordering/actions',data.ppe.openIssues.length],['PPE checks outstanding',data.ppe.outstanding.length],['Overdue training at month end',data.overdue.length],['Awaiting instructor at month end',data.awaitingInstructor.length],['Retraining linked to new versions',data.retrainingTriggered.length],['Pending approvals now',data.pending.length],['Documents approved/accepted',data.approvals.length],['Controlled reviews',data.reviews.length],['New/replacement versions approved',data.newVersions.length],['Documents overdue review',data.reviewOverdue.length],['Documents due within 30 days',data.reviewDueSoon.length],['Admin exceptions',data.exceptions.length]];doc.autoTable({head:[['Measure','Count']],body:summary,startY:32,theme:'grid',styles:{fontSize:7.5,cellPadding:1.7},tableWidth:120});let y=(doc.lastAutoTable?.finalY||70)+7;doc.setFontSize(11);doc.text('Training completed during the month',14,y);doc.autoTable({head:[['Employee','Training','Type','Completed','Method']],body:data.completions.length?data.completions.map(c=>{const t=state.training.find(x=>x.id===c.training_session_id);return [personName(c.user_id),trainingReference(t)?`${trainingReference(t)} - ${t?.name||''}`:t?.name||'',kindLabel(trainingKind(t)),fmtDateTime(c.at),c.method]}):[['None','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;doc.setFontSize(11);doc.text('Annual Safety Awareness completed during the month',14,y);doc.autoTable({head:[['Employee','Awareness topic','Version','Reviewed']],body:data.awareness.length?data.awareness.map(a=>{const i=awarenessItem(a.awareness_item_id);return [personName(a.user_id),i?`${i.code||''} ${i.title}`.trim():'Awareness item',a.item_version_label||'',fmtDateTime(a.occurred_at)]}):[['None','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Monthly PPE checks',14,y);doc.autoTable({head:[['Employee','Submitted','Signed name','Status','Issues']],body:data.ppe.checks.length?data.ppe.checks.map(c=>{const issues=data.ppe.issues.filter(i=>i.check_id===c.id);return [personName(c.user_id),fmtDateTime(c.submitted_at),c.signature_name||'',c.status||'',issues.map(i=>`${i.ppe_name_snapshot}: ${ppeResultLabel(i.result)}`).join('; ')||'None']}):[['None','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('PPE ordering / action list',14,y);doc.autoTable({head:[['Employee','PPE','Result','Comment','Action']],body:data.ppe.issues.length?data.ppe.issues.map(i=>{const c=state.ppeChecks.find(x=>x.id===i.check_id);return [personName(c?.user_id),i.ppe_name_snapshot||ppeItem(i.ppe_item_id)?.name||'',ppeResultLabel(i.result),i.comment||'',ppeActionLabel(i.action_status||'OPEN')]}):[['No PPE issues reported','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Outstanding training position at month end',14,y);doc.autoTable({head:[['Employee','Training','Status','Delivery','Due']],body:data.outstanding.length?data.outstanding.map(x=>[personName(x.a.user_id),trainingReference(x.t)?`${trainingReference(x.t)} - ${x.t.name}`:x.t.name,x.s.code.replaceAll('_',' '),deliveryText(x.s.method),fmtDate(x.s.due)]):[['None','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Document control activity during the month',14,y);const docRows=[...data.approvals.map(v=>{const d=state.documents.find(x=>x.id===v.document_id);return ['Approved/accepted',d?.reference||'',documentDisplayTitle(d),`v${v.version_label||''}`,fmtDateTime(v.approval_at),personName(v.approval_by)]}),...data.reviews.map(r=>{const v=state.versions.find(x=>x.id===r.document_version_id),d=state.documents.find(x=>x.id===v?.document_id);return ['Controlled review',d?.reference||'',documentDisplayTitle(d),`v${v?.version_label||''}`,fmtDateTime(r.reviewed_at||r.created_at),personName(r.reviewed_by||r.user_id)]})].sort((a,b)=>a[4].localeCompare(b[4]));doc.autoTable({head:[['Action','Reference','Document','Version','Date','Person']],body:docRows.length?docRows:[['None','','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});y=(doc.lastAutoTable?.finalY||y)+7;if(y>165){doc.addPage();y=14}doc.setFontSize(11);doc.text('Document review status',14,y);const reviewRows=[...data.reviewOverdue.map(x=>['Overdue',x.d.reference||'',documentDisplayTitle(x.d),`v${x.v.version_label||''}`,fmtDate(x.v.review_date)]),...data.reviewDueSoon.map(x=>['Due within 30 days',x.d.reference||'',documentDisplayTitle(x.d),`v${x.v.version_label||''}`,fmtDate(x.v.review_date)])];doc.autoTable({head:[['Status','Reference','Document','Version','Review date']],body:reviewRows.length?reviewRows:[['None','','','','']],startY:y+3,styles:{fontSize:7,cellPadding:1.5},margin:{left:14,right:14}});return {doc,data}}
+async function generateMonthlySafetyReport(value,opts={download:true,archive:true,scheduleId:null}){if(!isManager())return;const status=$('monthlyReportStatus');if(status){status.hidden=false;status.textContent='Generating monthly report…'}try{const {doc,data}=monthlySafetyReportDoc(value),fileName=`Safety-Compliance-${data.b.value}.pdf`,blob=doc.output('blob');let report=null;if(opts.archive!==false&&!state.loadErrors.generated_reports){const path=`reports/${data.b.value}/${crypto.randomUUID()}-${safeFileName(fileName)}`,up=await sb.storage.from('safety-files').upload(path,blob,{contentType:'application/pdf',upsert:false});if(up.error)throw up.error;const ins=await sb.from('generated_reports').insert({schedule_id:opts.scheduleId||null,report_type:'MONTHLY_SAFETY',period_start:data.b.start.toISOString().slice(0,10),period_end:data.b.end.toISOString().slice(0,10),file_name:fileName,storage_path:path,status:'ARCHIVED',summary:{training_completed:data.completions.length,awareness_completed:data.awareness.length,ppe_checks_submitted:data.ppe.checks.length,ppe_issues:data.ppe.issues.length,ppe_open_actions:data.ppe.openIssues.length,ppe_checks_outstanding:data.ppe.outstanding.length,training_overdue:data.overdue.length,pending_approvals:data.pending.length,documents_approved:data.approvals.length,controlled_reviews:data.reviews.length,admin_exceptions:data.exceptions.length},generated_by:state.user.id}).select().single();if(ins.error)throw ins.error;report=ins.data;state.generatedReports.unshift(report)}if(opts.download!==false)downloadBlob(blob,fileName);renderReportArchive();if(status)status.textContent=`${data.b.label} report created${report?' and archived':''}. Training completed: ${data.completions.length}; awareness reviews: ${data.awareness.length}; PPE checks: ${data.ppe.checks.length}; PPE issues: ${data.ppe.issues.length}.`;toast('Monthly Safety Compliance Report created.');return report}catch(e){console.error(e);if(status)status.textContent=e.message||'Could not generate report.';toast(e.message||'Could not generate monthly report.')}}
+async function downloadArchivedReport(id){const r=state.generatedReports.find(x=>x.id===id);if(!r?.storage_path)return toast('Stored report not found.');const d=await sb.storage.from('safety-files').download(r.storage_path);if(d.error||!d.data)return toast(d.error?.message||'Could not download report.');downloadBlob(d.data,r.file_name||'safety-report.pdf');try{await sb.from('report_download_activity').insert({report_id:r.id,user_id:state.user.id,file_name_snapshot:r.file_name||'safety-report.pdf'})}catch(e){console.warn('Report download audit',e)}}
+function reportTypeLabel(v){return ({MONTHLY_SAFETY:'Monthly Safety',WEEKLY_SAFETY:'Weekly Safety',MONTHLY_PPE:'Monthly PPE'})[v]||String(v||'Report').replaceAll('_',' ')}
+function renderReportArchive(){const el=$('reportArchiveList');if(!el)return;if(state.loadErrors.generated_reports){el.innerHTML='<div class="empty">Run the reporting SQL migration to enable the report archive.</div>';return}const rows=[...state.generatedReports].sort((a,b)=>new Date(b.generated_at||0)-new Date(a.generated_at||0)).slice(0,36);el.innerHTML=rows.length?rows.map(r=>{const logs=isReportViewer()?[]:state.reportEmailLog.filter(x=>x.report_id===r.id),sent=logs.filter(x=>x.status==='SENT').length,failed=logs.filter(x=>x.status==='FAILED').length;return `<div class="item-card compact"><div class="row-between"><div><strong>${esc(r.file_name||'Safety report')}</strong><div class="meta"><span class="badge">${esc(reportTypeLabel(r.report_type))}</span><span>${fmtDate(r.period_start)} – ${fmtDate(r.period_end)}</span><span>Generated ${fmtDateTime(r.generated_at)}</span><span class="badge ${r.status==='EMAIL_FAILED'?'overdue':'complete'}">${esc(r.status||'ARCHIVED')}</span>${logs.length?`<span>${sent} emailed${failed?` · ${failed} failed`:''}</span>`:''}</div></div><div class="row">${btn('Download','secondary',`data-download-report="${r.id}"`)}${logs.length?btn('Email log','ghost',`data-report-email-log="${r.id}"`):''}</div></div></div>`}).join(''):'<div class="empty">No reports have been generated yet.</div>'}
+function showReportEmailLog(reportId){const report=state.generatedReports.find(r=>r.id===reportId),rows=state.reportEmailLog.filter(x=>x.report_id===reportId).sort((a,b)=>new Date(b.sent_at||0)-new Date(a.sent_at||0));openModal('Report email log',`<p class="muted">${esc(report?.file_name||'Safety report')}</p><div class="card-list">${rows.length?rows.map(x=>`<div class="item-card compact"><div class="row-between"><div><strong>${esc(x.recipient)}</strong><div class="meta"><span>${fmtDateTime(x.sent_at)}</span><span class="badge ${x.status==='FAILED'?'overdue':'complete'}">${esc(x.status)}</span></div>${x.error_message?`<div class="muted">${esc(x.error_message)}</div>`:''}</div></div></div>`).join(''):'<div class="empty">No email attempts recorded.</div>'}</div><div class="actions">${btn('Close','primary','data-close-modal')}</div>`) }
+function showNewReportSchedule(existingId=null){if(!isAdmin())return;const x=existingId?state.reportSchedules.find(r=>r.id===existingId):null;openModal(x?'Edit scheduled report':'New scheduled report',`<div class="form-grid"><label>Name<input id="reportScheduleName" value="${esc(x?.name||'Monthly Safety Compliance Report')}"></label><label>Frequency<select id="reportScheduleFrequency"><option value="MONTHLY" ${x?.frequency!=='WEEKLY'?'selected':''}>Monthly</option><option value="WEEKLY" ${x?.frequency==='WEEKLY'?'selected':''}>Weekly</option></select></label><label>Day of month<input id="reportScheduleDay" type="number" min="1" max="28" value="${Number(x?.day_of_month||1)}"></label><label>Weekly day<select id="reportScheduleWeekday"><option value="1" ${Number(x?.day_of_week||1)===1?'selected':''}>Monday</option><option value="2" ${Number(x?.day_of_week||1)===2?'selected':''}>Tuesday</option><option value="3" ${Number(x?.day_of_week||1)===3?'selected':''}>Wednesday</option><option value="4" ${Number(x?.day_of_week||1)===4?'selected':''}>Thursday</option><option value="5" ${Number(x?.day_of_week||1)===5?'selected':''}>Friday</option><option value="6" ${Number(x?.day_of_week||1)===6?'selected':''}>Saturday</option><option value="7" ${Number(x?.day_of_week||1)===7?'selected':''}>Sunday</option></select></label><label>Recipients<input id="reportScheduleRecipients" placeholder="name@example.com, manager@example.com" value="${esc((x?.recipients||[]).join(', '))}"></label><label class="check-row full"><input id="reportScheduleEnabled" type="checkbox" ${x?.enabled===false?'':'checked'}> Schedule enabled</label><label class="check-row full"><input id="reportScheduleEmail" type="checkbox" ${x?.email_enabled?'checked':''}> Email automatically when the server email runner is configured</label></div><div class="hint-box">Monthly reports cover the previous calendar month. The report is always archived. Email requires the optional Supabase Edge Function included in this build and a configured sender.</div><div class="actions">${btn('Cancel','ghost','data-close-modal')}${btn('Save schedule','primary',`data-save-report-schedule="${x?.id||''}"`)}</div>`)}
+async function saveReportSchedule(id=''){if(!isAdmin())return;const name=clean($('reportScheduleName')?.value),frequency=$('reportScheduleFrequency')?.value||'MONTHLY',day=Math.min(28,Math.max(1,Number($('reportScheduleDay')?.value)||1)),recipients=clean($('reportScheduleRecipients')?.value).split(',').map(x=>x.trim()).filter(Boolean);if(!name)return toast('Schedule name is required.');const payload={name,frequency,day_of_month:day,day_of_week:Number($('reportScheduleWeekday')?.value)||1,recipients,enabled:!!$('reportScheduleEnabled')?.checked,email_enabled:!!$('reportScheduleEmail')?.checked,updated_at:new Date().toISOString()};let r;if(id)r=await sb.from('report_schedules').update(payload).eq('id',id);else r=await sb.from('report_schedules').insert({...payload,created_by:state.user.id});if(r.error)return toast(r.error.message);closeModal();await refresh('Scheduled report saved.')}
+async function toggleReportSchedule(id){if(!isAdmin())return;const x=state.reportSchedules.find(r=>r.id===id);if(!x)return;const r=await sb.from('report_schedules').update({enabled:!x.enabled,updated_at:new Date().toISOString()}).eq('id',id);if(r.error)return toast(r.error.message);await refresh(`Scheduled report ${x.enabled?'disabled':'enabled'}.`)}
+async function runReportSchedule(id){if(!isAdmin())return;const x=state.reportSchedules.find(r=>r.id===id);if(!x)return;if(x.frequency==='WEEKLY')return toast('Weekly schedules run through the automatic server report runner. Use Monthly for an immediate in-app test run.');const month=previousMonthValue(),report=await generateMonthlySafetyReport(month,{download:true,archive:true,scheduleId:null});if(report){await sb.from('report_schedules').update({last_run_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id);await refresh('Scheduled report test run created and archived.')}}
+function renderReportSchedules(){const el=$('reportScheduleList');if(!el||!isAdmin())return;if(state.loadErrors.report_schedules){el.innerHTML='<div class="empty">Run the reporting SQL migration to enable scheduled reports.</div>';return}const rows=[...state.reportSchedules].sort((a,b)=>String(a.name).localeCompare(String(b.name)));el.innerHTML=rows.length?rows.map(x=>`<div class="item-card schedule-card ${x.enabled?'traffic-green':'traffic-neutral'}"><div class="row-between"><div><h4>${esc(x.name)}</h4><div class="meta"><span class="badge">${esc(x.frequency||'MONTHLY')}</span><span>${x.frequency==='MONTHLY'?`Day ${Number(x.day_of_month||1)}`:`${['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][Number(x.day_of_week||1)]}`}</span><span>${(x.recipients||[]).length} recipient${(x.recipients||[]).length===1?'':'s'}</span><span>${x.email_enabled?'Email enabled':'Archive only'}</span>${x.last_run_at?`<span>Last run ${fmtDateTime(x.last_run_at)}</span>`:''}</div></div><span class="badge ${x.enabled?'complete':''}">${x.enabled?'Enabled':'Disabled'}</span></div><div class="row">${btn('Edit','secondary',`data-edit-report-schedule="${x.id}"`)}${btn(x.enabled?'Disable':'Enable','ghost',`data-toggle-report-schedule="${x.id}"`)}${btn('Run now','primary',`data-run-report-schedule="${x.id}"`)}</div></div>`).join(''):'<div class="empty">No scheduled reports yet.</div>'}
+
+async function globalClick(e){const el=e.target.closest('button');if(!el)return;if((state.offline||!navigator.onLine)&&['startPpeCheck','submitPpeCheck','ackAwareness','signTraining','confirmTrainingSign','requestInstructor','confirmInstructorRequest','trainingException','confirmTrainingException'].some(k=>el.dataset[k]!==undefined)){toast('Offline mode is read-only for compliance actions. Reconnect before signing, acknowledging, requesting instructor changes or submitting PPE checks.');return;}if(el.dataset.viewAwareness!==undefined){showView('awareness');return}if(el.dataset.viewPpe!==undefined){showView('ppe');return}if(el.dataset.startPpeCheck!==undefined)return showPpeCheck();if(el.dataset.submitPpeCheck!==undefined)return submitPpeCheck();if(el.dataset.viewPpeCheck)return viewPpeCheck(el.dataset.viewPpeCheck);if(el.dataset.downloadPpeCheck)return downloadPpeCheckPdf(el.dataset.downloadPpeCheck);if(el.dataset.managePpeCatalogue!==undefined)return showPpeCatalogue();if(el.dataset.editPpeItem)return editPpeItem(el.dataset.editPpeItem);if(el.dataset.savePpeItem!==undefined)return savePpeItem(el.dataset.savePpeItem);if(el.dataset.assignPpeItem)return showPpeAssignments(el.dataset.assignPpeItem);if(el.dataset.savePpeAssignments)return savePpeAssignments(el.dataset.savePpeAssignments);if(el.dataset.updatePpeAction)return showPpeAction(el.dataset.updatePpeAction);if(el.dataset.savePpeAction)return savePpeAction(el.dataset.savePpeAction);if(el.dataset.openAwareness)return openAwareness(el.dataset.openAwareness);if(el.dataset.ackAwareness)return acknowledgeAwareness(el.dataset.ackAwareness);if(el.dataset.assignAwareness)return showAwarenessAssignments(el.dataset.assignAwareness);if(el.dataset.saveAwarenessAssignments)return saveAwarenessAssignments(el.dataset.saveAwarenessAssignments);if(el.dataset.downloadReport)return downloadArchivedReport(el.dataset.downloadReport);if(el.dataset.reportEmailLog)return showReportEmailLog(el.dataset.reportEmailLog);if(el.dataset.editReportSchedule)return showNewReportSchedule(el.dataset.editReportSchedule);if(el.dataset.saveReportSchedule!==undefined)return saveReportSchedule(el.dataset.saveReportSchedule);if(el.dataset.toggleReportSchedule)return toggleReportSchedule(el.dataset.toggleReportSchedule);if(el.dataset.runReportSchedule)return runReportSchedule(el.dataset.runReportSchedule);if(el.dataset.docIndex){state.documentIndex=el.dataset.docIndex;if($('documentTypeFilter'))$('documentTypeFilter').value=state.documentIndex==='REGISTER'?'':state.documentIndex;renderDocuments();return}if(el.dataset.downloadRegister!==undefined)return documentRegisterPdf();if(el.dataset.closeModal!==undefined)return closeModal();if(el.dataset.createDocument!==undefined)return createDocumentRecord();if(el.dataset.addDocLink)return addDocumentLink(el.dataset.addDocLink);if(el.dataset.removeDocLink)return removeDocumentLink(el.dataset.removeDocLink);if(el.dataset.openRequiredTraining)return openRequiredTrainingMaterial(el.dataset.openRequiredTraining);if(el.dataset.openDoc)return openDocument(el.dataset.openDoc);if(el.dataset.downloadDoc)return downloadDocument(el.dataset.downloadDoc);if(el.dataset.markDocReviewed)return showMarkDocumentReviewed(el.dataset.markDocReviewed);if(el.dataset.confirmDocReviewed)return confirmDocumentReviewed(el.dataset.confirmDocReviewed);if(el.dataset.docActivity)return showDocumentActivity(el.dataset.docActivity);if(el.dataset.evidenceDoc)return showDocumentEvidencePack(el.dataset.evidenceDoc);if(el.dataset.generateEvidenceDoc)return generateEvidencePack('DOCUMENT',el.dataset.generateEvidenceDoc);if(el.dataset.evidenceTraining)return showTrainingEvidencePack(el.dataset.evidenceTraining);if(el.dataset.generateEvidenceTraining)return generateEvidencePack('TRAINING',el.dataset.generateEvidenceTraining);if(el.dataset.generateEvidenceSelected!==undefined)return generateSelectedEvidencePack();if(el.dataset.docDetails)return showDocDetails(el.dataset.docDetails);if(el.dataset.newVersion)return showNewVersion(el.dataset.newVersion);if(el.dataset.publishVersion)return publishVersionFromModal(el.dataset.publishVersion);if(el.dataset.toggleDoc)return showToggleDocument(el.dataset.toggleDoc);if(el.dataset.confirmToggleDoc)return toggleDocument(el.dataset.confirmToggleDoc);if(el.dataset.approveVersion)return showVersionApproval(el.dataset.approveVersion);if(el.dataset.saveVersionApproval)return saveVersionApproval(el.dataset.saveVersionApproval);if(el.dataset.editDocAudience)return showDocumentAudience(el.dataset.editDocAudience);if(el.dataset.saveDocAudience)return saveDocumentAudience(el.dataset.saveDocAudience);if(el.dataset.reviewDoc)return showDocumentReview(el.dataset.reviewDoc);if(el.dataset.saveDocReview)return saveDocumentReview(el.dataset.saveDocReview);if(el.dataset.deleteUnusedDoc)return showDeleteUnusedDocument(el.dataset.deleteUnusedDoc);if(el.dataset.confirmDeleteUnusedDoc)return deleteUnusedDocument(el.dataset.confirmDeleteUnusedDoc);if(el.dataset.deleteStorageOrphan)return deleteStorageOrphan(el.dataset.deleteStorageOrphan);if(el.dataset.deleteAllStorageOrphans!==undefined)return confirmDeleteAllStorageOrphans();if(el.dataset.confirmDeleteAllStorageOrphans!==undefined)return deleteAllStorageOrphans();if(el.dataset.saveTraining!==undefined)return saveTraining();if(el.dataset.viewTraining)return showTrainingDetails(el.dataset.viewTraining);if(el.dataset.openTrainingFile)return openTrainingFile(el.dataset.openTrainingFile);if(el.dataset.downloadTrainingFile)return downloadTrainingFile(el.dataset.downloadTrainingFile);if(el.dataset.trainingFileActivity)return showTrainingFileActivity(el.dataset.trainingFileActivity);if(el.dataset.approveTraining)return showTrainingApproval(el.dataset.approveTraining);if(el.dataset.confirmTrainingApproval)return confirmTrainingApproval(el.dataset.confirmTrainingApproval);if(el.dataset.assignTraining)return showAssignTraining(el.dataset.assignTraining);if(el.dataset.saveTrainingAudience)return saveTrainingAudience(el.dataset.saveTrainingAudience);if(el.dataset.editTraining)return showEditTraining(el.dataset.editTraining);if(el.dataset.saveTrainingEdit)return saveTrainingEdit(el.dataset.saveTrainingEdit);if(el.dataset.archiveTraining)return showArchiveTraining(el.dataset.archiveTraining);if(el.dataset.confirmArchiveTraining)return archiveTraining(el.dataset.confirmArchiveTraining);if(el.dataset.signTraining)return signTraining(el.dataset.signTraining);if(el.dataset.confirmTrainingSign)return confirmTrainingSign(el.dataset.confirmTrainingSign);if(el.dataset.trainingException)return showTrainingException(el.dataset.trainingException);if(el.dataset.confirmTrainingException)return confirmTrainingException(el.dataset.confirmTrainingException);if(el.dataset.requestInstructor)return requestInstructor(el.dataset.requestInstructor);if(el.dataset.confirmInstructorRequest)return confirmInstructorRequest(el.dataset.confirmInstructorRequest);if(el.dataset.saveGroupAttendance)return saveGroupAttendance(el.dataset.saveGroupAttendance);if(el.dataset.singleAttendance)return showSingleAttendance(el.dataset.singleAttendance);if(el.dataset.saveSingleAttendance)return saveSingleAttendance(el.dataset.saveSingleAttendance);if(el.dataset.newDepartment!==undefined)return showDepartmentEditor();if(el.dataset.editDepartment)return showDepartmentEditor(el.dataset.editDepartment);if(el.dataset.saveDepartment!==undefined)return saveDepartment(el.dataset.saveDepartment);if(el.dataset.toggleDepartment)return toggleDepartment(el.dataset.toggleDepartment);if(el.dataset.sendInvite!==undefined)return sendInvite();if(el.dataset.setRole)return showSetRole(el.dataset.setRole);if(el.dataset.saveRole)return saveRole(el.dataset.saveRole);if(el.dataset.resendUser)return showResendUser(el.dataset.resendUser);if(el.dataset.confirmResendUser)return resendUserAccess(el.dataset.confirmResendUser);if(el.dataset.toggleUser)return toggleUser(el.dataset.toggleUser);}
+
+function renderReports(){
+  document.querySelectorAll('.report-manager-content').forEach(el=>el.hidden=isReportViewer());
+  if(isReportViewer()){
+    const latest=[...state.generatedReports].sort((a,b)=>new Date(b.generated_at||0)-new Date(a.generated_at||0))[0];
+    $('reportStats').innerHTML=[
+      {label:'Reports available',value:state.generatedReports.length,traffic:state.generatedReports.length?'green':'neutral'},
+      {label:'Latest',value:latest?fmtDate(latest.generated_at):'—',traffic:'neutral'}
+    ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${esc(x.value)}</strong><span>${x.label}</span></div>`).join('');
+    renderReportArchive();return
+  }
+  const rows=complianceRows(),ppe=ppeManagerMonthSummary(currentMonthValue()),complete=rows.filter(r=>r.code==='COMPLETED').length,overdue=rows.filter(r=>r.code==='OVERDUE').length,action=rows.filter(r=>r.code!=='COMPLETED'&&r.code!=='OVERDUE').length;
+  $('reportStats').innerHTML=[
+    {label:'Compliant training',value:complete,traffic:'green'},
+    {label:'Action required',value:action,traffic:action?'amber':'green'},
+    {label:'Overdue training',value:overdue,traffic:overdue?'red':'green'},
+    {label:'PPE issues',value:ppe.issues,traffic:ppe.issues?'red':'green'}
+  ].map(x=>`<div class="stat traffic-${x.traffic}"><span class="traffic-dot"></span><strong>${x.value}</strong><span>${x.label}</span></div>`).join('');
+  if($('monthlyReportMonth')&&!$('monthlyReportMonth').value)$('monthlyReportMonth').value=previousMonthValue();
+  renderReportArchive();renderDocumentActivityReport()
+}
+async function renderAdmin(){
+  if(!$('buildDiagnostics'))return;
+  renderReportSchedules();renderDepartments();
+  let versionInfo=null;try{versionInfo=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.json())}catch{}
+  let regs=[];try{regs='serviceWorker' in navigator?await navigator.serviceWorker.getRegistrations():[]}catch{}
+  const arch=state.settings.find(s=>s.setting_key==='architecture_version')?.setting_value||'not found',front=state.settings.find(s=>s.setting_key==='front_end_version')?.setting_value||'not found';
+  const uiChecks=[
+    ['Role navigation',STANDARD_USER_VIEWS.size===4&&MANAGER_VIEWS.has('documents')&&ADMIN_VIEWS.has('admin')],
+    ['Traffic-light helpers',typeof statusChip==='function'&&typeof trafficPriority==='function'],
+    ['Simplified User UI',!STANDARD_USER_VIEWS.has('documents')&&!STANDARD_USER_VIEWS.has('training')],
+    ['Standalone Training split',standaloneTrainingKinds.length===4],
+    ['Document approval training schedule',typeof showVersionApproval==='function'&&typeof saveVersionApproval==='function'],
+    ['Hard button action router',window.__SAFETY_ACTION_ROUTER==='v2.7.2-capture'],
+    ['Admin/User view switch',typeof toggleAdminUserMode==='function'&&typeof isUserViewMode==='function'],
+    ['Offline snapshot + PDF cache',typeof restoreOfflineSnapshot==='function'&&typeof cachedSafetyBlob==='function'],
+    ['Password recovery flow',typeof showRecoveryPasswordSetup==='function']
+  ];
+  $('buildDiagnostics').innerHTML=`<div class="card-list"><div class="item-card compact traffic-card traffic-green"><div class="row-between"><span>Loaded JavaScript build</span><strong class="diagnostic-ok">v${APP_VERSION}</strong></div></div><div class="item-card compact traffic-card traffic-${versionInfo?.version===APP_VERSION?'green':'amber'}"><div class="row-between"><span>version.json</span><strong class="${versionInfo?.version===APP_VERSION?'diagnostic-ok':'diagnostic-warn'}">${esc(versionInfo?.version||'unavailable')}</strong></div></div><div class="item-card compact traffic-card traffic-${regs.length?'green':'amber'}"><div class="row-between"><span>Offline service worker</span><strong class="${regs.length?'diagnostic-ok':'diagnostic-warn'}">${regs.length?'Registered':'Not registered'}</strong></div><div class="muted">v2.7.2 uses a service worker to keep the app shell available offline.</div></div><div class="item-card compact"><div>Database architecture setting: <span class="codeish">${esc(arch)}</span></div><div>Front-end setting: <span class="codeish">${esc(front)}</span></div></div><div class="item-card compact"><div>Current URL: <span class="codeish">${esc(location.href)}</span></div><div>Build ID: <span class="codeish">${BUILD_ID}</span></div></div><div class="section-card compact"><h4>UI / workflow QA</h4>${uiChecks.map(([name,ok])=>`<div class="qa-row"><span>${esc(name)}</span>${statusChip(ok?'Pass':'Check',ok?'green':'red')}</div>`).join('')}</div>${Object.keys(state.loadErrors).length?`<div class="danger-note"><strong>Schema/load warnings</strong><br>${Object.entries(state.loadErrors).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</div>`:'<div class="success-note">Core tables loaded with no reported schema errors.</div>'}</div>`
+}
+
+function renderHelp(){
+  if(isStandardUser()){
+    $('helpContent').innerHTML=`<div class="help-card"><h3>Keep it simple</h3><p>Work from <strong>My Safety</strong>. Red means act now, amber means action is required, green means complete/current and grey means inactive or historical.</p></div><div class="help-card"><h3>My Safety</h3><p>Cards are automatically ordered with the most important actions first. Open the current approved safety document, complete the training or attendance step shown, then sign only when you understand it. Completed items remain available so you can reopen the current safety information later.</p></div><div class="help-card"><h3>Need help?</h3><p>Use <strong>Need instructor help</strong> when self-training is not enough. Ask your manager before carrying out the task if anything is unclear.</p></div><div class="help-card"><h3>Safety Awareness</h3><p>Complete awareness reading shown as amber or red. Green means that topic is up to date.</p></div><div class="help-card"><h3>PPE Checks</h3><p>Complete your monthly PPE check by the 28th and report anything missing, damaged or unsuitable.</p></div><div class="help-card"><h3>Offline mode</h3><p>After you have signed in online once, your day-to-day My Safety, Awareness and PPE information can still be viewed offline. Previously saved safety PDFs can be opened. Compliance actions such as signing training, acknowledging awareness and submitting PPE checks wait until you reconnect.</p></div>`;
+    return;
+  }
+  $('helpContent').innerHTML=`<div class="help-card"><h3>Documents drive controlled training</h3><p>RA, COSHH RA and SSW documents are uploaded to Documents. At approval confirm training method, refresher frequency, completion due period and audience. Safety Tracker then creates/updates the training schedule automatically. Toolbox Talks stay controlled through Documents and cannot be assigned until approved.</p></div><div class="help-card"><h3>Training = standalone training</h3><p>Use Training only for policies, inductions, refreshers, general H&amp;S briefings, equipment familiarisation or one-off training that is not driven by a controlled RA, COSHH RA, SSW or Toolbox Talk. Upload the PDF, choose Self-training or Instructor-led, set refresher frequency and assign Everyone, Departments and/or people.</p></div><div class="help-card"><h3>Traffic-light rule</h3><p><strong>Green</strong> = current/compliant/complete. <strong>Amber</strong> = pending, due soon or an action is required. <strong>Red</strong> = overdue, blocked, not approved or a problem needing action. <strong>Grey</strong> = archived, disabled, inactive or historical. Cards and summary tiles use this rule consistently.</p></div><div class="help-card"><h3>Cleaner cards</h3><p>The main action stays visible. Less-used actions such as activity, details, archive and some administration controls are under <strong>More</strong> so mobile screens remain easy to use.</p></div><div class="help-card"><h3>Role access</h3><p>Users see My Safety, Safety Awareness, PPE Checks and Help. Managers additionally see Documents, standalone Training, People, Compliance, Instructor and Reports. Admins additionally see Admin controls. Report Viewer accounts see Reports only.</p></div><div class="help-card"><h3>Departments</h3><p>Departments can be targeted at assignment time. Future active users added to a selected Department automatically inherit current training, awareness and PPE requirements while historical evidence is preserved.</p></div><div class="help-card"><h3>Admin / User mode switch</h3><p>Admins can use <strong>Switch to User</strong> in the header for normal day-to-day work. This changes only the interface; the account, audit identity and permissions in Supabase remain Admin. Return to Admin at any time while online.</p></div><div class="help-card"><h3>Offline mode</h3><p>After one successful online sign-in, Safety Tracker keeps a minimal personal snapshot for offline use. My Safety, Awareness and PPE information stays available read-only, and required PDFs that have been saved on the device can be opened. Signatures, acknowledgements, PPE submissions and management changes always wait for a live connection.</p></div><div class="help-card"><h3>Demo mode</h3><p>The login screen includes <strong>Try Demo</strong>. Demo mode uses only fictional Example Hotel Ltd data, supports Admin/Manager/User/Report Viewer role switching and never writes demo changes to the live database. The direct marketing link can use <strong>?demo=1</strong>.</p></div><div class="help-card"><h3>Compliance & Instructor</h3><p>Compliance is ordered red → amber → green so overdue work appears first. Instructor shows only outstanding instructor-led work; after attendance is recorded it clearly shows when the employee signature is the remaining step.</p></div><div class="help-card"><h3>Version check</h3><p>The header must show <strong>v2.7.2 CLEAN</strong>.</p></div>`
+}
+
+window.SafetyTrackerV2={APP_VERSION,BUILD_ID,state,sb,loadAll,loadReportViewerData,refresh,isReportViewer,canViewReports,runSafetySync,hashPdf,sha256Text,pdfTextFromBlob,currentVersion,approvedCurrentVersion,pendingApprovalVersion,versionApprovalStatus,isVersionApproved,ensureTrainingDocLink,createSourceTraining,syncSourceTrainings,safeFileName,productWords,similarity,refsInText,canonicalRef,declaredDocumentMatches,nextVersionLabel,publishFileAsNewVersion,existingDocMatch,extractSdsProductName,extractCoshhProductCandidates,productNameMatchScore,documentDisplayTitle,repairSdsTitles,extractRiskAssessmentTitle,repairRaTitles,renderDocumentRegister,documentRegisterPdf,logDocumentActivity,requiredTrainingMaterial,requiredTrainingMaterials,requiredTrainingMaterialOpened,openRequiredTrainingMaterial,showTrainingException,showDocumentEvidencePack,showTrainingEvidencePack,generateEvidencePack,generateSelectedEvidencePack,renderAwareness,awarenessStatus,renderPpe,ppeCheckStatus,monthlyPpeReportDoc,generateMonthlySafetyReport,monthlyReportData,classifySafetyPdfText,looksLikeCoshhAssessment,looksLikeSafetyDataSheet,toast};
+init();
