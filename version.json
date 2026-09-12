@@ -1,13 +1,11 @@
 {
-  "version": "2.8.5",
-  "label": "v2.8.5 CLEAN",
-  "build": "v285-contractor-permit-reports-20260912",
+  "version": "2.8.6",
+  "label": "v2.8.6 CLEAN",
+  "build": "v286-hot-work-yes-no-20260912",
   "changes": [
-    "Contractor Permit Reports added under Reports",
-    "Filter permits by company and single date/date range",
-    "Optional status and high-risk work filters",
-    "Preview report in app",
-    "Download contractor permit report as PDF or CSV",
-    "Report includes permit, contractor, dates, status, location, work type, approval and close-out details"
+    "Restored explicit Hot work permit required Yes/No question",
+    "Hot work Yes automatically records the high-risk Hot Work category and opens hot-work controls",
+    "Hot work No keeps hot-work controls hidden",
+    "Contractor permit reports from v2.8.5 retained"
   ]
 }
