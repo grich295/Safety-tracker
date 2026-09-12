@@ -1,1 +1,10 @@
-{"name":"Safety Tracker","short_name":"Safety","start_url":"./","display":"standalone","background_color":"#f4f6f8","theme_color":"#17324d","icons":[]}
+{
+  "name": "Safety Tracker",
+  "short_name": "Safety Tracker",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#17324d",
+  "theme_color": "#17324d",
+  "description": "Health and safety document control, training and compliance tracker."
+}
