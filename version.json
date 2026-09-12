@@ -1,6 +1,6 @@
 {
-  "version": "2.8.2",
-  "build": "v282-no-copyright-20260912",
+  "version": "2.8.3",
+  "build": "v283-permit-safety-controls-20260912",
   "label": "CLEAN",
   "features": [
     "Contractor sign-in and permit to work",
@@ -17,6 +17,9 @@
     "Password recovery",
     "Robust file open",
     "Password security warning on sign-in",
-    "Authenticated Manager/Admin acknowledgement replaces drawn signature for RA/COSHH/SSW/SDS document approval"
+    "Authenticated Manager/Admin acknowledgement replaces drawn signature for RA/COSHH/SSW/SDS document approval",
+    "Permit pre-start safety actions and controls",
+    "Fixed fire alarm test and assembly point acknowledgement",
+    "Mandatory contractor work-area close-out"
   ]
 }

@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v282.css" />
+  <link rel="stylesheet" href="styles-v283.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -24,7 +24,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.8.2 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.8.3 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -53,7 +53,7 @@
   <main id="contractorView" class="auth-shell" hidden>
     <section class="auth-card contractor-portal-card">
       <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Permit to Work and site sign-in.</p></div><button id="contractorBackBtn" class="ghost" type="button">Back to staff login</button></div>
-      <div class="build-badge">Safety Tracker v2.8.2 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.8.3 CLEAN</div>
       <div id="contractorPortalContent"></div>
     </section>
   </main>
@@ -61,7 +61,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.2</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.3</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -93,7 +93,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.2</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.3</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -281,16 +281,16 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v282.js"></script>
-  <script src="bulk-import-v282.js"></script>
-  <script src="demo-v282.js"></script>
+  <script src="app-v283.js"></script>
+  <script src="bulk-import-v283.js"></script>
+  <script src="demo-v283.js"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v282.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v283.js and keep your existing config.js.';}
       }
     },3500);
   </script>
