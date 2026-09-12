@@ -1,6 +1,6 @@
 {
-  "version": "2.5.0",
-  "build": "v250-ui-training-workflow-20260911",
+  "version": "2.6.0",
+  "build": "v260-traffic-ui-final-qa-20260912",
   "clean": true,
-  "notes": "Controlled RA/COSHH/SSW training schedules are confirmed at document approval. Training tab is reserved for standalone policy/induction/refresher/ad-hoc H&S training with file upload, audience, self/instructor delivery and refresher frequency. Includes simplified User UI and consistent traffic-light guidance."
+  "notes": "Dedicated UI/UX tidy release with consistent traffic lights, action-first cards, mobile cleanup, improved pending approval queue including Toolbox Talks, updated Help and QA diagnostics."
 }
