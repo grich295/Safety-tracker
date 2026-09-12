@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v272.css" />
+  <link rel="stylesheet" href="styles-v282.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -24,7 +24,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.7.2 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.8.2 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -32,6 +32,8 @@
         <button id="loginSubmitBtn" class="primary" type="submit">Sign in</button>
       </form>
       <button id="forgotPasswordBtn" class="link-button" type="button">Forgot password?</button>
+      <div class="security-login-note"><strong>Keep your password private.</strong> Never share your Safety Tracker password. If you think someone else may know it, use <strong>Forgot password?</strong> above to reset it immediately.</div>
+      <button id="contractorSignInBtn" class="secondary contractor-entry-button" type="button">Contractor Sign In / Permit to Work</button>
       <div class="demo-entry">
         <div class="demo-entry-divider"><span>or</span></div>
         <button id="tryDemoBtn" class="demo-launch-button" type="button">Try Demo</button>
@@ -48,11 +50,18 @@
     </section>
   </main>
 
+  <main id="contractorView" class="auth-shell" hidden>
+    <section class="auth-card contractor-portal-card">
+      <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Permit to Work and site sign-in.</p></div><button id="contractorBackBtn" class="ghost" type="button">Back to staff login</button></div>
+      <div class="build-badge">Safety Tracker v2.8.2 CLEAN</div>
+      <div id="contractorPortalContent"></div>
+    </section>
+  </main>
 
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.7.2</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.2</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -84,7 +93,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.7.2</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.8.2</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -94,6 +103,8 @@
       <button data-view="training" class="manager-catalogue" hidden>Training</button>
       <button data-view="awareness">Safety Awareness</button>
       <button data-view="ppe">PPE Checks</button>
+      <button data-view="onsite">Who's On Site</button>
+      <button data-view="asbestos" id="asbestosNavBtn" hidden>Asbestos Lookup</button>
       <button data-view="people" class="manager-only" hidden>People</button>
       <button data-view="compliance" class="manager-only" hidden>Compliance</button>
       <button data-view="instructor" class="manager-only" hidden>Instructor</button>
@@ -149,6 +160,20 @@
         <div class="filters"><input id="ppeSearch" placeholder="Search assigned PPE"><select id="ppeStatusFilter"><option value="">All statuses</option><option value="DUE">Due / overdue</option><option value="ISSUES">Issues reported</option><option value="COMPLETE">Complete</option></select></div>
         <div id="ppeList" class="card-list"></div>
         <div id="ppeManagerArea" class="manager-only" hidden></div>
+      </section>
+
+      <section id="onsiteView" class="view">
+        <div class="page-heading"><div><h2>Who's On Site</h2><p class="muted">Live contractor attendance and permit status. All signed-in staff can view this screen.</p></div><button id="newContractorStaffBtn" class="primary" type="button" hidden>Sign in contractor</button></div>
+        <div id="onSiteStats" class="stats-grid"></div>
+        <div id="onSiteList" class="card-list"></div>
+      </section>
+
+      <section id="asbestosView" class="view">
+        <div class="page-heading"><div><h2>Asbestos Lookup</h2><p class="muted">Maintenance reference for known or presumed asbestos information before intrusive work.</p></div></div>
+        <div class="danger-note"><strong>Stop-work rule:</strong> this register will show known/presumed asbestos from the current records. It does not prove that unlisted material is asbestos-free. If suspect material is encountered, stop work, prevent disturbance and report it before continuing.</div>
+        <div class="section-card"><div class="form-grid"><label>Work location<select id="asbestosLocationSelect"><option value="">Select location</option></select></label></div></div>
+        <div id="asbestosLookupSummary"></div>
+        <div id="asbestosLookupList" class="card-list"></div>
       </section>
 
       <section id="peopleView" class="view">
@@ -209,6 +234,10 @@
           <div id="departmentList" class="card-list" style="margin-top:12px"></div>
         </div>
         <div class="section-card">
+          <div class="row-between"><div><h3>Site locations</h3><p class="muted">Maintain the work-location structure used by Contractor Permits and Asbestos Lookup. Guest-room floors and individual rooms can be added beneath Guest Rooms when ready.</p></div><button class="primary" type="button" data-new-site-location>New location</button></div>
+          <div id="siteLocationList" class="card-list" style="margin-top:12px"></div>
+        </div>
+        <div class="section-card">
           <div class="row-between"><div><h3>Force Sync & Review</h3><p class="muted">Repairs RA/COSHH/SSW training records, links and review flags without creating document assignments.</p></div><button id="forceSyncBtn" class="primary">Force Sync & Review</button></div>
           <div id="forceSyncStatus" class="message" hidden></div>
         </div>
@@ -252,16 +281,16 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v272.js"></script>
-  <script src="bulk-import-v272.js"></script>
-  <script src="demo-v272.js"></script>
+  <script src="app-v282.js"></script>
+  <script src="bulk-import-v282.js"></script>
+  <script src="demo-v282.js"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v272.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v282.js and keep your existing config.js.';}
       }
     },3500);
   </script>

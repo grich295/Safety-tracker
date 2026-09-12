@@ -1,14 +1,22 @@
 {
-  "version": "2.7.2",
-  "build": "v272-admin-user-offline-20260912",
+  "version": "2.8.2",
+  "build": "v282-no-copyright-20260912",
   "label": "CLEAN",
   "features": [
+    "Contractor sign-in and permit to work",
+    "Maintenance permit approval",
+    "Digital contractor sign-in and sign-out",
+    "Hot-work conditional permit questions",
+    "Who\u2019s On Site for all signed-in staff",
+    "Maintenance asbestos lookup foundation",
+    "Location-driven asbestos permit checks",
+    "AWR-009 Asbestos Management & HSE Compliance Review",
     "Admin/User interface switch",
     "Safe read-only offline User mode",
-    "Personal offline snapshot",
-    "Offline cache for safety PDFs",
     "Demo mode",
     "Password recovery",
-    "Robust file open"
+    "Robust file open",
+    "Password security warning on sign-in",
+    "Authenticated Manager/Admin acknowledgement replaces drawn signature for RA/COSHH/SSW/SDS document approval"
   ]
 }
