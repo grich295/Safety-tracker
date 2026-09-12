@@ -1,6 +1,6 @@
 {
-  "version": "2.6.1",
-  "build": "v261-button-actions-recovery-20260912",
+  "version": "2.6.2",
+  "build": "v262-cache-button-recovery-20260912",
   "clean": true,
-  "notes": "Restores the delegated button-action dispatcher removed accidentally in v2.6.0, including document link add/remove actions. Retains the full v2.6.0 traffic-light UI and workflow changes."
+  "notes": "Fixes v2.6.1 asset references that still requested cached v2.6.0 JavaScript. Forces fresh v2.6.2 assets and makes PDF Open actions Android/popup-safe. Retains restored delegated button actions and v2.6 traffic-light UI."
 }
