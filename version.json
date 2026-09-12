@@ -1,6 +1,6 @@
 {
-  "version": "2.7.0",
-  "build_id": "v270-demo-mode-traffic-workflow-20260912",
+  "version": "2.7.1",
+  "build_id": "v271-file-open-recovery-20260912",
   "clean": true,
-  "notes": "Adds safe local Example Hotel Ltd demo mode with role switcher and direct ?demo=1 link. Retains v2.6.3 hard button router and repaired Supabase password recovery flow."
+  "notes": "Fixes manager/admin opening of pending controlled documents and Toolbox Talks using an authenticated Edge Function/file download fallback. Retains demo mode and repaired password recovery."
 }
