@@ -1,6 +1,6 @@
 {
-  "version": "2.6.0",
-  "build": "v260-traffic-ui-final-qa-20260912",
+  "version": "2.6.1",
+  "build": "v261-button-actions-recovery-20260912",
   "clean": true,
-  "notes": "Dedicated UI/UX tidy release with consistent traffic lights, action-first cards, mobile cleanup, improved pending approval queue including Toolbox Talks, updated Help and QA diagnostics."
+  "notes": "Restores the delegated button-action dispatcher removed accidentally in v2.6.0, including document link add/remove actions. Retains the full v2.6.0 traffic-light UI and workflow changes."
 }
