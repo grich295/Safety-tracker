@@ -1,6 +1,6 @@
 {
-  "version": "2.6.3",
-  "build_id": "v263-hard-button-router-password-recovery-20260912",
+  "version": "2.7.0",
+  "build_id": "v270-demo-mode-traffic-workflow-20260912",
   "clean": true,
-  "notes": "Hard capture-phase button router; unique uncached assets; repaired password recovery/new-password flow; traffic-light UI and v2.5 workflow retained."
+  "notes": "Adds safe local Example Hotel Ltd demo mode with role switcher and direct ?demo=1 link. Retains v2.6.3 hard button router and repaired Supabase password recovery flow."
 }

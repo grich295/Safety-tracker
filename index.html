@@ -14,7 +14,7 @@
     }
     if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => /safety-tracker/i.test(k)).map(k => caches.delete(k)))).catch(()=>{}); }
   </script>
-  <link rel="stylesheet" href="styles-v263.css" />
+  <link rel="stylesheet" href="styles-v270.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -31,7 +31,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.6.3 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.7.0 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -39,6 +39,11 @@
         <button id="loginSubmitBtn" class="primary" type="submit">Sign in</button>
       </form>
       <button id="forgotPasswordBtn" class="link-button" type="button">Forgot password?</button>
+      <div class="demo-entry">
+        <div class="demo-entry-divider"><span>or</span></div>
+        <button id="tryDemoBtn" class="demo-launch-button" type="button">Try Demo</button>
+        <p class="muted demo-entry-note">Explore Safety Tracker with fictional Example Hotel Ltd data. Nothing is saved to the live system.</p>
+      </div>
       <div id="passwordSetupArea" class="stack" hidden>
         <h2 id="passwordSetupTitle">Set your password</h2>
         <p id="passwordSetupHelp" class="muted">Invited users must choose their own password before entering Safety Tracker.</p>
@@ -50,9 +55,43 @@
     </section>
   </main>
 
+
+  <div id="demoView" class="demo-shell" hidden>
+    <header class="demo-topbar">
+      <div class="demo-brand-block">
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.7.0</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-company">Example Hotel Ltd</div>
+      </div>
+      <div class="demo-mode-badge">DEMO MODE</div>
+      <div class="demo-top-actions">
+        <label class="demo-role-label">View as
+          <select id="demoRoleSelect" aria-label="Demo role">
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="user">User</option>
+            <option value="report">Report Viewer</option>
+          </select>
+        </label>
+        <button id="demoResetBtn" class="ghost small" type="button">Reset demo</button>
+        <button id="demoExitBtn" class="ghost small" type="button">Exit demo</button>
+      </div>
+    </header>
+    <div class="demo-warning"><strong>Demo only:</strong> all names, documents, departments, signatures and training records are fictional. Demo actions stay in this browser session and never write to Supabase.</div>
+    <nav id="demoNav" class="nav-tabs demo-nav"></nav>
+    <main class="page-shell demo-page-shell">
+      <div id="demoContent"></div>
+    </main>
+    <div id="demoModal" class="demo-modal-backdrop" hidden>
+      <section class="demo-modal-card" role="dialog" aria-modal="true" aria-labelledby="demoModalTitle">
+        <div class="modal-head"><h3 id="demoModalTitle">Demo</h3><button id="demoModalClose" class="icon-button" type="button" aria-label="Close">×</button></div>
+        <div id="demoModalBody"></div>
+      </section>
+    </div>
+  </div>
+
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.6.3</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.7.0</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -195,7 +234,7 @@
         <div class="section-card">
           <h3>Bulk Import</h3>
           <p class="muted">Analyse PDFs locally, including combined RA/COSHH/SSW/TBT packs. Safety Tracker splits each controlled reference into its own record, shows the detected page ranges, then publishes only new or changed content.</p>
-          <div class="hint-box"><strong>Rules:</strong> RA/COSHH/SSW → controlled Documents plus Training. SDS/MSDS → reference-only Documents. Toolbox Talks → instructor-led Training.</div>
+          <div class="hint-box"><strong>Rules:</strong> RA/COSHH/SSW → controlled Documents; training method, frequency, due period and audience are confirmed at approval and the schedule is created automatically. SDS/MSDS → reference-only Documents. Toolbox Talks → controlled instructor-led training after approval.</div>
           <div class="bulk-drop"><label>Section PDF files<input id="bulkImportFiles" type="file" accept="application/pdf,.pdf" multiple></label><p class="muted">Maximum 45 MB per PDF.</p></div>
           <div class="row"><button id="bulkAnalyzeBtn" class="secondary">Analyse PDFs</button><button id="bulkImportBtn" class="primary" disabled>Import selected</button><button id="bulkClearBtn" class="ghost">Clear</button></div>
           <div id="bulkImportStatus" class="message" hidden></div>
@@ -219,15 +258,16 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v263.js"></script>
-  <script src="bulk-import-v263.js"></script>
+  <script src="app-v270.js"></script>
+  <script src="bulk-import-v270.js"></script>
+  <script src="demo-v270.js"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v263.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v270.js and keep your existing config.js.';}
       }
     },3500);
   </script>
