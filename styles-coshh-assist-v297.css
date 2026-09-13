@@ -1,2 +1,41 @@
 .coshh-ref-suggestion,.coshh-source-reader,.coshh-analysis-panel,.coshh-related-panel{margin-top:10px;padding:12px;border:1px solid rgba(148,163,184,.35);border-radius:14px;background:rgba(15,23,42,.32)}
 .coshh-mini{padding:5px 9px;margin-left:8px;border-radius:9px;border:1px solid rgba(148,163,184,.45);background:transparent;color:inherit;font-weight:700}.coshh-small{font-size:.86rem;opacity:.8;margin-top:6px;line-height:1.35}.coshh-people-ticks{margin-top:8px}.coshh-tick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:8px}.coshh-tick-grid label,.coshh-related-item{display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid rgba(148,163,184,.28);border-radius:11px;background:rgba(255,255,255,.025)}.coshh-tick-grid input,.coshh-related-item input{width:22px;height:22px;flex:0 0 auto}.coshh-found ul{padding-left:20px}.coshh-found li{margin:5px 0;line-height:1.4}.coshh-review,.coshh-responsibility{margin-top:10px;padding:10px;border-radius:10px;background:rgba(245,158,11,.10)}.coshh-responsibility{background:rgba(59,130,246,.10)}.coshh-related-list{display:grid;gap:8px;margin:10px 0}.coshh-decision-grid{display:grid;gap:8px;margin-top:10px}.coshh-decision-grid>div{padding:10px;border-radius:10px;background:rgba(255,255,255,.035);line-height:1.4}@media(max-width:560px){.coshh-tick-grid{grid-template-columns:1fr}}
+
+.coshh-ref-fallback{margin:12px 0;padding:12px;border:1px solid rgba(148,163,184,.35);border-radius:14px;background:rgba(15,23,42,.32)}
+.coshh-ref-fallback .coshh-ref-label{display:block;font-weight:800;margin-bottom:8px}
+.coshh-ref-fallback input{width:100%}
+[data-coshh-suggested="1"]{outline:2px solid rgba(34,197,94,.35);outline-offset:1px}
+
+/* v2.10.4 template-driven creator */
+.template-driven-creator{margin:0 0 18px;padding:14px;border:1px solid rgba(148,163,184,.35);border-radius:16px;background:rgba(15,23,42,.24)}
+.template-assist-head h4{margin:0 0 6px;font-size:1.05rem}
+.template-assist-head p,.template-help{color:#9ca3af;font-size:.9rem}
+.template-responsibility{margin:10px 0;padding:10px 12px;border-left:4px solid #f59e0b;background:rgba(245,158,11,.08);border-radius:8px}
+.template-mode{display:grid;gap:8px;margin:12px 0}
+.template-mode label{display:flex;gap:8px;align-items:center;padding:9px 10px;border:1px solid rgba(148,163,184,.28);border-radius:10px}
+.template-grid,.template-questionnaire{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.template-grid label,.template-questionnaire label{display:flex;flex-direction:column;gap:6px;font-weight:700}
+.template-grid .full,.template-questionnaire .full{grid-column:1/-1}
+.template-driven-creator input[type=text],.template-driven-creator textarea,.template-driven-creator select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.42);background:rgba(255,255,255,.06);color:inherit}
+.template-driven-creator textarea{min-height:105px;resize:vertical}
+.template-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-weight:400}
+.template-checks label{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border:1px solid rgba(148,163,184,.25);border-radius:9px}
+.template-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.template-doc-preview{margin-top:14px;padding:14px;background:#fff;color:#1f2937;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.template-doc-head{display:flex;justify-content:space-between;gap:12px;padding:10px;background:#d9eaf7;border:1px solid #8c8c8c}
+.template-doc-row{display:grid;grid-template-columns:32% 1fr;border-left:1px solid #8c8c8c;border-right:1px solid #8c8c8c;border-bottom:1px solid #8c8c8c}
+.template-doc-row>*{padding:8px}
+.template-doc-row b{background:#d9eaf7}
+.template-doc-key{padding:12px;border:1px solid #8c8c8c;border-top:0;background:#f8fafc}
+.template-doc-block{padding:10px;border:1px solid #8c8c8c;border-top:0}
+.template-doc-block p{white-space:pre-wrap;margin:6px 0 0}
+.template-doc-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.template-doc-table th,.template-doc-table td{border:1px solid #8c8c8c;padding:7px;vertical-align:top}
+.template-doc-table th{background:#d9eaf7}
+.template-signoff{margin-top:12px;padding:10px;border:1px solid #8c8c8c;background:#f8fafc}
+@media(max-width:700px){
+ .template-grid,.template-questionnaire{grid-template-columns:1fr}
+ .template-grid .full,.template-questionnaire .full{grid-column:auto}
+ .template-checks{grid-template-columns:1fr}
+ .template-doc-table{display:block;overflow:auto}
+}
