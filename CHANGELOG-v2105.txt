@@ -1,0 +1,7 @@
+v2.10.5
+- Proper integrated creator rebuild from current repository source.
+- Separate template-driven RA/COSHH/SSW/TBT questionnaires and generated document layouts.
+- Existing same-type topic/template matching.
+- Editable references, people-exposed ticks, COSHH SDS suggestions.
+- Removed loading of legacy COSHH assist overlay.
+- Cache-busting app/styles/SW names and consistent visible version.
