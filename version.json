@@ -1,1 +1,6 @@
-{"version":"2.9.15","build":"v2915-training-excel-evidence-selectall-20260913","label":"CLEAN","date":"2026-09-13"}
+{
+  "version": "2.10.0",
+  "build": "v2100-document-creator-20260913",
+  "label": "CLEAN",
+  "date": "2026-09-13"
+}

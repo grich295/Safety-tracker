@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow" />
   <title>Safety Tracker</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles-v2915.css" />
+  <link rel="stylesheet" href="styles-v2100.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
@@ -25,7 +25,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.9.15 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.0 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -54,7 +54,7 @@
   <main id="contractorView" class="auth-shell" hidden>
     <section class="auth-card contractor-portal-card">
       <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Site sign-in, fire/life-safety, asbestos and Permit to Work screening.</p></div><button id="contractorBackBtn" class="ghost" type="button">Back to staff login</button></div>
-      <div class="build-badge">Safety Tracker v2.9.15 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.0 CLEAN</div>
       <div id="contractorPortalContent"></div>
     </section>
   </main>
@@ -62,7 +62,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.9.11</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.0</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -94,13 +94,14 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.9.11</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.0</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
     <nav id="mainNav" class="nav-tabs">
       <button data-view="mySafety" class="active">My Safety</button>
       <button data-view="documents">Documents</button>
+      <button data-view="creator" class="manager-only" hidden>Create Safety Doc</button>
       <button data-view="training" class="manager-catalogue" hidden>Training</button>
       <button data-view="awareness">Safety Awareness</button>
       <button data-view="ppe">PPE Checks</button>
@@ -140,6 +141,17 @@
           <div class="row-between"><div><h3 id="documentIndexTitle">Document index</h3><p id="documentIndexDescription" class="muted"></p></div><button id="documentIndexBackBtn" class="secondary" type="button">All indexes</button></div>
         </div>
         <div id="documentsList" class="card-list"></div>
+      </section>
+
+      <section id="creatorView" class="view">
+        <div class="page-heading"><div><h2>Create Safety Document</h2><p class="muted">Build a COSHH Risk Assessment, Safe System of Work or Toolbox Talk from existing controlled source documents and a guided questionnaire.</p></div></div>
+        <div class="creator-grid">
+          <button class="creator-tile" type="button" data-creator-start="COSHH"><strong>COSHH Risk Assessment</strong><span>Select an SDS/MSDS, read the source sheet, answer site-use questions and create a controlled draft.</span></button>
+          <button class="creator-tile" type="button" data-creator-start="SSW"><strong>Safe System of Work</strong><span>Build a safe sequence from the relevant RA/COSHH controls and task details.</span></button>
+          <button class="creator-tile" type="button" data-creator-start="TOOLBOX_TALK"><strong>Toolbox Talk</strong><span>Create an instructor-led briefing from the approved RA/COSHH/SSW documents.</span></button>
+        </div>
+        <div class="section-card"><h3>Recommendation rules</h3><p class="muted">Safety Tracker will advise whether an SSW and/or Toolbox Talk is needed. The recommendation does not block you: a Manager/Admin can choose <strong>Create anyway</strong> and the override is saved in the draft audit record.</p><div id="creatorRuleSummary" class="creator-rule-summary"></div></div>
+        <div class="section-card"><div class="row-between"><div><h3>Saved drafts</h3><p class="muted">Drafts are stored in Safety Tracker so they can be continued from another device.</p></div><button class="secondary" type="button" data-creator-refresh>Refresh drafts</button></div><div id="creatorDraftList" class="card-list"></div></div>
       </section>
 
       <section id="trainingView" class="view">
@@ -312,16 +324,16 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v2915.js"></script>
-  <script src="bulk-import-v2915.js"></script>
-  <script src="demo-v2915.js"></script>
+  <script src="app-v2100.js"></script>
+  <script src="bulk-import-v2100.js"></script>
+  <script src="demo-v2100.js"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v2915.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v2100.js and keep your existing config.js.';}
       }
     },3500);
   </script>
