@@ -1,4 +1,4 @@
-Safety Tracker v2.10.8 CLEAN
+Safety Tracker v2.10.9 CLEAN
 
 Rebuilt from v2.10.7 CLEAN.
 
@@ -12,8 +12,16 @@ COSHH creator fixes:
 - Existing v2.10.7 contractor headcount, PTW, document control, training, demo, offline and reporting changes retained.
 
 Upload these 3 files to the root of Safety-tracker GitHub:
-1. index.html (rename index-v2108.html to index.html)
-2. app-v2108.js
-3. styles-v2108.css
+1. index.html (rename index.html)
+2. app-v2109.js
+3. styles-v2109.css
 
 No SQL migration is required for this rebuild.
+
+
+v2.10.9 changes:
+- Added Who Has Key shortcut on My Safety beside the live Who's On Site shortcut.
+- Shortcut shows current outstanding key/card count.
+- Opens a live key register showing holder, company, key/card reference, authorised area and issue time.
+- Key/card can be returned directly from the register.
+- Uses existing contractor access/key records; no Supabase SQL required.
