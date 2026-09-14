@@ -1,27 +1,14 @@
-Safety Tracker v2.10.9 CLEAN
+Safety Tracker v2.10.11 CLEAN
+Build ID: v21011-document-control-20260914
 
-Rebuilt from v2.10.7 CLEAN.
+Changes in this build:
+- Approved documents can now be edited for controlled metadata: title/reference, training method, refresher frequency, current review date and training audience. PDF content changes still use Create New Version.
+- Document Manager/Register now exposes direct Links and Edit controls. Document links remain pairwise/direct; one link does not create links between the related documents.
+- Document Creation ON/OFF control for Manager/Admin. OFF blocks new document creation but keeps existing documents, approvals, Register, links and Training working.
+- Safety document creator PDF header uses a neutral YOUR COMPANY LOGO HERE placeholder; no Shield logo/branding is added.
+- General Maintenance H&S disclaimer added, plus contractor sign-in, creator and asbestos contextual notices.
+- Contractor digital signatures remain in place. Document approvals continue to use tick confirmation rather than a drawn signature.
+- Pending approval queue remains at the top of Documents.
 
-COSHH creator fixes:
-- Restored a full PPE/RPE section: hand, eye/face, respiratory, body/skin and other PPE notes.
-- Added product/substance, routes of exposure/health effects, first aid, spill response, storage, fire precautions, environmental/disposal and further-control fields.
-- Added initial and post-control risk scoring.
-- Read Selected Source Sheets now reads SDS sections and pre-populates COSHH fields wherever readable.
-- SDS product name, physical form, H-statements/classification, PPE, first aid, spill, storage, fire/environmental information, ventilation/handling and exposure wording are suggested automatically.
-- Generated COSHH PDF now includes all restored sections.
-- Existing v2.10.7 contractor headcount, PTW, document control, training, demo, offline and reporting changes retained.
-
-Upload these 3 files to the root of Safety-tracker GitHub:
-1. index.html (rename index.html)
-2. app-v2109.js
-3. styles-v2109.css
-
-No SQL migration is required for this rebuild.
-
-
-v2.10.9 changes:
-- Added Who Has Key shortcut on My Safety beside the live Who's On Site shortcut.
-- Shortcut shows current outstanding key/card count.
-- Opens a live key register showing holder, company, key/card reference, authorised area and issue time.
-- Key/card can be returned directly from the register.
-- Uses existing contractor access/key records; no Supabase SQL required.
+Database:
+- No new SQL migration is included. The Document Creation toggle uses the existing safety_tracker_settings table.
