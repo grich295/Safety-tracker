@@ -25,7 +25,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.10.20 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.23 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -33,6 +33,16 @@
         <button id="loginSubmitBtn" class="primary" type="submit">Sign in</button>
       </form>
       <button id="forgotPasswordBtn" class="link-button" type="button">Forgot password?</button>
+      <div class="demo-entry">
+        <div class="demo-entry-divider"><span>viewer</span></div>
+        <button id="viewerAccessBtn" class="demo-launch-button" type="button">Viewer Access</button>
+        <div id="viewerLoginArea" class="stack" hidden>
+          <label>Viewer username<input id="viewerUsername" autocomplete="username" maxlength="40"></label>
+          <label>Viewer password<input id="viewerPassword" type="password" autocomplete="current-password"></label>
+          <button id="viewerLoginBtn" class="primary" type="button">Open Viewer Mode</button>
+          <p class="muted">Temporary view-only access. No email account is required and Viewer actions never change live Safety Tracker records.</p>
+        </div>
+      </div>
       <div class="compliance-disclaimer"><strong>Health &amp; Safety notice:</strong> Safety Tracker supports maintenance H&amp;S management and record keeping. It does not by itself certify legal compliance, competence, suitability of controls, or that work is safe to proceed. Users remain responsible for following current legislation, company procedures, manufacturer instructions and site-specific controls.</div>
       <div class="security-login-note"><strong>Keep your password private.</strong> Never share your Safety Tracker password. If you think someone else may know it, use <strong>Forgot password?</strong> above to reset it immediately.</div>
       <div class="demo-entry">
@@ -54,7 +64,7 @@
   <main id="contractorView" class="auth-shell" hidden>
     <section class="auth-card contractor-portal-card">
       <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Site sign-in, fire/life-safety, asbestos and Permit to Work screening.</p></div><button id="contractorBackBtn" class="ghost" type="button">Return to Who's On Site</button></div>
-      <div class="build-badge">Safety Tracker v2.10.20 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.23 CLEAN</div>
       <div class="compliance-disclaimer contractor-disclaimer"><strong>Compliance notice:</strong> Signing in records attendance, induction, access/key and permit information. It does not by itself confirm that a contractor, company, work activity or documentation is legally compliant, competent, authorised or safe to proceed. Required RAMS, permits, qualifications, insurance, supervision and controls must still be verified before work starts.</div>
       <div id="contractorPortalContent"></div>
     </section>
@@ -63,7 +73,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.22</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.23</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -95,7 +105,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.22</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.23</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -106,8 +116,7 @@
       <button data-view="documents">Documents</button>
       <button data-view="creator" class="manager-only" hidden>Create Safety Doc</button>
       <button data-view="awareness">Safety Awareness</button>
-      <button data-view="ppe">PPE Checks</button>
-      <button data-view="firstAid">First Aid Checks</button>
+      <button data-view="checklists">Checklists</button>
       <button data-view="onsite">Who's On Site</button>
       <button data-view="asbestos" id="asbestosNavBtn" hidden>Asbestos Lookup</button>
       <button data-view="people" class="manager-only" hidden>People</button>
@@ -121,7 +130,7 @@
 
     <main class="page-shell">
       <section id="mySafetyView" class="view active-view">
-        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.22 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
+        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.23 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
         <div class="my-safety-live-shortcuts"><div id="mySafetyOnSiteShortcut" class="my-safety-onsite-wrap"></div><div id="mySafetyKeyShortcut" class="my-safety-onsite-wrap"></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div class="section-card"><div class="row-between"><div><h3>H&amp;S training overview</h3><p class="muted">Select a traffic-light tile to open that section in H&amp;S Training.</p></div><button class="secondary" type="button" data-open-hs-training="ALL">Open H&amp;S Training</button></div><div id="mySafetyCategoryTiles" class="my-safety-category-grid"></div></div>
@@ -169,6 +178,11 @@
         <div id="trainingStats" class="stats-grid"></div>
         <div class="filters"><input id="trainingSearch" placeholder="Search standalone training or reference"><select id="trainingTypeFilter"><option value="">All types</option></select><select id="trainingStatusFilter"><option value="ACTIVE">Active</option><option value="ARCHIVED">Archived</option><option value="">All statuses</option></select></div>
         <div id="trainingList" class="card-list"></div>
+      </section>
+
+      <section id="checklistsView" class="view">
+        <div class="page-heading"><div><h2>Checklists</h2><p class="muted">Recurring safety checks in one place.</p></div></div>
+        <div id="checklistTiles" class="dashboard-tiles"></div>
       </section>
 
       <section id="awarenessView" class="view">
@@ -280,6 +294,11 @@
           <div class="row-between"><div><h3>Document Creation</h3><p class="muted">Show or hide the Create Safety Doc area. Turning this OFF blocks new generated/uploaded RA, COSHH RA, SSW and Toolbox Talk documents but leaves existing documents, approvals, links and training available.</p></div><button id="adminDocumentCreationToggleBtn" class="secondary" type="button" data-toggle-document-creation>Document Creation</button></div>
           <div id="adminDocumentCreationStateNote" class="message" style="margin-top:12px"></div>
         </div>
+        <div class="section-card" id="viewerAccessAdminCard">
+          <div class="row-between"><div><h3>Guest / Viewer Access</h3><p class="muted">Create temporary username/password access without email. Viewers use a privacy-safe interactive copy of the app: they can explore workflows such as PTW, but nothing is saved and reports cannot be generated/downloaded.</p></div><button class="primary" type="button" data-new-viewer>Create Viewer</button></div>
+          <div class="hint-box"><strong>Privacy:</strong> Viewer Mode uses fictional/masked people and records. Real employee names, emails, signatures and live operational records are not exposed.</div>
+          <div id="viewerAccessList" class="card-list" style="margin-top:12px"><div class="muted">Open Admin to load viewer accounts.</div></div>
+        </div>
         <div class="section-card">
           <div class="row-between"><div><h3>Departments</h3><p class="muted">Create and manage your own departments. Users can then be assigned to a department in People, and approved documents can target departments automatically.</p></div><button class="primary" type="button" data-new-department>New department</button></div>
           <div id="departmentList" class="card-list" style="margin-top:12px"></div>
@@ -346,7 +365,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v21022.js?v=21020-authfix"></script>
+  <script src="app-v21023.js?v=21023"></script>
   <script src="bulk-import-v2100.js"></script>
   <script src="demo-v2100.js"></script>
   <script>
