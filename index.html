@@ -63,7 +63,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.18</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.21</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -95,7 +95,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.18</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.21</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -120,7 +120,7 @@
 
     <main class="page-shell">
       <section id="mySafetyView" class="view active-view">
-        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.19 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
+        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.21 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
         <div class="my-safety-live-shortcuts"><div id="mySafetyOnSiteShortcut" class="my-safety-onsite-wrap"></div><div id="mySafetyKeyShortcut" class="my-safety-onsite-wrap"></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div class="section-card"><div class="row-between"><div><h3>H&amp;S training overview</h3><p class="muted">Select a traffic-light tile to open that section in H&amp;S Training.</p></div><button class="secondary" type="button" data-open-hs-training="ALL">Open H&amp;S Training</button></div><div id="mySafetyCategoryTiles" class="my-safety-category-grid"></div></div>
@@ -338,7 +338,7 @@
 
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
-  <script src="app-v21020.js?v=21020-authfix"></script>
+  <script src="app-v21021.js?v=21020-authfix"></script>
   <script src="bulk-import-v2100.js"></script>
   <script src="demo-v2100.js"></script>
   <script>
@@ -347,7 +347,7 @@
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v21020.js and keep your existing config.js.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, upload app-v21021.js and keep your existing config.js.';}
       }
     },3500);
   </script>
