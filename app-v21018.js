@@ -901,7 +901,7 @@ async function init(){
         const url=r.active?.scriptURL||r.waiting?.scriptURL||r.installing?.scriptURL||'';
         if(url&&url.includes('/Safety-tracker/')&&!url.endsWith('/sw-v2105.js'))await r.unregister();
       }
-      const r=await navigator.serviceWorker.register('./sw-v21015.js',{updateViaCache:'none'});
+      const r=await navigator.serviceWorker.register('./sw-v21018.js',{updateViaCache:'none'});
       await r.update().catch(()=>{});
     }catch(e){console.warn('Offline service worker',e)}
   });
