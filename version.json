@@ -1,6 +1,6 @@
 {
   "version": "2.10.28",
-  "build_id": "v21028-training-frequency-hotfix-20260916",
+  "build_id": "v21028-clean-training-settings-20260916",
   "clean": true,
-  "notes": "Fixes previousMonthValue report crash and makes controlled-document training method/frequency/audience editable and persistent from Training settings. Based on v2.10.27."
+  "notes": "Full v2.10.28 CLEAN build based on v2.10.27. Fixes previousMonthValue report crash; exposes Training settings on approved RA/COSHH RA/SSW cards; saves training method, One-off/3/6/12/24-month/custom frequency and audience together; syncs renewal settings to linked auto-managed training and active assignments. No SQL migration required."
 }
