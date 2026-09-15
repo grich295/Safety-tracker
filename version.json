@@ -1,1 +1,6 @@
-{"version":"2.10.27","label":"2.10.27 CLEAN","build":"21027"}
+{
+  "version": "2.10.28",
+  "build_id": "v21028-training-frequency-hotfix-20260916",
+  "clean": true,
+  "notes": "Fixes previousMonthValue report crash and makes controlled-document training method/frequency/audience editable and persistent from Training settings. Based on v2.10.27."
+}

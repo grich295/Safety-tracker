@@ -1,0 +1,24 @@
+Safety Tracker v2.10.28 — replace the build/script block at the bottom of index.html
+
+Replace the existing block that starts with:
+  window.SAFETY_BUILD={version:'2.10.27'...
+through the script tags for app-v21027.js / bulk-import-v21027.js / demo-v2100.js
+with this:
+
+<script>
+  window.SAFETY_BUILD={version:'2.10.28',label:'2.10.28 CLEAN',build:'21028'};
+  window.applySafetyBuildLabel=function(){
+    document.querySelectorAll('.version').forEach(function(el){el.textContent='v'+window.SAFETY_BUILD.version});
+    document.querySelectorAll('.build-badge').forEach(function(el){el.textContent='Safety Tracker v'+window.SAFETY_BUILD.label});
+    document.querySelectorAll('.dashboard-version').forEach(function(el){el.textContent='v'+window.SAFETY_BUILD.label});
+  };
+  document.addEventListener('DOMContentLoaded',window.applySafetyBuildLabel);
+</script>
+<script src="app-v21027.js?v=21028"></script>
+<script src="safety-v21028-hotfix.js?v=21028"></script>
+<script src="bulk-import-v21027.js?v=21028"></script>
+<script src="demo-v2100.js?v=21028"></script>
+
+Keep the existing 3.5-second SafetyTrackerV2 load-check script immediately after these tags.
+
+Optional but recommended: change any hard-coded visible "2.10.27" text elsewhere in index.html to "2.10.28". applySafetyBuildLabel() will update the main version elements at runtime anyway.
