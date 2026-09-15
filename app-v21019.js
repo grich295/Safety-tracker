@@ -1,7 +1,7 @@
 /* Safety Tracker v2.10.19 CLEAN - training evidence accuracy and outstanding fixes. */
 'use strict';
 
-const APP_VERSION='2.10.18';
+const APP_VERSION='2.10.19';
 const BUILD_ID='v21019-training-evidence-fix-20260914';
 const SAFETY_APP_URL='https://grich295.github.io/Safety-tracker/';
 const CFG=window.SAFETY_TRACKER_CONFIG||{};

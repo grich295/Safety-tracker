@@ -1,5 +1,5 @@
-const SHELL_CACHE='safety-shell-v21019';
-const RUNTIME_CACHE='safety-runtime-v21019';
+const SHELL_CACHE='safety-shell-v21019-loginfix';
+const RUNTIME_CACHE='safety-runtime-v21019-loginfix';
 const SHELL=['./','./index.html','./styles-v21019.css','./app-v21019.js','./bulk-import-v2100.js','./demo-v2100.js','./config.js','./manifest.webmanifest'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
