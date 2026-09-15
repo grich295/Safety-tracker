@@ -210,13 +210,11 @@
 .dashboard-version{display:inline-block;font-size:.62em;font-weight:700;vertical-align:middle;margin-left:.45rem;padding:.2rem .45rem;border:1px solid rgba(96,165,250,.45);border-radius:999px;color:#93c5fd;background:rgba(30,64,175,.15)}
 .creator-form select{min-height:48px}.creator-form .muted{font-weight:400}.coshh-template-note{border-left:4px solid #3b82f6}
 
-
 /* v2.10.8 restored full COSHH RA creator */
 .coshh-subsection{border:1px solid var(--border);border-radius:14px;padding:14px;background:rgba(23,50,77,.035)}
 .coshh-subsection h4{margin:0 0 10px;color:var(--ink)}
 .creator-form .coshh-template-note{margin-bottom:4px}
 @media(max-width:760px){.coshh-subsection{padding:11px}}
-
 
 /* v2.10.9 My Safety live contractor + key shortcuts */
 .my-safety-live-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:-2px 0 18px}
@@ -235,7 +233,6 @@
 .key-register-summary span{color:#5f6d7a}
 @media(max-width:760px){.my-safety-live-shortcuts{grid-template-columns:1fr}.my-safety-live-shortcuts .my-safety-onsite-button{min-height:0}}
 
-
 /* v2.10.11 document control, disclaimers and editable approved controls */
 .compliance-disclaimer{margin:12px 0;padding:12px 14px;border:1px solid #c7d5e3;border-radius:10px;background:#f5f8fb;color:#24384a;font-size:.92rem;line-height:1.45}
 .contractor-disclaimer{margin-bottom:16px}
@@ -245,67 +242,17 @@
 .register-row .row{margin-top:6px}
 @media (prefers-color-scheme:dark){.compliance-disclaimer{background:#152536;border-color:#31465a;color:#d7e2ec}.app-compliance-footer{color:#9fb0c0}}
 
-
 /* v2.10.12 clickable My Safety training summary */
-.my-safety-stat-button{
-  appearance:none;
-  -webkit-appearance:none;
-  width:100%;
-  text-align:left;
-  font:inherit;
-  color:inherit;
-  cursor:pointer;
-  border:1px solid var(--border,#d8e0e7);
-}
-.my-safety-stat-button:hover,
-.my-safety-stat-button:focus-visible{
-  transform:translateY(-1px);
-  box-shadow:0 7px 18px rgba(20,42,64,.12);
-}
-.my-safety-stat-button.active{
-  outline:3px solid rgba(31,73,110,.18);
-  outline-offset:2px;
-}
-.my-safety-drilldown{
-  margin-bottom:12px;
-}
-.my-safety-category-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
-  gap:10px;
-  margin-top:12px;
-}
-.my-safety-category-button{
-  appearance:none;
-  -webkit-appearance:none;
-  border:1px solid var(--border,#d8e0e7);
-  border-radius:12px;
-  background:#fff;
-  color:var(--ink,#17324d);
-  padding:12px;
-  text-align:left;
-  cursor:pointer;
-  min-height:66px;
-}
-.my-safety-category-button strong,
-.my-safety-category-button span{
-  display:block;
-}
-.my-safety-category-button span{
-  margin-top:4px;
-  font-size:.82rem;
-  color:var(--muted,#687786);
-}
-.my-safety-category-button.active{
-  border-color:#244b6f;
-  box-shadow:0 0 0 2px rgba(36,75,111,.13);
-}
-@media(max-width:640px){
-  .my-safety-category-grid{grid-template-columns:1fr 1fr}
-  .my-safety-drilldown-head{align-items:flex-start;flex-direction:column}
-  .my-safety-drilldown-head button{width:100%}
-}
-
+.my-safety-stat-button{appearance:none;-webkit-appearance:none;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;border:1px solid var(--border,#d8e0e7)}
+.my-safety-stat-button:hover,.my-safety-stat-button:focus-visible{transform:translateY(-1px);box-shadow:0 7px 18px rgba(20,42,64,.12)}
+.my-safety-stat-button.active{outline:3px solid rgba(31,73,110,.18);outline-offset:2px}
+.my-safety-drilldown{margin-bottom:12px}
+.my-safety-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-top:12px}
+.my-safety-category-button{appearance:none;-webkit-appearance:none;border:1px solid var(--border,#d8e0e7);border-radius:12px;background:#fff;color:var(--ink,#17324d);padding:12px;text-align:left;cursor:pointer;min-height:66px}
+.my-safety-category-button strong,.my-safety-category-button span{display:block}
+.my-safety-category-button span{margin-top:4px;font-size:.82rem;color:var(--muted,#687786)}
+.my-safety-category-button.active{border-color:#244b6f;box-shadow:0 0 0 2px rgba(36,75,111,.13)}
+@media(max-width:640px){.my-safety-category-grid{grid-template-columns:1fr 1fr}.my-safety-drilldown-head{align-items:flex-start;flex-direction:column}.my-safety-drilldown-head button{width:100%}}
 
 /* v2.10.13 Chemical / COSHH Linking */
 .document-control-quick-actions{display:flex;gap:8px;margin-left:auto}
@@ -320,7 +267,6 @@
 .chemical-linked-reference.missing-link{border-color:#c28513;background:#fff8e9}
 .chemical-linked-reference:hover,.chemical-linked-reference:focus-visible{transform:translateY(-1px);box-shadow:0 6px 14px rgba(20,42,64,.10)}
 @media(max-width:700px){.document-control-quick-actions{width:100%;margin:10px 0 0}.document-control-link-button{width:100%}.chemical-link-summary{grid-template-columns:1fr}}
-
 
 /* v2.10.15 evidence/reporting UI cleanup */
 .evidence-grouped-list{display:grid;gap:.75rem}
@@ -361,17 +307,20 @@
 .evidence-compact-section{padding:12px}
 .evidence-training-details>summary{cursor:pointer;padding:4px 2px 10px}
 .evidence-training-actions{justify-content:flex-end;margin-bottom:8px}
-@media(max-width:700px){
- .evidence-picker-toolbar{align-items:stretch}
- .evidence-selected-summary{width:100%}
- .evidence-mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);width:100%}
- .evidence-mode-buttons button{padding:9px 6px}
- .evidence-group-title{padding:.68rem}
- .evidence-picker-list .check-row{align-items:flex-start}
- .training-doc-required,.training-doc-opened{width:100%}
-}
+@media(max-width:700px){.evidence-picker-toolbar{align-items:stretch}.evidence-selected-summary{width:100%}.evidence-mode-buttons{display:grid;grid-template-columns:repeat(3,1fr);width:100%}.evidence-mode-buttons button{padding:9px 6px}.evidence-group-title{padding:.68rem}.evidence-picker-list .check-row{align-items:flex-start}.training-doc-required,.training-doc-opened{width:100%}}
 
 /* v2.10.18 training evidence accuracy */
 .training-doc-required{background:#b91c1c!important;color:#fff!important;border-color:#ef4444!important}.training-doc-opened{background:#047857!important;color:#fff!important;border-color:#22c55e!important}
-\n/* v2.10.19 My Safety overview + H&S Training */
+
+/* v2.10.19 My Safety overview + H&S Training */
 .my-safety-category-button.traffic-green{border-left:6px solid #16a34a}.my-safety-category-button.traffic-amber{border-left:6px solid #d97706}.my-safety-category-button.traffic-red{border-left:6px solid #dc2626}.my-safety-category-button.traffic-neutral{border-left:6px solid #94a3b8}.my-safety-category-button .traffic-dot{display:inline-block;margin-right:7px}.hs-training-grid{margin-bottom:16px}.hs-training-grid .my-safety-category-button.active{outline:3px solid rgba(15,23,42,.18);transform:translateY(-1px)}
+
+/* v2.10.28 checklist hub card layout hotfix */
+.dashboard-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch;width:100%}
+.dashboard-tile{appearance:none;-webkit-appearance:none;width:100%;min-width:0;min-height:118px;border:2px solid var(--border);border-left-width:8px;border-radius:16px;padding:18px;display:grid;grid-template-columns:14px minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;row-gap:6px;align-content:center;align-items:start;text-align:left;font:inherit;box-shadow:0 3px 10px rgba(18,42,66,.06);overflow:hidden}
+.dashboard-tile .traffic-dot{display:block!important;grid-column:1;grid-row:1 / span 2;width:12px;height:12px;margin-top:4px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px rgba(255,255,255,.5)}
+.dashboard-tile strong{display:block;grid-column:2;grid-row:1;font-size:1.12rem;line-height:1.25;color:inherit;overflow-wrap:anywhere}
+.dashboard-tile>span:not(.traffic-dot){display:block;grid-column:2;grid-row:2;font-size:.92rem;line-height:1.35;color:inherit;opacity:.82;overflow-wrap:anywhere}
+.dashboard-tile:hover,.dashboard-tile:focus-visible{transform:translateY(-1px);box-shadow:0 7px 18px rgba(18,42,66,.12)}
+.dashboard-tile:focus-visible{outline:3px solid rgba(31,73,110,.22);outline-offset:2px}
+@media(max-width:760px){.dashboard-tiles{grid-template-columns:1fr;gap:12px}.dashboard-tile{min-height:104px;padding:16px;border-radius:15px}.dashboard-tile strong{font-size:1.08rem}.dashboard-tile>span:not(.traffic-dot){font-size:.9rem}}

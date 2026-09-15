@@ -1,14 +1,18 @@
-Safety Tracker v2.10.11 CLEAN
-Build ID: v21011-document-control-20260914
+Safety Tracker v2.10.27 - Checklist layout hotfix
+15 September 2026
 
-Changes in this build:
-- Approved documents can now be edited for controlled metadata: title/reference, training method, refresher frequency, current review date and training audience. PDF content changes still use Create New Version.
-- Document Manager/Register now exposes direct Links and Edit controls. Document links remain pairwise/direct; one link does not create links between the related documents.
-- Document Creation ON/OFF control for Manager/Admin. OFF blocks new document creation but keeps existing documents, approvals, Register, links and Training working.
-- Safety document creator PDF header uses a neutral YOUR COMPANY LOGO HERE placeholder; no Shield logo/branding is added.
-- General Maintenance H&S disclaimer added, plus contractor sign-in, creator and asbestos contextual notices.
-- Contractor digital signatures remain in place. Document approvals continue to use tick confirmation rather than a drawn signature.
-- Pending approval queue remains at the top of Documents.
+ROOT CAUSE
+The current app creates checklist buttons with the classes dashboard-tiles and dashboard-tile, but the deployed styles-v21019.css does not contain definitions for those classes. The browser therefore renders the two checklist buttons as near-default inline-looking controls, causing labels/counts to run together on mobile.
 
-Database:
-- No new SQL migration is included. The Document Creation toggle uses the existing safety_tracker_settings table.
+THIS HOTFIX
+Replace the existing styles-v21019.css in the Safety-tracker repository with the file in this ZIP.
+
+The fix:
+- gives PPE Checks and First Aid Checks proper card styling;
+- keeps the title and count/status on separate lines;
+- stacks cards full width on screens up to 760px;
+- keeps two columns on wider screens;
+- adds proper padding, touch area, focus state and traffic-light dot layout.
+
+No SQL/database migration is required.
+This is intentionally a CSS-only hotfix over v2.10.27 so it does not alter current Safety Tracker logic or data.
