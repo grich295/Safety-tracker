@@ -1,6 +1,6 @@
-const SHELL_CACHE='safety-shell-v21028-training-settings';
-const RUNTIME_CACHE='safety-runtime-v21028-training-settings';
-const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest'];
+const SHELL_CACHE='safety-shell-v21030-ptw-quick-entry';
+const RUNTIME_CACHE='safety-runtime-v21030-ptw-quick-entry';
+const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21029-core.js','./hotfix-v21029-ui.js','./hotfix-v21029-exception.js','./hotfix-v21030-ptw.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',

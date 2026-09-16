@@ -1,6 +1,6 @@
 {
-  "version": "2.10.28",
-  "build_id": "v21028-clean-training-settings-20260916",
+  "version": "2.10.30",
+  "build_id": "v21030-ptw-quick-entry-20260916",
   "clean": true,
-  "notes": "Full v2.10.28 CLEAN build based on v2.10.27. Fixes previousMonthValue report crash; exposes Training settings on approved RA/COSHH RA/SSW cards; saves training method, One-off/3/6/12/24-month/custom frequency and audience together; syncs renewal settings to linked auto-managed training and active assignments. No SQL migration required."
+  "notes": "Adds mobile PTW quick entry on top of the v2.10.28 live baseline plus v2.10.29 hotfixes. PTW pre-start controls default to N/A, use one-tap N/A/Yes/No buttons, include Set all to N/A, require a final reviewed-controls confirmation, highlight No in red, and retain the existing block on unresolved No controls. No SQL migration required."
 }
