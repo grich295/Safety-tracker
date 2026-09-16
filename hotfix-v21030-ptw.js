@@ -174,11 +174,27 @@
     }
   },true);
 
+  let enhanceQueued=false;
+  function queueEnhance(){
+    if(enhanceQueued) return;
+    enhanceQueued=true;
+    requestAnimationFrame(()=>{
+      enhanceQueued=false;
+      enhance();
+    });
+  }
+
   installStyles();
-  enhance();
-  const observer=new MutationObserver(()=>enhance());
-  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+  queueEnhance();
+  // Watch only for contractor-form DOM being added/replaced. Watching every hidden
+  // attribute created a burst of MutationObserver callbacks when a PTW trigger was
+  // checked on some Android/Samsung devices and could make the portal appear frozen.
+  const observer=new MutationObserver(mutations=>{
+    if(mutations.some(m=>m.type==='childList')) queueEnhance();
+  });
+  const portal=document.getElementById('contractorPortalContent');
+  observer.observe(portal||document.body,{childList:true,subtree:true});
   document.addEventListener('change',e=>{
-    if(e.target?.classList?.contains('cp-high-risk')||e.target?.id==='cpHotWorkRequired'||e.target?.id==='cpNoHighRisk') setTimeout(enhance,0);
+    if(e.target?.classList?.contains('cp-high-risk')||e.target?.id==='cpHotWorkRequired'||e.target?.id==='cpNoHighRisk') queueEnhance();
   });
 })();

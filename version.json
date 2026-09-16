@@ -1,6 +1,6 @@
 {
-  "version": "2.10.30",
-  "build_id": "v21030-ptw-quick-entry-20260916",
+  "version": "2.10.31",
+  "build_id": "v21031-ptw-stability-20260916",
   "clean": true,
-  "notes": "Adds mobile PTW quick entry on top of the v2.10.28 live baseline plus v2.10.29 hotfixes. PTW pre-start controls default to N/A, use one-tap N/A/Yes/No buttons, include Set all to N/A, require a final reviewed-controls confirmation, highlight No in red, and retain the existing block on unresolved No controls. No SQL migration required."
+  "notes": "PTW stability fix. Removes the MutationObserver hidden-attribute storm when PTW triggers are checked, opens the PTW form from already-loaded app data instead of waiting on public_config, performs asbestos/location preview from current loaded register data, and opens post-submit PTW review by loading only the selected permit instead of reloading the entire Safety Tracker. No SQL migration required."
 }

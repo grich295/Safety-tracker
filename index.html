@@ -25,7 +25,7 @@
       <div class="brand-mark">ST</div>
       <h1>Safety Tracker</h1>
       <p class="muted">Controlled documents, training and sign-off tracking.</p>
-      <div class="build-badge">Safety Tracker v2.10.29 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.31 CLEAN</div>
       <div id="loginBootStatus" class="muted" style="margin-bottom:10px">Loading secure sign-in…</div>
       <form id="loginForm" class="stack">
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required></label>
@@ -64,7 +64,7 @@
   <main id="contractorView" class="auth-shell" hidden>
     <section class="auth-card contractor-portal-card">
       <div class="row-between"><div><div class="brand-mark">PTW</div><h1>Contractor Sign In</h1><p class="muted">Site sign-in, fire/life-safety, asbestos and Permit to Work screening.</p></div><button id="contractorBackBtn" class="ghost" type="button">Return to Who's On Site</button></div>
-      <div class="build-badge">Safety Tracker v2.10.29 CLEAN</div>
+      <div class="build-badge">Safety Tracker v2.10.31 CLEAN</div>
       <div class="compliance-disclaimer contractor-disclaimer"><strong>Compliance notice:</strong> Signing in records attendance, induction, access/key and permit information. It does not by itself confirm that a contractor, company, work activity or documentation is legally compliant, competent, authorised or safe to proceed. Required RAMS, permits, qualifications, insurance, supervision and controls must still be verified before work starts.</div>
       <div id="contractorPortalContent"></div>
     </section>
@@ -73,7 +73,7 @@
   <div id="demoView" class="demo-shell" hidden>
     <header class="demo-topbar">
       <div class="demo-brand-block">
-        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.29</span><span class="clean-pill">CLEAN</span></div>
+        <div class="demo-brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.31</span><span class="clean-pill">CLEAN</span></div>
         <div class="demo-company">Example Hotel Ltd</div>
       </div>
       <div class="demo-mode-badge">DEMO MODE</div>
@@ -105,7 +105,7 @@
 
   <div id="appView" hidden>
     <header class="topbar">
-      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.29</span><span class="clean-pill">CLEAN</span></div>
+      <div class="brand-line"><strong>Safety Tracker</strong><span class="version">v2.10.31</span><span class="clean-pill">CLEAN</span></div>
       <div class="user-chip"><span id="currentUserName">User</span><span id="currentUserRole" class="pill"></span><button id="adminUserModeBtn" class="ghost small top-ghost mode-switch" type="button" hidden>Switch to User</button><button id="signOutBtn" class="ghost small top-ghost">Sign out</button></div>
     </header>
 
@@ -130,7 +130,7 @@
 
     <main class="page-shell">
       <section id="mySafetyView" class="view active-view">
-        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.29 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
+        <div class="page-heading"><div><h2>My Safety <span class="dashboard-version">v2.10.31 CLEAN</span></h2><p class="muted">Your safety overview. Traffic lights show where you are up to; individual documents and training are kept out of this dashboard.</p></div></div>
         <div class="my-safety-live-shortcuts"><div id="mySafetyOnSiteShortcut" class="my-safety-onsite-wrap"></div><div id="mySafetyKeyShortcut" class="my-safety-onsite-wrap"></div></div>
         <div id="mySafetyStats" class="stats-grid"></div>
         <div class="section-card"><div class="row-between"><div><h3>H&amp;S training overview</h3><p class="muted">Select a traffic-light tile to open that section in H&amp;S Training.</p></div><button class="secondary" type="button" data-open-hs-training="ALL">Open H&amp;S Training</button></div><div id="mySafetyCategoryTiles" class="my-safety-category-grid"></div></div>
@@ -366,7 +366,7 @@
   <dialog id="modal" class="modal"><form method="dialog" onsubmit="return false"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div><div id="modalBody"></div></form></dialog>
 
   <script>
-    window.SAFETY_BUILD={version:'2.10.30',label:'2.10.30 CLEAN',build:'21030'};
+    window.SAFETY_BUILD={version:'2.10.31',label:'2.10.31 CLEAN',build:'21031'};
     window.applySafetyBuildLabel=function(){
       document.querySelectorAll('.version').forEach(function(el){el.textContent='v'+window.SAFETY_BUILD.version});
       document.querySelectorAll('.build-badge').forEach(function(el){el.textContent='Safety Tracker v'+window.SAFETY_BUILD.label});
@@ -374,20 +374,21 @@
     };
     document.addEventListener('DOMContentLoaded',window.applySafetyBuildLabel);
   </script>
-  <script src="app-v21028.js?v=21030"></script>
-  <script src="hotfix-v21029-core.js?v=21030"></script>
-  <script src="hotfix-v21029-ui.js?v=21030"></script>
-  <script src="hotfix-v21029-exception.js?v=21030"></script>
-  <script src="hotfix-v21030-ptw.js?v=21030"></script>
-  <script src="bulk-import-v21028.js?v=21030"></script>
-  <script src="demo-v2100.js?v=21030"></script>
+  <script src="app-v21028.js?v=21031"></script>
+  <script src="hotfix-v21029-core.js?v=21031"></script>
+  <script src="hotfix-v21029-ui.js?v=21031"></script>
+  <script src="hotfix-v21029-exception.js?v=21031"></script>
+  <script src="hotfix-v21030-ptw.js?v=21031"></script>
+  <script src="hotfix-v21031-ptw-stability.js?v=21031"></script>
+  <script src="bulk-import-v21028.js?v=21031"></script>
+  <script src="demo-v2100.js?v=21031"></script>
   <script>
     window.setTimeout(function(){
       if(!window.SafetyTrackerV2){
         var m=document.getElementById('authMessage');
         var b=document.getElementById('loginBootStatus');
         if(b)b.textContent='Sign-in code did not load.';
-        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, confirm the v2.10.29 hotfix files are present.';}
+        if(m){m.hidden=false;m.textContent='Safety Tracker could not load its sign-in code. Refresh this page once. If this remains, confirm the v2.10.31 hotfix files are present.';}
       }
     },3500);
   </script>
