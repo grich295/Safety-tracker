@@ -1,6 +1,6 @@
 {
-  "version": "2.10.31",
-  "build_id": "v21031-ptw-stability-20260916",
+  "version": "2.10.32",
+  "build_id": "v21032-auto-orders-custom-checklists-20260916",
   "clean": true,
-  "notes": "PTW stability fix. Removes the MutationObserver hidden-attribute storm when PTW triggers are checked, opens the PTW form from already-loaded app data instead of waiting on public_config, performs asbestos/location preview from current loaded register data, and opens post-submit PTW review by loading only the selected permit instead of reloading the entire Safety Tracker. No SQL migration required."
+  "notes": "PPE and First Aid quick checks now default to OK and automatically create order/action items when something is missing, broken/damaged, used/consumed, low or expired; notes remain optional. Adds a fully customisable Checklist Builder under Checklists for Admin/Manager, with recurring/ad-hoc schedules, department/responsible person, multiple response types, automatic action rules, optional order items, reassignment and history-ready records. Supabase migration v21032 was applied directly."
 }
