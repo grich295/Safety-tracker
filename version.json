@@ -1,6 +1,6 @@
 {
-  "version": "2.10.32",
-  "build_id": "v21032-auto-orders-custom-checklists-20260916",
+  "version": "2.10.33",
+  "build_id": "v21033-ptw-report-privacy-20260917",
   "clean": true,
-  "notes": "PPE and First Aid quick checks now default to OK and automatically create order/action items when something is missing, broken/damaged, used/consumed, low or expired; notes remain optional. Adds a fully customisable Checklist Builder under Checklists for Admin/Manager, with recurring/ad-hoc schedules, department/responsible person, multiple response types, automatic action rules, optional order items, reassignment and history-ready records. Supabase migration v21032 was applied directly."
+  "notes": "PTW reporting privacy update: routine contractor permit previews, PDF reports and CSV exports mask contractor names and omit digital signature images, while the original signed PTW record retains full names and signatures. Admin/Manager can explicitly include full identity/signatures for evidence exports. Existing PTW stability fixes are preserved."
 }

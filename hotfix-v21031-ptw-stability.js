@@ -1,4 +1,4 @@
-/* Safety Tracker v2.10.31 PTW stability hotfix */
+/* Safety Tracker v2.10.31 PTW stability hotfix + v2.10.33 PTW report privacy */
 'use strict';
 (function(){
   const core=window.SafetyTrackerV2;
@@ -39,9 +39,6 @@
     out.innerHTML=rows.map(x=>`<div class="item-card compact traffic-amber"><strong>${esc(x.material||'Asbestos register item')}</strong><div class="meta"><span>${esc(x.identification_status||'')}</span><span>${esc(x.condition||'')}</span></div>${x.management_action?`<div>${esc(x.management_action)}</div>`:''}</div>`).join('');
   }
 
-  // Open the contractor/PTW form from data already loaded in the signed-in app.
-  // This removes the edge-function round trip that could leave Android devices
-  // sitting on a blank/loading sheet before the form appeared.
   window.showContractorPortal=async function(route='STAFF'){
     if(!state.user) return notify('Staff sign-in is required.');
     route='STAFF';
@@ -66,8 +63,6 @@
     }
   };
 
-  // Stop the original location handler from waiting on the permit Edge Function.
-  // The same current asbestos/location rows are already present in app state.
   document.addEventListener('change',e=>{
     if(e.target?.id!=='cpLocation') return;
     e.stopImmediatePropagation();
@@ -87,7 +82,7 @@
     try{
       const ev=await withTimeout(sb.from('contractor_permit_events_v280').select('*').eq('permit_id',id).order('occurred_at',{ascending:true}),7000,'PTW history load timed out.');
       if(!ev.error){state.contractorPermitEvents=(state.contractorPermitEvents||[]).filter(x=>x.permit_id!==id).concat(ev.data||[])}
-    }catch(_e){/* history is helpful but must not block approval */}
+    }catch(_e){}
     return p;
   }
 
@@ -115,8 +110,6 @@
     }
   }
 
-  // Capture the review click before the old handler calls loadAll(), which reloads
-  // the entire Safety Tracker and was the main cause of the apparent freeze.
   document.addEventListener('click',e=>{
     const b=e.target.closest('button[data-contractor-review-ptw]');
     if(!b) return;
@@ -124,10 +117,147 @@
     reviewFast(b.dataset.contractorReviewPtw,b);
   },true);
 
-  // If another part of the app calls the function directly, use the fast path too.
   window.reviewPermitAfterSubmit=async function(id){return reviewFast(id,null)};
-
-  // Keep the original functions available for diagnostics/fallback without using them normally.
   window.__safetyPtwOriginalShowPortal=originalShowPortal;
   window.__safetyPtwOriginalReview=originalReview;
+})();
+
+/* v2.10.33 PTW report privacy: mask routine report identity, preserve original signed PTW */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core?.state) return;
+
+  if(window.SAFETY_BUILD){
+    window.SAFETY_BUILD.version='2.10.33';
+    window.SAFETY_BUILD.label='2.10.33 CLEAN';
+    window.SAFETY_BUILD.build='21033';
+    try{window.applySafetyBuildLabel?.()}catch(_e){}
+  }
+  try{core.APP_VERSION='2.10.33'}catch(_e){}
+
+  const state=core.state;
+  const originals={
+    preview:window.renderPermitReportPreview||core.renderPermitReportPreview,
+    pdf:window.downloadPermitReportPdf||core.downloadPermitReportPdf,
+    csv:window.downloadPermitReportCsv||core.downloadPermitReportCsv,
+    pdfDoc:window.permitReportPdfDoc
+  };
+  const $=id=>document.getElementById(id);
+  const notify=msg=>{try{if(typeof window.toast==='function')return window.toast(msg)}catch(_e){} const t=$('toast');if(t){t.textContent=msg;t.hidden=false;setTimeout(()=>t.hidden=true,4000)}};
+
+  function isManagerOrAdmin(){
+    const p=state.profile||{};
+    return p.report_only!==true&&['admin','manager'].includes(String(p.role||'').toLowerCase());
+  }
+  function maskPiece(piece){
+    const chars=Array.from(String(piece||''));
+    if(!chars.length) return '';
+    if(chars.length===1) return chars[0]+'**';
+    return chars[0]+'*'.repeat(Math.max(2,chars.length-1));
+  }
+  function maskName(name){
+    const value=String(name||'').trim();
+    if(!value) return '';
+    return value.split(/(\s+|[-’'])/u).map(part=>/^(\s+|[-’'])$/u.test(part)?part:maskPiece(part)).join('');
+  }
+  function maskPermit(p){
+    if(!p) return p;
+    return {...p,
+      contractor_name:maskName(p.contractor_name),
+      contractor_signin_signed_name:maskName(p.contractor_signin_signed_name),
+      contractor_signout_signed_name:maskName(p.contractor_signout_signed_name),
+      contractor_signin_signature:null,
+      contractor_signout_signature:null
+    };
+  }
+  function includeFullIdentity(){return isManagerOrAdmin()&&$('permitReportFullIdentity')?.checked===true;}
+  function withProtectedPermitState(fn){
+    if(includeFullIdentity()) return fn();
+    const originalPermits=state.contractorPermits;
+    state.contractorPermits=(originalPermits||[]).map(maskPermit);
+    try{return fn()}finally{state.contractorPermits=originalPermits}
+  }
+  function stampPrivacyFooter(result){
+    if(includeFullIdentity()) return result;
+    const doc=result?.doc||result;
+    if(!doc?.getNumberOfPages||!doc?.setPage||!doc?.text) return result;
+    try{
+      const pages=doc.getNumberOfPages();
+      for(let i=1;i<=pages;i++){
+        doc.setPage(i);doc.setFontSize?.(7);
+        doc.text('Privacy: contractor names are masked and digital signature images are omitted from this report. Full details remain in the original PTW record.',10,204,{maxWidth:275});
+      }
+    }catch(_e){}
+    return result;
+  }
+  function renderPreviewProtected(){
+    if(typeof originals.preview!=='function') return notify('PTW report preview is unavailable. Refresh Safety Tracker once.');
+    const result=withProtectedPermitState(()=>originals.preview());ensurePrivacyControl();return result;
+  }
+  function downloadPdfProtected(){
+    if(typeof originals.pdf!=='function') return notify('PTW PDF report is unavailable. Refresh Safety Tracker once.');
+    if(includeFullIdentity()){notify('Full contractor identity/signatures enabled for this evidence export.');return originals.pdf();}
+    return withProtectedPermitState(()=>originals.pdf());
+  }
+  function downloadCsvProtected(){
+    if(typeof originals.csv!=='function') return notify('PTW CSV report is unavailable. Refresh Safety Tracker once.');
+    if(includeFullIdentity()){notify('Full contractor identity enabled for this evidence export.');return originals.csv();}
+    return withProtectedPermitState(()=>originals.csv());
+  }
+  if(typeof originals.pdfDoc==='function'){
+    window.permitReportPdfDoc=function(){const result=withProtectedPermitState(()=>originals.pdfDoc());return stampPrivacyFooter(result);};
+  }
+  window.renderPermitReportPreview=renderPreviewProtected;
+  window.downloadPermitReportPdf=downloadPdfProtected;
+  window.downloadPermitReportCsv=downloadCsvProtected;
+  core.renderPermitReportPreview=renderPreviewProtected;
+  core.downloadPermitReportPdf=downloadPdfProtected;
+  core.downloadPermitReportCsv=downloadCsvProtected;
+  core.maskPtwReportName=maskName;
+
+  function ensurePrivacyControl(){
+    const anchor=$('permitReportCompany')||$('permitReportPreviewBtn')||$('permitReportPdfBtn');
+    if(!anchor) return;
+    if($('permitReportPrivacyBox')){
+      const full=$('permitReportFullIdentity');if(full) full.closest('.ptw-full-identity-row').hidden=!isManagerOrAdmin();return;
+    }
+    const box=document.createElement('div');
+    box.id='permitReportPrivacyBox';box.className='hint-box ptw-report-privacy-box';
+    box.innerHTML=`<strong>Contractor privacy in PTW reports</strong>
+      <div>Routine previews, PDF reports and CSV exports mask the contractor's first/last name (for example <strong>John Smith → J*** S****</strong>) and omit digital signature images. The original signed PTW record is not changed and keeps the full name and signatures.</div>
+      <label class="check-row ptw-full-identity-row" style="margin-top:10px" ${isManagerOrAdmin()?'':'hidden'}>
+        <input id="permitReportFullIdentity" type="checkbox"> Include full contractor names and digital signatures in this evidence export
+      </label>
+      <div id="permitReportPrivacyState" class="muted" style="margin-top:6px">Default: privacy-masked report.</div>`;
+    const container=anchor.closest('.section-card')||anchor.parentElement;
+    if(container){const filters=anchor.closest('.filters');if(filters) filters.insertAdjacentElement('afterend',box);else container.insertBefore(box,container.firstChild?.nextSibling||null);}
+    $('permitReportFullIdentity')?.addEventListener('change',e=>{
+      const stateText=$('permitReportPrivacyState');
+      if(e.target.checked){
+        if(!isManagerOrAdmin()){e.target.checked=false;return notify('Only Admin/Manager can include full contractor identity in PTW report exports.');}
+        if(stateText) stateText.innerHTML='<strong>Evidence mode:</strong> full contractor identity/signatures will be included until this box is unticked or the page is refreshed.';
+        notify('Full-identity PTW evidence export enabled.');
+      }else{
+        if(stateText) stateText.textContent='Default: privacy-masked report.';notify('PTW reports returned to privacy-masked mode.');
+      }
+      renderPreviewProtected();
+    });
+  }
+  document.addEventListener('click',e=>{
+    const button=e.target.closest('button');if(!button)return;
+    if(button.id==='permitReportPreviewBtn'){e.preventDefault();e.stopImmediatePropagation();renderPreviewProtected();$('permitReportSummary')?.scrollIntoView?.({behavior:'smooth',block:'start'});notify('Contractor permit report preview updated.');return;}
+    if(button.id==='permitReportPdfBtn'){e.preventDefault();e.stopImmediatePropagation();downloadPdfProtected();return;}
+    if(button.id==='permitReportCsvBtn'){e.preventDefault();e.stopImmediatePropagation();downloadCsvProtected();}
+  },true);
+  function installStyles(){
+    if($('ptwReportPrivacyStyles'))return;
+    const style=document.createElement('style');style.id='ptwReportPrivacyStyles';style.textContent=`
+      .ptw-report-privacy-box{margin:12px 0;border-left:4px solid #5b7185}
+      .ptw-report-privacy-box>div{margin-top:6px;line-height:1.45}
+      .ptw-full-identity-row{background:#fff8e6;border:1px solid #e2be63;padding:10px;border-radius:10px}
+      .ptw-full-identity-row input{width:auto;min-width:auto}`;document.head.appendChild(style);
+  }
+  installStyles();ensurePrivacyControl();
+  const observer=new MutationObserver(mutations=>{if(mutations.some(m=>m.type==='childList'))ensurePrivacyControl();});
+  observer.observe(document.body,{childList:true,subtree:true});
 })();
