@@ -1,6 +1,6 @@
 {
-  "version": "2.10.33",
-  "build_id": "v21033-ptw-report-privacy-20260917",
+  "version": "2.10.36",
+  "build_id": "v21036-monthly-knowledge-flex-auto-20260918",
   "clean": true,
-  "notes": "PTW reporting privacy update: routine contractor permit previews, PDF reports and CSV exports mask contractor names and omit digital signature images, while the original signed PTW record retains full names and signatures. Admin/Manager can explicitly include full identity/signatures for evidence exports. Existing PTW stability fixes are preserved."
+  "notes": "Monthly knowledge checks are fully automatic and configurable. Admin can set 1-10 questions per month and Easy, Standard, Hard or Mixed difficulty, plus ON/OFF. Applicable new/current safety training sources and new document versions are detected automatically while Admin/Manager is signed in; superseded versions stop being used. Questions remain multiple choice with three options and one correct answer, and all selected questions must be correct to complete the month. Formal training renewal schedules remain separate."
 }
