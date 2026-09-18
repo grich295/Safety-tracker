@@ -1,6 +1,6 @@
 {
-  "version": "2.10.45",
-  "build_id": "v21045-version-cache-tidy-20260918",
+  "version": "2.10.46",
+  "build_id": "v21046-clean-baseline-20260918",
   "clean": true,
-  "notes": "Housekeeping stage 2 only: centralises visible build/version identity and JavaScript cache-busting around version.json. index.html now reads version.json with no-store, creates the single SAFETY_BUILD value, applies all visible version labels from it, and loads the existing app/hotfix scripts in the same order using the current build_id as their cache token. Older feature hotfixes no longer overwrite the build number with their own historical versions. version.json is also included in the offline shell cache. No workflow, database or navigation behaviour is intentionally changed. Includes all v2.10.44 navigation tidy and prior features."
+  "notes": "Housekeeping stage 3: consolidates the six active hotfix scripts into one current baseline file, hotfix-v21046-baseline.js, while keeping app-v21028.js, bulk import and demo files separate so startup behaviour remains close to the proven live architecture. index.html now loads five local app scripts instead of ten, and the offline service-worker shell caches the same reduced active set. No database, workflow, permission or navigation logic is intentionally changed. The old individual hotfix files may remain in the repository for now but are no longer referenced by the live app; they can be archived in the final repository-cleanup stage after this build is verified."
 }
