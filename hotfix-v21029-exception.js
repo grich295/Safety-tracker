@@ -2665,3 +2665,331 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.safetyCalendarV21043={render:cRenderForce,go:cGo};
 })();
+
+/* Safety Tracker v2.10.44 - navigation tidy / grouped hubs */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state)return;
+
+  const nst=core.state;
+  const n$=id=>document.getElementById(id);
+  const nesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const nToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+  const nIsReportViewer=()=>nst.profile?.report_only===true;
+  const nIsManager=()=>!nIsReportViewer()&&['admin','manager'].includes(String(nst.profile?.role||'').toLowerCase())&&!((nst.profile?.role==='admin')&&(nst.offline||nst.uiMode==='user'));
+  const nIsAdmin=()=>nIsManager()&&String(nst.profile?.role||'').toLowerCase()==='admin';
+  const nCan=view=>{try{return typeof canAccessView==='function'?canAccessView(view):true}catch(_e){return true}};
+  const nDocCreationOn=()=>{try{return typeof documentCreationEnabled==='function'?documentCreationEnabled():true}catch(_e){return true}};
+
+  const NAV_GROUPS={
+    training:{rep:'hsTraining',views:new Set(['hsTraining','training','awareness','instructor'])},
+    checks:{rep:'checklists',views:new Set(['checklists','ppe','firstAid'])},
+    documents:{rep:'documents',views:new Set(['documents','creator'])},
+    management:{rep:'reports',views:new Set(['reports','compliance','people','admin'])}
+  };
+
+  function nApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.44';
+      window.SAFETY_BUILD.label='2.10.44 CLEAN';
+      window.SAFETY_BUILD.build='21044';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.44 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.44 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.44');
+  }
+
+  function nOriginalNav(view){return document.querySelector(`#mainNav button[data-view="${view}"]`)}
+
+  function nApplyTopNav(){
+    const nav=n$('mainNav');if(!nav)return;
+    const hideAlways=['training','creator','awareness','people','compliance','instructor','admin'];
+    hideAlways.forEach(v=>{const b=nOriginalNav(v);if(b)b.hidden=true});
+
+    const hs=nOriginalNav('hsTraining');
+    if(hs){hs.textContent='Training';hs.title='H&S Training, standalone training, awareness and instructor tools';hs.hidden=!nCan('hsTraining')}
+
+    const checks=nOriginalNav('checklists');
+    if(checks){
+      checks.textContent='Checks';
+      checks.title='Custom checks, PPE and First Aid';
+      const any=['checklists','ppe','firstAid'].some(nCan);
+      checks.hidden=!any;
+      checks.dataset.navHubRep='checks';
+    }
+
+    const docs=nOriginalNav('documents');
+    if(docs){docs.textContent='Documents';docs.title='Document library, register, approvals, change impact and creation';docs.hidden=!nCan('documents')}
+
+    const reports=nOriginalNav('reports');
+    if(reports){
+      if(nIsReportViewer()){
+        reports.textContent='Reports';
+        reports.title='Reports';
+        reports.hidden=!nCan('reports');
+      }else{
+        reports.textContent='Management';
+        reports.title='Safety Actions, compliance, people, calendar, reports, knowledge and Admin';
+        reports.hidden=!nIsManager()||!nCan('reports');
+        reports.dataset.navHubRep='management';
+      }
+    }
+
+    const onsite=nOriginalNav('onsite');if(onsite)onsite.textContent="Who's On Site";
+    const asbestos=nOriginalNav('asbestos');if(asbestos)asbestos.textContent='Asbestos';
+    const help=nOriginalNav('help');if(help)help.textContent='Help';
+
+    nav.classList.add('tidy-nav-v21044');
+    nMarkTopNav(window.currentViewName||'mySafety');
+  }
+
+  function nMarkTopNav(view){
+    const v=String(view||'');
+    const nav=n$('mainNav');if(!nav)return;
+    nav.querySelectorAll('button[data-view]').forEach(b=>b.classList.remove('active'));
+    let rep=v;
+    for(const g of Object.values(NAV_GROUPS)){if(g.views.has(v)){rep=g.rep;break}}
+    const b=nOriginalNav(rep);if(b&&!b.hidden)b.classList.add('active');
+  }
+
+  function nHubButton(group,key,label,action,visible=true){
+    return visible?`<button type="button" class="nav-hub-button" data-nav-hub-group="${nesc(group)}" data-nav-hub-key="${nesc(key)}" data-nav-hub-action="${nesc(action)}">${nesc(label)}</button>`:'';
+  }
+
+  function nHubHtml(group,buttons){
+    return `<div class="nav-hub-v21044" data-nav-hub="${nesc(group)}"><div class="nav-hub-scroll">${buttons.join('')}</div></div>`;
+  }
+
+  function nInstallHub(viewId,group,buttons){
+    const view=n$(viewId+'View');if(!view)return;
+    let hub=view.querySelector(`.nav-hub-v21044[data-nav-hub="${group}"]`);
+    const html=nHubHtml(group,buttons);
+    if(!hub){
+      const head=view.querySelector('.page-heading');
+      if(head)head.insertAdjacentHTML('afterend',html);
+      else view.insertAdjacentHTML('afterbegin',html);
+    }else{
+      hub.outerHTML=html;
+    }
+  }
+
+  function nEnsureHubs(){
+    const instructor=nIsManager()&&nCan('instructor');
+    const trainingBtns=[
+      nHubButton('training','hs','H&S Training','view:hsTraining',nCan('hsTraining')),
+      nHubButton('training','standalone','Standalone','view:training',nCan('training')),
+      nHubButton('training','awareness','Awareness','view:awareness',nCan('awareness')),
+      nHubButton('training','instructor','Instructor','view:instructor',instructor)
+    ].filter(Boolean);
+    ['hsTraining','training','awareness'].forEach(v=>nInstallHub(v,'training',trainingBtns));
+    if(instructor)nInstallHub('instructor','training',trainingBtns);
+
+    const checkBtns=[
+      nHubButton('checks','custom','Custom Checks','view:checklists',nCan('checklists')),
+      nHubButton('checks','ppe','PPE','view:ppe',nCan('ppe')),
+      nHubButton('checks','firstaid','First Aid','view:firstAid',nCan('firstAid'))
+    ].filter(Boolean);
+    ['checklists','ppe','firstAid'].forEach(v=>{if(nCan(v))nInstallHub(v,'checks',checkBtns)});
+
+    if(nIsManager()){
+      const docBtns=[
+        nHubButton('documents','library','Library','docs:library',true),
+        nHubButton('documents','register','Register','docs:register',true),
+        nHubButton('documents','approvals','Approvals','docs:approvals',true),
+        nHubButton('documents','impact','Change Impact','docs:impact',true),
+        nHubButton('documents','create','Create','view:creator',nCan('creator')&&nDocCreationOn())
+      ].filter(Boolean);
+      nInstallHub('documents','documents',docBtns);
+      if(nCan('creator'))nInstallHub('creator','documents',docBtns);
+
+      const mgmtBtns=[
+        nHubButton('management','actions','Safety Actions','management:actions',true),
+        nHubButton('management','compliance','Compliance','view:compliance',nCan('compliance')),
+        nHubButton('management','people','People','view:people',nCan('people')),
+        nHubButton('management','calendar','Calendar','management:calendar',true),
+        nHubButton('management','reports','Reports','management:reports',true),
+        nHubButton('management','knowledge','Knowledge','management:knowledge',true),
+        nHubButton('management','admin','Admin','view:admin',nIsAdmin()&&nCan('admin'))
+      ].filter(Boolean);
+      ['reports','compliance','people'].forEach(v=>{if(nCan(v))nInstallHub(v,'management',mgmtBtns)});
+      if(nIsAdmin()&&nCan('admin'))nInstallHub('admin','management',mgmtBtns);
+    }
+
+    nWireHubs();
+    nMarkHubForView(window.currentViewName||'mySafety');
+  }
+
+  function nWireHubs(){
+    document.querySelectorAll('.nav-hub-v21044 [data-nav-hub-action]').forEach(b=>{
+      if(b.dataset.navHubWired==='1')return;
+      b.dataset.navHubWired='1';
+      b.addEventListener('click',()=>nGoHubAction(b.dataset.navHubAction,b.dataset.navHubGroup,b.dataset.navHubKey));
+    });
+  }
+
+  function nMarkHub(group,key){
+    document.querySelectorAll(`.nav-hub-v21044[data-nav-hub="${group}"] .nav-hub-button`).forEach(b=>b.classList.toggle('active',b.dataset.navHubKey===key));
+  }
+
+  function nMarkHubForView(view){
+    if(['hsTraining','training','awareness','instructor'].includes(view)){
+      nMarkHub('training',({hsTraining:'hs',training:'standalone',awareness:'awareness',instructor:'instructor'})[view]);
+    }
+    if(['checklists','ppe','firstAid'].includes(view)){
+      nMarkHub('checks',({checklists:'custom',ppe:'ppe',firstAid:'firstaid'})[view]);
+    }
+    if(['documents','creator'].includes(view)){
+      nMarkHub('documents',view==='creator'?'create':'library');
+    }
+    if(['reports','compliance','people','admin'].includes(view)){
+      nMarkHub('management',({reports:'reports',compliance:'compliance',people:'people',admin:'admin'})[view]);
+    }
+  }
+
+  function nShow(view){
+    try{
+      if(typeof showView==='function')return showView(view);
+      nOriginalNav(view)?.click();
+    }catch(e){nToast(e?.message||'Could not open that section.')}
+  }
+
+  function nScroll(selector){
+    let tries=0;
+    const tick=()=>{
+      const el=document.querySelector(selector);
+      if(el){try{el.scrollIntoView({behavior:'smooth',block:'start'})}catch(_e){};return}
+      if(++tries<18)setTimeout(tick,120);
+    };
+    setTimeout(tick,80);
+  }
+
+  function nRenderDocumentsNow(){
+    try{if(typeof renderDocuments==='function')renderDocuments()}catch(_e){}
+  }
+
+  async function nGoHubAction(action,group,key){
+    if(!action)return;
+    if(action.startsWith('view:')){
+      const view=action.split(':')[1];
+      if(!nCan(view))return nToast('That section is not available for this account.');
+      if(view==='creator'&&!nDocCreationOn())return nToast('Document Creation is currently OFF.');
+      nShow(view);setTimeout(()=>{nMarkTopNav(view);nMarkHub(group,key)},20);return;
+    }
+
+    if(action==='docs:library'){
+      nShow('documents');
+      core.state.documentIndex='ALL';
+      const t=n$('documentTypeFilter');if(t)t.value='';
+      const s=n$('documentStatusFilter');if(s)s.value='ACTIVE';
+      const q=n$('documentSearch');if(q)q.value='';
+      nRenderDocumentsNow();nMarkHub('documents','library');return;
+    }
+    if(action==='docs:register'){
+      nShow('documents');
+      core.state.documentIndex='REGISTER';
+      const t=n$('documentTypeFilter');if(t)t.value='';
+      const q=n$('documentSearch');if(q)q.value='';
+      nRenderDocumentsNow();nMarkHub('documents','register');return;
+    }
+    if(action==='docs:approvals'){
+      nShow('documents');
+      core.state.documentIndex='ALL';
+      const t=n$('documentTypeFilter');if(t)t.value='';
+      const s=n$('documentStatusFilter');if(s)s.value='PENDING';
+      nRenderDocumentsNow();nMarkHub('documents','approvals');nScroll('#documentApprovalOverview');return;
+    }
+    if(action==='docs:impact'){
+      nShow('documents');nMarkHub('documents','impact');nScroll('#documentChangeImpactPanelV21040');return;
+    }
+    if(action==='management:actions'){
+      nShow('compliance');nMarkHub('management','actions');nScroll('#unifiedSafetyActionsCardV21039');return;
+    }
+    if(action==='management:calendar'){
+      nShow('reports');nMarkHub('management','calendar');nScroll('#safetyCalendarCardV21043');return;
+    }
+    if(action==='management:reports'){
+      nShow('reports');nMarkHub('management','reports');
+      setTimeout(()=>n$('reportsView')?.querySelector('.page-heading')?.scrollIntoView({behavior:'smooth',block:'start'}),80);return;
+    }
+    if(action==='management:knowledge'){
+      nShow('reports');nMarkHub('management','knowledge');nScroll('#monthlyKnowledgeAnalyticsCardV21041');return;
+    }
+  }
+
+  function nFirstAccessibleCheckView(){
+    return ['checklists','ppe','firstAid'].find(nCan)||'mySafety';
+  }
+
+  function nTopClickCapture(e){
+    const b=e.target.closest('#mainNav button[data-nav-hub-rep]');
+    if(!b)return;
+    if(b.dataset.navHubRep==='checks'&&!nCan('checklists')){
+      e.preventDefault();e.stopImmediatePropagation();nShow(nFirstAccessibleCheckView());
+    }
+  }
+
+  function nAfterView(name){
+    setTimeout(()=>{
+      nApplyTopNav();
+      nEnsureHubs();
+      nMarkTopNav(name);
+      nMarkHubForView(name);
+    },0);
+  }
+
+  // Preserve existing routing while keeping grouped navigation active.
+  const nOriginalShowView=window.showView;
+  if(typeof nOriginalShowView==='function'){
+    window.showView=function(name,...args){
+      const out=nOriginalShowView.call(this,name,...args);
+      nAfterView(name);
+      return out;
+    };
+  }
+
+  const nOriginalApplyViewModeUi=window.applyViewModeUi;
+  if(typeof nOriginalApplyViewModeUi==='function'){
+    window.applyViewModeUi=function(...args){
+      const out=nOriginalApplyViewModeUi.apply(this,args);
+      setTimeout(()=>{nApplyTopNav();nEnsureHubs()},0);
+      return out;
+    };
+  }
+
+  const nOriginalUpdateDocumentCreationUi=window.updateDocumentCreationUi;
+  if(typeof nOriginalUpdateDocumentCreationUi==='function'){
+    window.updateDocumentCreationUi=function(...args){
+      const out=nOriginalUpdateDocumentCreationUi.apply(this,args);
+      setTimeout(()=>{nApplyTopNav();nEnsureHubs()},0);
+      return out;
+    };
+  }
+
+  document.addEventListener('click',nTopClickCapture,true);
+  window.addEventListener('pageshow',()=>setTimeout(()=>{nApplyTopNav();nEnsureHubs();nApplyVersion()},180));
+
+  const style=document.createElement('style');
+  style.id='navigationTidyStylesV21044';
+  style.textContent=`
+    #mainNav.tidy-nav-v21044{gap:6px}
+    .nav-hub-v21044{margin:0 0 14px;padding:0;border:0;background:transparent}
+    .nav-hub-scroll{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 6px;scrollbar-width:thin}
+    .nav-hub-button{flex:0 0 auto;border:1px solid #cfd9e0;background:#fff;color:#17324d;border-radius:999px;padding:8px 13px;font-weight:750;white-space:nowrap}
+    .nav-hub-button:hover{border-color:#8fa4b4}
+    .nav-hub-button.active{background:#17324d;color:#fff;border-color:#17324d}
+    @media(max-width:760px){
+      #mainNav.tidy-nav-v21044{display:flex;overflow-x:auto;white-space:nowrap;gap:4px;padding-bottom:5px}
+      #mainNav.tidy-nav-v21044>button{flex:0 0 auto}
+      .nav-hub-scroll{margin-left:-2px;margin-right:-2px}
+      .nav-hub-button{padding:8px 11px}
+    }
+  `;
+  document.head.appendChild(style);
+
+  [0,300,900,1800,3200].forEach(ms=>setTimeout(()=>{
+    nApplyVersion();nApplyTopNav();nEnsureHubs();
+  },ms));
+
+  core.navigationTidyV21044={apply:nApplyTopNav,ensureHubs:nEnsureHubs,go:nGoHubAction};
+})();
