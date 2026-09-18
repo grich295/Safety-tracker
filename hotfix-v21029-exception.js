@@ -1725,3 +1725,235 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.documentChangeImpactV21040={refresh:iRefresh,get candidates(){return iCandidates}};
 })();
+
+/* Safety Tracker v2.10.41 - Monthly Knowledge analytics */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+
+  const mst=core.state, msb=core.sb;
+  const m$=id=>document.getElementById(id);
+  const mesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const mIsManager=()=>mst.profile?.report_only!==true&&['admin','manager'].includes(String(mst.profile?.role||'').toLowerCase());
+  const mToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+  let mBusy=false,mMonths=12,mData=null,mTeam=[];
+
+  function mApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.41';
+      window.SAFETY_BUILD.label='2.10.41 CLEAN';
+      window.SAFETY_BUILD.build='21041';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.41 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.41 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.41');
+  }
+  [0,500,1700,3300].forEach(ms=>setTimeout(mApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',mApplyVersion,{once:true});
+
+  function mTrafficPercent(v){
+    const n=Number(v||0);
+    if(n>=80)return 'green';
+    if(n>=60)return 'amber';
+    return 'red';
+  }
+  function mTrafficWrong(wrong,answers){
+    if(!Number(answers||0))return 'neutral';
+    const acc=100-(100*Number(wrong||0)/Number(answers||1));
+    return mTrafficPercent(acc);
+  }
+  function mFmtMonth(v){
+    if(!v)return '—';
+    return new Date(String(v).slice(0,10)+'T00:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+  }
+  function mDifficulty(v){
+    return ({EASY:'Easy',STANDARD:'Standard',HARD:'Hard',MIXED:'Mixed'})[String(v||'').toUpperCase()]||String(v||'Mixed');
+  }
+
+  async function mLoad(){
+    const [a,t,s]=await Promise.all([
+      msb.rpc('monthly_knowledge_analytics_v21041',{p_months:mMonths}),
+      msb.rpc('monthly_knowledge_team_status_v21035'),
+      msb.rpc('get_monthly_knowledge_settings_v21035')
+    ]);
+    if(a.error)throw new Error(a.error.message);
+    if(t.error)throw new Error(t.error.message);
+    if(s.error)throw new Error(s.error.message);
+    mData=a.data||{};
+    mTeam=t.data||[];
+    return {settings:s.data||{}};
+  }
+
+  function mCurrentSummary(settings){
+    const ready=mTeam.filter(x=>!['PREPARING','OFF'].includes(String(x.status||'')));
+    const complete=ready.filter(x=>x.status==='CURRENT').length;
+    const overdue=ready.filter(x=>x.status==='OVERDUE').length;
+    const due=ready.filter(x=>x.status==='DUE').length;
+    const pct=ready.length?Math.round(1000*complete/ready.length)/10:0;
+    return {ready:ready.length,complete,overdue,due,pct,enabled:!!settings.enabled};
+  }
+
+  function mTopicRows(){
+    const topics=Array.isArray(mData?.topics)?mData.topics:[];
+    return topics.filter(x=>Number(x.wrong_answers||0)>0).slice(0,12);
+  }
+
+  function mRepeatRows(){
+    const topics=Array.isArray(mData?.topics)?mData.topics:[];
+    return topics.filter(x=>x.repeated_miss===true).slice(0,8);
+  }
+
+  function mRenderTopics(){
+    const rows=mTopicRows(), repeats=mRepeatRows();
+    const weak=m$('monthlyKnowledgeWeakTopicsV21041');
+    if(weak){
+      if(!rows.length){
+        weak.innerHTML='<div class="success-note"><strong>No missed topics recorded in this period.</strong> More analytics will appear as monthly checks are completed.</div>';
+      }else{
+        weak.innerHTML=`<div class="card-list">${rows.map(x=>{
+          const tr=mTrafficPercent(Number(x.accuracy_percent||0));
+          return `<div class="item-card compact traffic-${tr}">
+            <div class="row-between"><div><strong>${mesc(x.topic||'Safety topic')}</strong><div class="meta"><span>${Number(x.answers||0)} answer${Number(x.answers||0)===1?'':'s'}</span><span>${Number(x.wrong_answers||0)} missed</span><span>${Number(x.people||0)} people</span></div></div><span class="badge ${tr==='red'?'overdue':tr==='amber'?'due':'complete'}">${Number(x.accuracy_percent||0)}% correct</span></div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+    }
+    const repeat=m$('monthlyKnowledgeRepeatedMissesV21041');
+    if(repeat){
+      if(!repeats.length){
+        repeat.innerHTML='<div class="hint-box"><strong>No repeated weak topic yet.</strong> A topic appears here only after it has been missed at least twice in the selected period.</div>';
+      }else{
+        repeat.innerHTML=repeats.map(x=>`<div class="item-card compact traffic-${mTrafficPercent(Number(x.accuracy_percent||0))}">
+          <div class="row-between"><div><strong>${mesc(x.topic||'Safety topic')}</strong><div class="muted">${Number(x.wrong_answers||0)} incorrect answer${Number(x.wrong_answers||0)===1?'':'s'} from ${Number(x.people||0)} people.</div></div><span class="badge overdue">Repeated miss</span></div>
+        </div>`).join('');
+      }
+    }
+  }
+
+  function mRenderDifficulty(){
+    const el=m$('monthlyKnowledgeDifficultyAnalyticsV21041');if(!el)return;
+    const rows=Array.isArray(mData?.difficulty)?mData.difficulty:[];
+    if(!rows.length){el.innerHTML='<div class="muted">No difficulty data yet.</div>';return}
+    el.innerHTML=rows.map(x=>{
+      const pct=Number(x.accuracy_percent||0),tr=mTrafficPercent(pct);
+      return `<div class="knowledge-analytics-bar-row">
+        <div class="row-between"><strong>${mesc(mDifficulty(x.difficulty))}</strong><span>${pct}% correct · ${Number(x.answers||0)} answered</span></div>
+        <div class="knowledge-analytics-bar"><span class="traffic-${tr}" style="width:${Math.max(0,Math.min(100,pct))}%"></span></div>
+      </div>`;
+    }).join('');
+  }
+
+  function mRenderMonthly(){
+    const el=m$('monthlyKnowledgeMonthlyTrendV21041');if(!el)return;
+    const rows=Array.isArray(mData?.monthly)?[...mData.monthly].reverse():[];
+    if(!rows.length){el.innerHTML='<div class="muted">No monthly history yet.</div>';return}
+    el.innerHTML=`<div class="knowledge-month-grid">${rows.map(x=>{
+      const pct=Number(x.participant_completion_percent||0),tr=mTrafficPercent(pct);
+      return `<div class="knowledge-month-cell traffic-${tr}">
+        <strong>${mesc(mFmtMonth(x.month_start))}</strong>
+        <span>${Number(x.completed_people||0)}/${Number(x.participants||0)} participants completed</span>
+        <span>${Number(x.attempts||0)} attempt${Number(x.attempts||0)===1?'':'s'} · avg ${Number(x.average_score_percent||0)}%</span>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  async function mRender(){
+    if(!mIsManager()||mBusy)return;
+    const view=m$('reportsView');if(!view)return;
+    let card=m$('monthlyKnowledgeAnalyticsCardV21041');
+    if(!card){
+      card=document.createElement('section');
+      card.id='monthlyKnowledgeAnalyticsCardV21041';
+      card.className='section-card report-manager-content monthly-knowledge-analytics-section';
+      const monthly=view.querySelector('.monthly-report-section');
+      monthly?.insertAdjacentElement('afterend',card)||view.appendChild(card);
+    }
+    mBusy=true;
+    try{
+      card.innerHTML='<div class="muted">Loading Monthly Knowledge analytics…</div>';
+      const {settings}=await mLoad();
+      const s=mData?.summary||{},current=mCurrentSummary(settings);
+      const firstRate=Number(s.first_try_pass_rate||0),avg=Number(s.average_score_percent||0);
+      const answerCount=Number(s.answers||0),wrong=Number(s.wrong_answers||0);
+      const wrongTraffic=mTrafficWrong(wrong,answerCount);
+      card.innerHTML=`<div class="row-between">
+          <div><h3>Monthly Knowledge Analytics</h3><p class="muted">Shows how the monthly checks are being completed and which safety subjects are being missed. This is a learning indicator, not a replacement for formal training/compliance status.</p></div>
+          <div class="row"><label class="analytics-period-label">Period<select id="monthlyKnowledgeAnalyticsPeriodV21041"><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option><option value="24">24 months</option></select></label><button id="refreshMonthlyKnowledgeAnalyticsV21041" class="secondary small" type="button">Refresh</button></div>
+        </div>
+        <div class="stats-grid knowledge-analytics-stats">
+          <div class="stat traffic-${!current.enabled?'neutral':mTrafficPercent(current.pct)}"><strong>${current.enabled?current.pct+'%':'OFF'}</strong><span>Current-month completion</span></div>
+          <div class="stat traffic-${Number(s.first_try_total||0)?mTrafficPercent(firstRate):'neutral'}"><strong>${Number(s.first_try_total||0)?firstRate+'%':'—'}</strong><span>Passed first attempt</span></div>
+          <div class="stat traffic-${Number(s.attempts||0)?mTrafficPercent(avg):'neutral'}"><strong>${Number(s.attempts||0)?avg+'%':'—'}</strong><span>Average score</span></div>
+          <div class="stat traffic-${answerCount?wrongTraffic:'neutral'}"><strong>${wrong}</strong><span>Incorrect answers</span></div>
+        </div>
+        <div class="hint-box"><strong>Current month:</strong> ${current.complete} complete · ${current.due} due · ${current.overdue} overdue · ${current.ready} people currently ready for a check. ${settings.enabled?'Monthly checks are ON.':'Monthly checks are OFF.'}</div>
+        <div class="knowledge-analytics-two-col">
+          <div><h4>Repeatedly missed topics</h4><p class="muted">Appears after the same topic has been answered incorrectly at least twice in the selected period.</p><div id="monthlyKnowledgeRepeatedMissesV21041"></div></div>
+          <div><h4>Difficulty performance</h4><p class="muted">Correct-answer rate by Easy, Standard and Hard questions.</p><div id="monthlyKnowledgeDifficultyAnalyticsV21041"></div></div>
+        </div>
+        <div class="section-card compact knowledge-analytics-inner"><h4>Topics with incorrect answers</h4><div id="monthlyKnowledgeWeakTopicsV21041"></div></div>
+        <div class="section-card compact knowledge-analytics-inner"><h4>Monthly history</h4><p class="muted">Historical percentage below is the percentage of people who attempted a check in that month and ultimately completed it. The current-month headline above uses the live expected/ready user list.</p><div id="monthlyKnowledgeMonthlyTrendV21041"></div></div>`;
+      const period=m$('monthlyKnowledgeAnalyticsPeriodV21041');if(period)period.value=String(mMonths);
+      period?.addEventListener('change',async e=>{mMonths=Number(e.target.value||12);await mRenderForce()});
+      m$('refreshMonthlyKnowledgeAnalyticsV21041')?.addEventListener('click',mRenderForce);
+      mRenderTopics();mRenderDifficulty();mRenderMonthly();
+      mAddHelpAction();
+    }catch(e){
+      card.innerHTML=`<div class="danger-note"><strong>Monthly Knowledge analytics could not load.</strong><br>${mesc(e?.message||e)}</div>`;
+    }finally{mBusy=false}
+  }
+
+  async function mRenderForce(){
+    mBusy=false;
+    return mRender();
+  }
+
+  function mAddHelpAction(){
+    const mod=core.roleAwareHelpV21038;
+    if(!mod?.actions||mod.actions.some(x=>x.id==='monthly-knowledge-analytics'))return;
+    mod.actions.push({
+      id:'monthly-knowledge-analytics',
+      roles:['manager','admin'],
+      group:'Reports',
+      title:'Monthly Knowledge Analytics',
+      desc:'See completion, scores, repeated weak topics and performance by question difficulty.',
+      view:'reports',
+      anchor:'#monthlyKnowledgeAnalyticsCardV21041',
+      keywords:'monthly knowledge analytics questions scores weak topics wrong answers difficulty reports'
+    });
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    if(b.dataset.view==='reports'||b.closest?.('[data-view="reports"]'))setTimeout(mRender,80);
+  },true);
+
+  window.addEventListener('pageshow',()=>setTimeout(()=>{
+    if(m$('reportsView')?.classList.contains('active-view'))mRenderForce();
+  },180));
+
+  const style=document.createElement('style');
+  style.id='monthlyKnowledgeAnalyticsStylesV21041';
+  style.textContent=`
+    #monthlyKnowledgeAnalyticsCardV21041{scroll-margin-top:10px}
+    .analytics-period-label{margin:0;min-width:135px}
+    .knowledge-analytics-stats{margin-top:12px}
+    .knowledge-analytics-two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    .knowledge-analytics-inner{margin-top:14px}
+    .knowledge-analytics-bar-row{margin:10px 0}.knowledge-analytics-bar{height:10px;background:#e7edf1;border-radius:999px;overflow:hidden;margin-top:5px}.knowledge-analytics-bar>span{display:block;height:100%;border-radius:999px}
+    .knowledge-analytics-bar>span.traffic-green{background:#2d6a4f}.knowledge-analytics-bar>span.traffic-amber{background:#d89414}.knowledge-analytics-bar>span.traffic-red{background:#b42318}
+    .knowledge-month-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.knowledge-month-cell{border:1px solid #d8e0e6;border-left-width:5px;border-radius:10px;padding:10px;display:grid;gap:3px}.knowledge-month-cell span{font-size:.82rem;color:#5f6f7f}
+    @media(max-width:760px){.knowledge-analytics-two-col{grid-template-columns:1fr}#monthlyKnowledgeAnalyticsCardV21041>.row-between{display:block}#monthlyKnowledgeAnalyticsCardV21041>.row-between>.row{margin-top:10px;flex-wrap:wrap}.analytics-period-label{flex:1}}
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    mApplyVersion();
+    mAddHelpAction();
+    if(mIsManager()&&m$('reportsView')?.classList.contains('active-view'))mRender();
+  },950);
+
+  core.monthlyKnowledgeAnalyticsV21041={render:mRenderForce};
+})();

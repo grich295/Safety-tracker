@@ -1,6 +1,6 @@
 {
-  "version": "2.10.40",
-  "build_id": "v21040-document-change-impact-review-20260918",
+  "version": "2.10.41",
+  "build_id": "v21041-monthly-knowledge-analytics-20260918",
   "clean": true,
-  "notes": "Adds automatic Document Change Impact review for replacement controlled-document versions. Managers/Admins see each replacement checked against direct pairwise document links, linked/current training and active assignments. Pending replacements can be reviewed before approval; newly approved replacements from this build onward remain flagged until impact is reviewed. Reviews are auditable in Supabase with outcome, note, reviewer, timestamp and an impact snapshot, and automatically reopen if linked documents/training/assignments change after the recorded review. Training still pointing at an older approved source version is flagged red. Direct Go there links are added to Documents, Safety Actions and role-aware Help. Includes all v2.10.39 Unified Safety Actions, v2.10.38 Help and v2.10.37 flicker fixes."
+  "notes": "Adds Monthly Knowledge Analytics under Reports for Managers/Admins. Shows live current-month completion, first-attempt pass rate, average score, incorrect-answer count, repeated weak topics, topic accuracy, Easy/Standard/Hard performance and monthly history with 3/6/12/24-month filters. Analytics are aggregate learning indicators and do not expose correct answer text or replace formal training/compliance status. Role-aware Help gains a direct Go there entry. Includes all v2.10.40 Document Change Impact, v2.10.39 Unified Safety Actions, v2.10.38 Help and v2.10.37 flicker fixes."
 }
