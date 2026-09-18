@@ -1,6 +1,6 @@
 {
-  "version": "2.10.42",
-  "build_id": "v21042-toolbox-talk-suggestions-20260918",
+  "version": "2.10.43",
+  "build_id": "v21043-safety-calendar-20260918",
   "clean": true,
-  "notes": "Adds Suggested Toolbox Talks to Monthly Knowledge Analytics. A suggestion appears only when the same topic has at least two incorrect answers from at least two different people in the selected 3/6/12/24-month period. Existing linked Toolbox Talks are detected and offered for re-delivery instead of encouraging duplicates. Where approved RA/COSHH/SSW source documents exist, Manager/Admin can open a pre-filled Toolbox Talk creator form; nothing is saved, approved or assigned until the manager chooses to continue through the normal controlled-document workflow. Unsupported topics without approved controlled sources cannot auto-create a draft. Role-aware Help gains a direct Go there entry. Includes all v2.10.41 analytics and prior fixes."
+  "notes": "Adds a Manager/Admin Safety Calendar under Reports. It combines training renewal dates, controlled-document review dates, monthly PPE checks, First Aid checks, custom checklist due dates and contractor/PTW start/finish dates in one month view. Calendar items use red/amber/green status, include type/person/status filters, a mobile-friendly month grid and agenda, and each event has a direct Go there button. Role-aware Help gains a direct Safety Calendar entry. No database migration is required. Includes all v2.10.42 Toolbox Talk suggestions and prior fixes."
 }

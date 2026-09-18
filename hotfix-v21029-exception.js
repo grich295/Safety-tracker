@@ -2227,3 +2227,441 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.toolboxTalkSuggestionsV21042={refresh:tRefresh};
 })();
+
+/* Safety Tracker v2.10.43 - Safety Calendar */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+
+  const cst=core.state, csb=core.sb;
+  const c$=id=>document.getElementById(id);
+  const cesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const cIsManager=()=>cst.profile?.report_only!==true&&['admin','manager'].includes(String(cst.profile?.role||'').toLowerCase());
+  const cToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+
+  let cMonth=new Date().toISOString().slice(0,7);
+  let cSelectedDay='';
+  let cEvents=[];
+  let cCustomRuns=[];
+  let cBusy=false;
+
+  function cApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.43';
+      window.SAFETY_BUILD.label='2.10.43 CLEAN';
+      window.SAFETY_BUILD.build='21043';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.43 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.43 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.43');
+  }
+  [0,500,1800,3500].forEach(ms=>setTimeout(cApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',cApplyVersion,{once:true});
+
+  function cToday(){return new Date().toISOString().slice(0,10)}
+  function cDateOnly(v){
+    if(!v)return '';
+    const s=String(v);
+    return s.length>=10?s.slice(0,10):'';
+  }
+  function cFmtDate(v){return v?new Date(cDateOnly(v)+'T00:00:00').toLocaleDateString('en-GB'):'—'}
+  function cFmtMonth(v){
+    if(!v)return '';
+    return new Date(v+'-01T00:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  }
+  function cPerson(id){
+    const p=(cst.people||[]).find(x=>x.id===id);
+    return p?.display_name||p?.email||'Unassigned';
+  }
+  function cTraffic(date,{complete=false,hardRed=false}={}){
+    if(hardRed)return 'red';
+    if(complete)return 'green';
+    const d=cDateOnly(date),today=cToday();
+    if(!d)return 'neutral';
+    if(d<today)return 'red';
+    const days=Math.floor((new Date(d+'T12:00:00')-new Date(today+'T12:00:00'))/86400000);
+    return days<=30?'amber':'green';
+  }
+  function cPriority(t){return ({red:0,amber:1,green:2,neutral:3})[t]??4}
+  function cEvent(x){
+    return {
+      id:x.id||crypto.randomUUID(),date:cDateOnly(x.date),type:x.type||'Other',
+      title:x.title||'Safety event',detail:x.detail||'',personId:x.personId||'',
+      person:x.person||'',traffic:x.traffic||'neutral',status:x.status||'',
+      go:x.go||{},timeLabel:x.timeLabel||''
+    };
+  }
+  function cInMonth(date){return !!date&&cDateOnly(date).slice(0,7)===cMonth}
+
+  async function cLoadCustomRuns(){
+    const [y,m]=cMonth.split('-').map(Number);
+    const first=`${cMonth}-01`;
+    const next=new Date(y,m,1);
+    const end=new Date(next.getTime()-86400000).toISOString().slice(0,10);
+    const r=await csb.from('custom_checklist_runs_v21032')
+      .select('*')
+      .gte('due_date',first)
+      .lte('due_date',end)
+      .order('due_date',{ascending:true});
+    if(r.error)throw r.error;
+    cCustomRuns=r.data||[];
+  }
+
+  function cBuildEvents(){
+    const out=[];
+
+    // Training renewal / completion dates.
+    for(const a of (cst.trainingAssignments||[])){
+      if(a.active===false)continue;
+      const t=(cst.training||[]).find(x=>x.id===a.training_session_id);
+      if(!t||t.status==='ARCHIVED')continue;
+      let st=null;
+      try{if(typeof assignmentStatus==='function')st=assignmentStatus(a,t)}catch(_e){}
+      const due=cDateOnly(st?.due||a.due_date);
+      if(!cInMonth(due))continue;
+      const tr=cTraffic(due,{complete:st?.code==='COMPLETED'});
+      out.push(cEvent({
+        id:'training-'+a.id,date:due,type:'Training',
+        title:`${t.reference?t.reference+' · ':''}${t.name||'Training'}`,
+        detail:st?.code==='COMPLETED'?'Current — next renewal date':(st?.label||'Training due'),
+        personId:a.user_id,person:cPerson(a.user_id),traffic:tr,status:st?.label||st?.code||'Due',
+        go:{view:'compliance',personId:a.user_id,status:st?.code}
+      }));
+    }
+
+    // Controlled document reviews.
+    for(const d of (cst.documents||[]).filter(x=>x.status!=='ARCHIVED')){
+      let v=null;
+      try{if(typeof approvedCurrentVersion==='function')v=approvedCurrentVersion(d.id)}catch(_e){}
+      if(!v){
+        v=(cst.versions||[]).find(x=>x.document_id===d.id&&x.status==='CURRENT'&&String(x.approval_status||'').toUpperCase()==='APPROVED')||null;
+      }
+      const due=cDateOnly(v?.review_date);
+      if(!cInMonth(due))continue;
+      const tr=cTraffic(due);
+      out.push(cEvent({
+        id:'document-'+d.id,date:due,type:'Document review',
+        title:`${d.reference?d.reference+' · ':''}${d.title||d.name||'Controlled document'}`,
+        detail:'Controlled document review date',person:'Manager / Admin',traffic:tr,status:tr==='red'?'Review overdue':'Review due',
+        go:{view:'documents',search:d.reference||d.title||''}
+      }));
+    }
+
+    // PPE monthly checks.
+    for(const p of (cst.ppeChecks||[])){
+      const due=cDateOnly(p.due_date);
+      if(!cInMonth(due))continue;
+      const complete=!!p.submitted_at||['COMPLETE','ISSUES'].includes(String(p.status||'').toUpperCase());
+      const tr=cTraffic(due,{complete});
+      out.push(cEvent({
+        id:'ppe-'+p.id,date:due,type:'PPE',
+        title:'Monthly PPE check',detail:complete?'Submitted':'Employee PPE check due',
+        personId:p.user_id,person:cPerson(p.user_id),traffic:tr,status:complete?'Complete':tr==='red'?'Overdue':'Due',
+        go:{view:'ppe'}
+      }));
+    }
+
+    // First Aid box checks.
+    for(const f of (cst.firstAidChecks||[])){
+      const due=cDateOnly(f.due_date);
+      if(!cInMonth(due))continue;
+      const box=(cst.firstAidBoxes||[]).find(x=>x.id===f.box_id);
+      const complete=!!f.submitted_at||!['DUE',''].includes(String(f.status||'').toUpperCase());
+      const tr=cTraffic(due,{complete});
+      out.push(cEvent({
+        id:'firstaid-'+f.id,date:due,type:'First Aid',
+        title:`${box?.name||'First Aid box'} check`,detail:box?.location||'Monthly First Aid check',
+        personId:f.assigned_user_id,person:cPerson(f.assigned_user_id),traffic:tr,status:complete?'Complete':tr==='red'?'Overdue':'Due',
+        go:{view:'firstAid'}
+      }));
+    }
+
+    // Custom checklist due dates.
+    for(const r of cCustomRuns){
+      const due=cDateOnly(r.due_date);
+      if(!cInMonth(due))continue;
+      const complete=!!r.submitted_at;
+      const hardRed=complete&&String(r.status||'').toUpperCase()==='ISSUES';
+      const tr=cTraffic(due,{complete:complete&&!hardRed,hardRed});
+      out.push(cEvent({
+        id:'custom-'+r.id,date:due,type:'Custom check',
+        title:r.template_name_snapshot||'Custom checklist',
+        detail:r.location_snapshot||'Scheduled custom safety check',
+        personId:r.assigned_user_id,person:cPerson(r.assigned_user_id),traffic:tr,
+        status:complete?(hardRed?'Completed · issues raised':'Complete'):(tr==='red'?'Overdue':'Due'),
+        go:{view:'checklists',clickSelectors:[`[data-cc-open-run="${r.id}"]`,`[data-cc-view-run="${r.id}"]`]}
+      }));
+    }
+
+    // Contractor / PTW scheduled start and finish dates.
+    for(const p of (cst.contractorPermits||[])){
+      if(['CANCELLED'].includes(String(p.status||'').toUpperCase()))continue;
+      const company=p.contractor_company||'Contractor';
+      const job=p.work_description||'Contractor work';
+      const start=cDateOnly(p.expected_start);
+      const finish=cDateOnly(p.expected_finish);
+
+      if(cInMonth(start)){
+        const awaiting=p.status==='AWAITING_APPROVAL';
+        const tr=awaiting?cTraffic(start):'green';
+        out.push(cEvent({
+          id:'ptw-start-'+p.id,date:start,type:'PTW / Contractor',
+          title:`${company} · work starts`,detail:job,person:'Maintenance',traffic:tr,
+          status:awaiting?'Awaiting approval':'Scheduled / active',
+          timeLabel:p.expected_start?new Date(p.expected_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
+          go:{view:'onsite',clickSelectors:[`[data-permit-approve="${p.id}"]`,`[data-permit-view="${p.id}"]`]}
+        }));
+      }
+      if(cInMonth(finish)){
+        const overdue=p.status==='ACTIVE'&&p.expected_finish&&new Date(p.expected_finish)<new Date();
+        const closed=p.status==='CLOSED';
+        const waiting=p.status==='AWAITING_CLOSE';
+        const tr=overdue?'red':closed?'green':waiting?'amber':'green';
+        out.push(cEvent({
+          id:'ptw-finish-'+p.id,date:finish,type:'PTW / Contractor',
+          title:`${company} · expected finish`,detail:job,person:'Maintenance',traffic:tr,
+          status:overdue?'Over expected finish':closed?'Closed':waiting?'Awaiting close-out':'Scheduled finish',
+          timeLabel:p.expected_finish?new Date(p.expected_finish).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
+          go:{view:'onsite',clickSelectors:[`[data-permit-close="${p.id}"]`,`[data-permit-view="${p.id}"]`]}
+        }));
+      }
+    }
+
+    return out.sort((a,b)=>a.date.localeCompare(b.date)||cPriority(a.traffic)-cPriority(b.traffic)||a.type.localeCompare(b.type)||a.title.localeCompare(b.title));
+  }
+
+  function cMonthBounds(){
+    const [y,m]=cMonth.split('-').map(Number);
+    return {y,m,days:new Date(y,m,0).getDate(),firstDow:new Date(y,m-1,1).getDay()};
+  }
+  function cEventsForDate(date,filtered){
+    return filtered.filter(e=>e.date===date);
+  }
+  function cCurrentFilters(){
+    return {
+      type:c$('safetyCalendarTypeFilterV21043')?.value||'ALL',
+      person:c$('safetyCalendarPersonFilterV21043')?.value||'ALL',
+      traffic:c$('safetyCalendarTrafficFilterV21043')?.value||'ALL'
+    };
+  }
+  function cFiltered(){
+    const f=cCurrentFilters();
+    return cEvents.filter(e=>
+      (f.type==='ALL'||e.type===f.type)&&
+      (f.person==='ALL'||e.personId===f.person)&&
+      (f.traffic==='ALL'||e.traffic===f.traffic)
+    );
+  }
+  function cDayHtml(day,filtered){
+    const {y,m}=cMonthBounds();
+    const date=`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const rows=cEventsForDate(date,filtered);
+    const red=rows.filter(x=>x.traffic==='red').length,amber=rows.filter(x=>x.traffic==='amber').length,green=rows.filter(x=>x.traffic==='green').length;
+    const isToday=date===cToday(),selected=date===cSelectedDay;
+    const previews=rows.slice(0,3).map(x=>`<span class="calendar-mini traffic-${x.traffic}" title="${cesc(x.title)}">${cesc(x.type)}</span>`).join('');
+    return `<button type="button" class="safety-calendar-day ${isToday?'today':''} ${selected?'selected':''}" data-calendar-day="${date}">
+      <span class="safety-calendar-day-number">${day}</span>
+      <span class="safety-calendar-dots">${red?`<i class="dot red"></i>`:''}${amber?`<i class="dot amber"></i>`:''}${green?`<i class="dot green"></i>`:''}</span>
+      <span class="safety-calendar-mini-list">${previews}${rows.length>3?`<span class="calendar-more">+${rows.length-3} more</span>`:''}</span>
+    </button>`;
+  }
+  function cRenderGrid(){
+    const grid=c$('safetyCalendarGridV21043');if(!grid)return;
+    const filtered=cFiltered(),b=cMonthBounds();
+    const offset=(b.firstDow+6)%7; // Monday = 0
+    let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>`<div class="safety-calendar-weekday">${x}</div>`).join('');
+    for(let i=0;i<offset;i++)html+='<div class="safety-calendar-day blank"></div>';
+    for(let d=1;d<=b.days;d++)html+=cDayHtml(d,filtered);
+    grid.innerHTML=html;
+    grid.querySelectorAll('[data-calendar-day]').forEach(b=>b.addEventListener('click',()=>{
+      cSelectedDay=cSelectedDay===b.dataset.calendarDay?'':b.dataset.calendarDay;
+      cRenderGrid();cRenderAgenda();
+    }));
+  }
+  function cAgendaRows(){
+    let rows=cFiltered();
+    if(cSelectedDay)rows=rows.filter(x=>x.date===cSelectedDay);
+    return rows;
+  }
+  function cRenderAgenda(){
+    const list=c$('safetyCalendarAgendaV21043');if(!list)return;
+    const rows=cAgendaRows();
+    const heading=c$('safetyCalendarAgendaHeadingV21043');
+    if(heading)heading.textContent=cSelectedDay?`Events on ${cFmtDate(cSelectedDay)}`:`Events in ${cFmtMonth(cMonth)}`;
+    const clear=c$('safetyCalendarClearDayV21043');if(clear)clear.hidden=!cSelectedDay;
+    if(!rows.length){list.innerHTML='<div class="success-note">No safety calendar events match these filters.</div>';return}
+    list.innerHTML=rows.map(e=>`<div class="item-card compact traffic-${e.traffic}">
+      <div class="row-between"><div><span class="safety-calendar-type">${cesc(e.type)}</span><strong>${cesc(e.title)}</strong><div class="muted">${cesc(e.detail)}</div></div><span class="badge ${e.traffic==='red'?'overdue':e.traffic==='amber'?'due':e.traffic==='green'?'complete':''}">${cesc(e.status||e.traffic)}</span></div>
+      <div class="meta"><span>${cFmtDate(e.date)}${e.timeLabel?' · '+cesc(e.timeLabel):''}</span>${e.person?`<span>${cesc(e.person)}</span>`:''}</div>
+      <div class="actions"><button type="button" class="primary small" data-calendar-go="${cesc(e.id)}">Go there</button></div>
+    </div>`).join('');
+    list.querySelectorAll('[data-calendar-go]').forEach(b=>b.addEventListener('click',()=>cGo(b.dataset.calendarGo)));
+  }
+  function cRenderStats(){
+    const el=c$('safetyCalendarStatsV21043');if(!el)return;
+    const f=cFiltered(),red=f.filter(x=>x.traffic==='red').length,amber=f.filter(x=>x.traffic==='amber').length,green=f.filter(x=>x.traffic==='green').length;
+    el.innerHTML=[
+      ['Overdue / urgent',red,red?'red':'green'],
+      ['Due / attention',amber,amber?'amber':'green'],
+      ['Current / planned',green,'green'],
+      ['Total events',f.length,f.length?'neutral':'green']
+    ].map(([l,n,t])=>`<div class="stat traffic-${t}"><strong>${n}</strong><span>${l}</span></div>`).join('');
+  }
+  function cRenderFilters(){
+    const type=c$('safetyCalendarTypeFilterV21043'),person=c$('safetyCalendarPersonFilterV21043');
+    if(type){
+      const keep=type.value||'ALL';
+      const types=[...new Set(cEvents.map(x=>x.type))].sort();
+      type.innerHTML='<option value="ALL">All types</option>'+types.map(x=>`<option value="${cesc(x)}">${cesc(x)}</option>`).join('');
+      if([...type.options].some(o=>o.value===keep))type.value=keep;
+    }
+    if(person){
+      const keep=person.value||'ALL';
+      const ids=[...new Set(cEvents.map(x=>x.personId).filter(Boolean))];
+      person.innerHTML='<option value="ALL">All people</option>'+ids.map(id=>`<option value="${cesc(id)}">${cesc(cPerson(id))}</option>`).join('');
+      if([...person.options].some(o=>o.value===keep))person.value=keep;
+    }
+  }
+  function cRenderBody(){
+    cRenderFilters();cRenderStats();cRenderGrid();cRenderAgenda();
+  }
+
+  async function cRender(){
+    if(!cIsManager()||cBusy)return;
+    const reports=c$('reportsView');if(!reports)return;
+    let card=c$('safetyCalendarCardV21043');
+    if(!card){
+      card=document.createElement('section');
+      card.id='safetyCalendarCardV21043';
+      card.className='section-card report-manager-content safety-calendar-section';
+      const stats=c$('reportStats');
+      stats?.insertAdjacentElement('afterend',card)||reports.prepend(card);
+    }
+    cBusy=true;
+    try{
+      card.innerHTML='<div class="muted">Loading Safety Calendar…</div>';
+      await cLoadCustomRuns();
+      cEvents=cBuildEvents();
+      card.innerHTML=`<div class="row-between">
+        <div><h3>Safety Calendar</h3><p class="muted">Training renewals, controlled document reviews, PPE, First Aid, custom checks and contractor/PTW dates in one place.</p></div>
+        <div class="safety-calendar-nav"><button type="button" class="secondary small" id="calendarPrevV21043">‹</button><button type="button" class="secondary small" id="calendarTodayV21043">Today</button><button type="button" class="secondary small" id="calendarNextV21043">›</button></div>
+      </div>
+      <h4 class="safety-calendar-month-title" id="safetyCalendarMonthTitleV21043">${cesc(cFmtMonth(cMonth))}</h4>
+      <div class="safety-calendar-filters">
+        <label>Type<select id="safetyCalendarTypeFilterV21043"></select></label>
+        <label>Person<select id="safetyCalendarPersonFilterV21043"></select></label>
+        <label>Status<select id="safetyCalendarTrafficFilterV21043"><option value="ALL">All</option><option value="red">Red / overdue</option><option value="amber">Amber / due</option><option value="green">Green / current</option></select></label>
+      </div>
+      <div id="safetyCalendarStatsV21043" class="stats-grid"></div>
+      <div class="traffic-key calendar-legend"><span class="legend red">Overdue / urgent</span><span class="legend amber">Due / attention</span><span class="legend green">Current / planned</span></div>
+      <div id="safetyCalendarGridV21043" class="safety-calendar-grid"></div>
+      <div class="section-card compact safety-calendar-agenda-card">
+        <div class="row-between"><h4 id="safetyCalendarAgendaHeadingV21043"></h4><button type="button" class="ghost small" id="safetyCalendarClearDayV21043" hidden>Show whole month</button></div>
+        <div id="safetyCalendarAgendaV21043" class="card-list"></div>
+      </div>`;
+
+      c$('calendarPrevV21043')?.addEventListener('click',()=>cShiftMonth(-1));
+      c$('calendarNextV21043')?.addEventListener('click',()=>cShiftMonth(1));
+      c$('calendarTodayV21043')?.addEventListener('click',()=>{cMonth=cToday().slice(0,7);cSelectedDay='';cRenderForce()});
+      c$('safetyCalendarClearDayV21043')?.addEventListener('click',()=>{cSelectedDay='';cRenderGrid();cRenderAgenda()});
+      ['safetyCalendarTypeFilterV21043','safetyCalendarPersonFilterV21043','safetyCalendarTrafficFilterV21043'].forEach(id=>c$(id)?.addEventListener('change',cRenderBody));
+      cRenderBody();cAddHelpAction();
+    }catch(e){
+      card.innerHTML=`<div class="danger-note"><strong>Safety Calendar could not load.</strong><br>${cesc(e?.message||e)}</div>`;
+    }finally{cBusy=false}
+  }
+  function cShiftMonth(delta){
+    const [y,m]=cMonth.split('-').map(Number),d=new Date(y,m-1+delta,1);
+    cMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    cSelectedDay='';
+    cRenderForce();
+  }
+  async function cRenderForce(){cBusy=false;return cRender()}
+
+  async function cWaitClick(selectors){
+    for(let i=0;i<18;i++){
+      for(const sel of selectors||[]){
+        const el=document.querySelector(sel);
+        if(el){try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){};setTimeout(()=>el.click(),60);return true}
+      }
+      await new Promise(r=>setTimeout(r,120));
+    }
+    return false;
+  }
+  async function cGo(id){
+    const e=cEvents.find(x=>x.id===id);if(!e)return;
+    const g=e.go||{};
+    try{
+      if(g.view){
+        if(typeof showView==='function')showView(g.view);
+        else document.querySelector(`#mainNav button[data-view="${g.view}"]`)?.click();
+      }
+      await new Promise(r=>setTimeout(r,120));
+      if(g.search&&g.view==='documents'){
+        const input=c$('documentSearch');
+        if(input){input.value=g.search;input.dispatchEvent(new Event('input',{bubbles:true}))}
+      }
+      if(g.personId&&g.view==='compliance'){
+        const p=c$('compliancePersonFilter');if(p){p.value=g.personId;p.dispatchEvent(new Event('input',{bubbles:true}))}
+        const s=c$('complianceStatusFilter');if(s&&g.status&&[...s.options].some(o=>o.value===g.status)){s.value=g.status;s.dispatchEvent(new Event('input',{bubbles:true}))}
+      }
+      if(g.clickSelectors?.length)await cWaitClick(g.clickSelectors);
+    }catch(err){cToast('Could not open calendar item: '+(err?.message||err))}
+  }
+
+  function cAddHelpAction(){
+    const mod=core.roleAwareHelpV21038;
+    if(!mod?.actions||mod.actions.some(x=>x.id==='safety-calendar'))return;
+    mod.actions.push({
+      id:'safety-calendar',
+      roles:['manager','admin'],
+      group:'Management',
+      title:'Safety Calendar',
+      desc:'See training renewals, document reviews, PPE, First Aid, custom checks and PTW dates together.',
+      view:'reports',
+      anchor:'#safetyCalendarCardV21043',
+      keywords:'safety calendar due dates renewals document review ppe first aid custom checklist ptw contractor'
+    });
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    if(b.dataset.view==='reports'||b.closest?.('[data-view="reports"]'))setTimeout(cRender,100);
+  },true);
+  window.addEventListener('pageshow',()=>setTimeout(()=>{
+    if(c$('reportsView')?.classList.contains('active-view'))cRenderForce();
+  },220));
+
+  const style=document.createElement('style');
+  style.id='safetyCalendarStylesV21043';
+  style.textContent=`
+    #safetyCalendarCardV21043{scroll-margin-top:10px}.safety-calendar-nav{display:flex;gap:6px}
+    .safety-calendar-month-title{text-align:center;margin:12px 0 8px}
+    .safety-calendar-filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:10px 0}
+    .safety-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:12px}
+    .safety-calendar-weekday{text-align:center;font-weight:800;font-size:.8rem;color:#5a6e7f;padding:5px}
+    .safety-calendar-day{min-height:104px;border:1px solid #d8e0e6;border-radius:10px;background:#fff;padding:7px;text-align:left;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+    .safety-calendar-day:hover{border-color:#9aabb8}.safety-calendar-day.today{box-shadow:0 0 0 2px #17324d inset}.safety-calendar-day.selected{outline:3px solid rgba(23,50,77,.18)}
+    .safety-calendar-day.blank{background:#f6f8fa;border-style:dashed;min-height:104px}
+    .safety-calendar-day-number{font-weight:800}.safety-calendar-dots{display:flex;gap:4px;min-height:8px}
+    .safety-calendar-dots .dot{width:7px;height:7px;border-radius:50%;display:inline-block}.safety-calendar-dots .red{background:#b42318}.safety-calendar-dots .amber{background:#d89414}.safety-calendar-dots .green{background:#2d6a4f}
+    .safety-calendar-mini-list{display:grid;gap:3px}.calendar-mini{display:block;padding:2px 4px;border-left:3px solid;border-radius:4px;background:#f7f9fa;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .calendar-mini.traffic-red{border-color:#b42318}.calendar-mini.traffic-amber{border-color:#d89414}.calendar-mini.traffic-green{border-color:#2d6a4f}.calendar-more{font-size:.68rem;color:#607182}
+    .safety-calendar-agenda-card{margin-top:14px}.safety-calendar-type{display:block;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5d7284;margin-bottom:3px}
+    @media(max-width:760px){
+      .safety-calendar-filters{grid-template-columns:1fr}.safety-calendar-grid{gap:3px}.safety-calendar-weekday{font-size:.7rem;padding:3px}
+      .safety-calendar-day{min-height:62px;padding:5px}.safety-calendar-day.blank{min-height:62px}.safety-calendar-mini-list{display:none}.safety-calendar-day-number{font-size:.86rem}
+      #safetyCalendarCardV21043>.row-between{display:block}.safety-calendar-nav{margin-top:8px}
+    }
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    cApplyVersion();cAddHelpAction();
+    if(cIsManager()&&c$('reportsView')?.classList.contains('active-view'))cRender();
+  },1200);
+
+  core.safetyCalendarV21043={render:cRenderForce,go:cGo};
+})();
