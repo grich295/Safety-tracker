@@ -1,6 +1,6 @@
 {
-  "version": "2.10.36",
-  "build_id": "v21036-monthly-knowledge-flex-auto-20260918",
+  "version": "2.10.37",
+  "build_id": "v21037-monthly-knowledge-flicker-fix-20260918",
   "clean": true,
-  "notes": "Monthly knowledge checks are fully automatic and configurable. Admin can set 1-10 questions per month and Easy, Standard, Hard or Mixed difficulty, plus ON/OFF. Applicable new/current safety training sources and new document versions are detected automatically while Admin/Manager is signed in; superseded versions stop being used. Questions remain multiple choice with three options and one correct answer, and all selected questions must be correct to complete the month. Formal training renewal schedules remain separate."
+  "notes": "Fixes the Monthly Knowledge Check screen flickering on mobile by removing the self-triggering whole-DOM MutationObserver. Knowledge cards now refresh only on startup, navigation and app resume. Monthly questions still open in the standard Safety Tracker modal after the user taps the knowledge-check button; the modal is forced to start at the top on mobile. Existing automatic question-bank generation, ON/OFF, 1-10 question setting and Easy/Standard/Hard/Mixed difficulty remain unchanged. No SQL migration required."
 }

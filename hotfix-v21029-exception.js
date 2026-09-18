@@ -41,7 +41,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   const core=window.SafetyTrackerV2;
   if(!core||!core.sb||!core.state)return;
 
-  const KVER='2.10.36';
+  const KVER='2.10.37';
   const ksb=core.sb, ks=core.state;
   const k$=id=>document.getElementById(id);
   const kesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -57,7 +57,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
     if(window.SAFETY_BUILD){
       window.SAFETY_BUILD.version=KVER;
       window.SAFETY_BUILD.label=KVER+' CLEAN';
-      window.SAFETY_BUILD.build='21036';
+      window.SAFETY_BUILD.build='21037';
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
     document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+KVER+' CLEAN');
@@ -236,10 +236,10 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   async function kRenderMyCard(){
     if(kMyLoading||!ks.user||ks.profile?.report_only===true)return;
     const view=k$('mySafetyView');if(!view)return;
-    let card=k$('monthlyKnowledgeCardV21036');
+    let card=k$('monthlyKnowledgeCardV21037');
     if(!card){
       card=document.createElement('div');
-      card.id='monthlyKnowledgeCardV21036';
+      card.id='monthlyKnowledgeCardV21037';
       card.className='section-card monthly-knowledge-card';
       const anchor=k$('mySafetyStats');
       anchor?.insertAdjacentElement('afterend',card)||view.appendChild(card);
@@ -290,7 +290,11 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       const total=q.questions.length;
       kQuiz={issueId:q.issue_id,questions:q.questions};
       openModal('Monthly Knowledge Check',`<div class="hint-box"><strong>${total} random ${kesc(kDifficultyLabel(q.difficulty))} question${total===1?'':'s'} for this month.</strong> Choose one answer for each. You need ${Number(q.required_score||total)}/${total}. Wrong answers show the safety topic to review, and a retry uses another random set where possible.</div><div class="knowledge-question-list">${q.questions.map((x,i)=>kQuestionHtml(x,i+1,total)).join('')}</div><div id="monthlyKnowledgeResult" class="message" hidden></div><div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" id="submitMonthlyKnowledgeBtn">Check answers</button></div>`);
-      setTimeout(()=>k$('submitMonthlyKnowledgeBtn')?.addEventListener('click',kSubmitMonthlyQuiz),0);
+      setTimeout(()=>{
+        k$('submitMonthlyKnowledgeBtn')?.addEventListener('click',kSubmitMonthlyQuiz);
+        const modal=k$('modal'),body=k$('modalBody');
+        try{if(modal)modal.scrollTop=0;if(body)body.scrollTop=0;}catch(_e){}
+      },0);
     }catch(e){ktoast('Could not start monthly knowledge check: '+(e.message||e))}
     finally{if(button){button.disabled=false;button.textContent='Take monthly knowledge check'}}
   }
@@ -418,7 +422,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   }
 
   async function kRefreshAdmin(){
-    const card=k$('monthlyKnowledgeAdminCardV21036');if(!card||!kIsAdmin()||kAdminLoading)return;
+    const card=k$('monthlyKnowledgeAdminCardV21037');if(!card||!kIsAdmin()||kAdminLoading)return;
     kAdminLoading=true;
     try{
       const [settings,banks,teamResp]=await Promise.all([
@@ -454,8 +458,8 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function kEnsureAdminCard(){
     if(!kIsAdmin())return;
-    const view=k$('adminView');if(!view||k$('monthlyKnowledgeAdminCardV21036'))return;
-    const card=document.createElement('div');card.className='section-card';card.id='monthlyKnowledgeAdminCardV21036';
+    const view=k$('adminView');if(!view||k$('monthlyKnowledgeAdminCardV21037'))return;
+    const card=document.createElement('div');card.className='section-card';card.id='monthlyKnowledgeAdminCardV21037';
     card.innerHTML=`<div class="row-between"><div><h3>Monthly Knowledge Checks</h3><p class="muted">Automatic monthly testing using each person’s current assigned safety information.</p></div><button type="button" class="secondary" id="monthlyKnowledgeToggleBtn">Monthly Knowledge Checks</button></div>
       <div id="monthlyKnowledgeSwitchState" style="margin-top:10px"><div class="muted">Loading setting…</div></div>
       <div class="form-grid" style="margin-top:12px">
@@ -478,9 +482,9 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   async function kRenderTeamCard(){
     if(!kIsManager()||kTeamLoading)return;
     const view=k$('complianceView');if(!view)return;
-    let card=k$('monthlyKnowledgeComplianceCardV21036');
+    let card=k$('monthlyKnowledgeComplianceCardV21037');
     if(!card){
-      card=document.createElement('div');card.id='monthlyKnowledgeComplianceCardV21036';card.className='section-card';
+      card=document.createElement('div');card.id='monthlyKnowledgeComplianceCardV21037';card.className='section-card';
       const stats=k$('complianceStats');stats?.insertAdjacentElement('afterend',card)||view.appendChild(card);
     }
     kTeamLoading=true;
@@ -508,18 +512,20 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
     if(b.dataset.view==='compliance')setTimeout(kRenderTeamCard,50);
   },true);
 
-  const kObserver=new MutationObserver(mutations=>{
-    if(mutations.some(m=>m.type==='childList'))setTimeout(kEnsureCards,35);
-  });
-  kObserver.observe(document.body,{childList:true,subtree:true});
-
+  // Do not observe the whole DOM here. Re-rendering the knowledge card changes
+  // child nodes, which would trigger the observer again and can cause Android
+  // screen flicker. Refresh only on startup, navigation and returning to app.
   setTimeout(kEnsureCards,450);
   setTimeout(kEnsureCards,1600);
+  window.addEventListener('pageshow',()=>setTimeout(kEnsureCards,80));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')setTimeout(kEnsureCards,120);
+  });
   setTimeout(()=>kAutoBuildMissing(true),2500);
   kAutoTimer=setInterval(()=>kAutoBuildMissing(false),120000);
 
   const style=document.createElement('style');
-  style.id='monthlyKnowledgeStylesV21036';
+  style.id='monthlyKnowledgeStylesV21037';
   style.textContent=`
     .monthly-knowledge-card{border-left:5px solid #94a3b8}
     .monthly-knowledge-card.traffic-green{border-left-color:#2d6a4f}.monthly-knowledge-card.traffic-amber{border-left-color:#d89414}.monthly-knowledge-card.traffic-red{border-left-color:#b42318}
@@ -533,7 +539,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   `;
   document.head.appendChild(style);
 
-  core.monthlyKnowledgeV21036={
+  core.monthlyKnowledgeV21037={
     render:kRenderMyCard,autoBuild:()=>kAutoBuildMissing(true),review:kReviewQuestions,
     refreshAdmin:kRefreshAdmin,saveConfig:kSaveConfig
   };
