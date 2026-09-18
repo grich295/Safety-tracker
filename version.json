@@ -1,6 +1,6 @@
 {
-  "version": "2.10.38",
-  "build_id": "v21038-role-aware-action-help-20260918",
+  "version": "2.10.39",
+  "build_id": "v21039-unified-safety-actions-20260918",
   "clean": true,
-  "notes": "Adds role-aware action Help for Users, Managers and Admins. Help now has task search and direct Go there buttons that navigate to the correct Safety Tracker screen, subsection or form rather than telling the user which menus/buttons to press. Includes direct routes for training, monthly knowledge checks, PPE, First Aid, checklists, contractor/PTW, document control, compliance, reports, evidence packs, users, departments, viewers, Checklist Builder, monthly question settings, site locations, bulk import, sync, storage cleanup and diagnostics. Includes the v2.10.37 knowledge-card flicker fix. No SQL migration required."
+  "notes": "Adds a unified Safety Actions dashboard for Managers/Admins. It combines controlled-document approvals/reviews, overdue training, PPE issues and overdue checks, First Aid replenishment/checks, custom checklist actions, PTW approval/overdue/close-out actions and overdue Monthly Knowledge Checks. Actions are prioritised red/high or amber/action-required, show owner/due/status, can be filtered/searched, and each row has a direct Go there button. A Safety Actions shortcut is also shown on My Safety for Managers/Admins and Help gains a direct Safety Actions entry. Includes all v2.10.38 role-aware Help and v2.10.37 flicker fixes. No SQL migration required."
 }

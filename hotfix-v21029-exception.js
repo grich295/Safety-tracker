@@ -788,3 +788,586 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.roleAwareHelpV21038={render:hRender,go:hGo,actions:ACTIONS};
 })();
+
+/* Safety Tracker v2.10.39 - unified Safety Actions dashboard */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+
+  const ast=core.state, asb=core.sb;
+  const a$=id=>document.getElementById(id);
+  const aesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const aclean=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const aIsManager=()=>ast.profile?.report_only!==true&&['admin','manager'].includes(String(ast.profile?.role||'').toLowerCase());
+  const aPerson=id=>{
+    const p=(ast.people||[]).find(x=>x.id===id);
+    return p?.display_name||p?.email||'Unassigned';
+  };
+  const aToday=()=>new Date().toISOString().slice(0,10);
+  const aFmtDate=v=>v?new Date(String(v).length===10?v+'T00:00:00':v).toLocaleDateString('en-GB'):'—';
+  const aFmtDateTime=v=>v?new Date(v).toLocaleString('en-GB'):'—';
+  const aToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+
+  let aLoading=false,aActions=[],aCustomLoadedAt=0,aCustomRuns=[],aCustomItems=[],aKnowledgeRows=[];
+
+  function aApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.39';
+      window.SAFETY_BUILD.label='2.10.39 CLEAN';
+      window.SAFETY_BUILD.build='21039';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.39 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.39 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.39');
+  }
+  [0,500,1400,2800].forEach(ms=>setTimeout(aApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',aApplyVersion,{once:true});
+
+  function aPriority(priority){return String(priority||'AMBER').toUpperCase()==='RED'?'RED':'AMBER'}
+  function aAction(x){return {
+    id:x.id||crypto.randomUUID(),
+    type:x.type||'Other',
+    title:x.title||'Safety action',
+    detail:x.detail||'',
+    owner:x.owner||'Manager / Admin',
+    due:x.due||'',
+    dueLabel:x.dueLabel||'',
+    status:x.status||'Open',
+    priority:aPriority(x.priority),
+    go:x.go||{view:'compliance'},
+    sortDate:x.sortDate||x.due||'9999-12-31'
+  }}
+
+  function aLatestPendingVersion(docId){
+    return (ast.versions||[]).filter(v=>v.document_id===docId&&String(v.approval_status||'').toUpperCase()==='PENDING')
+      .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null;
+  }
+
+  function aCurrentApprovedVersion(docId){
+    try{
+      if(typeof approvedCurrentVersion==='function')return approvedCurrentVersion(docId);
+    }catch(_e){}
+    return (ast.versions||[]).filter(v=>v.document_id===docId&&String(v.approval_status||'').toUpperCase()==='APPROVED')
+      .sort((a,b)=>new Date(b.issue_date||b.created_at||0)-new Date(a.issue_date||a.created_at||0))[0]||null;
+  }
+
+  function aDocTitle(d){
+    try{if(typeof documentDisplayTitle==='function')return documentDisplayTitle(d)}catch(_e){}
+    return d?.title||d?.name||d?.reference||'Document';
+  }
+
+  function aCoreActions(){
+    const out=[];
+    const today=aToday();
+
+    // Controlled documents: keep high-volume approval work as one clear action.
+    const activeDocs=(ast.documents||[]).filter(d=>d.status!=='ARCHIVED');
+    const pendingDocs=activeDocs.map(d=>({d,v:aLatestPendingVersion(d.id)})).filter(x=>x.v);
+    if(pendingDocs.length){
+      const oldest=pendingDocs.map(x=>x.v.created_at).filter(Boolean).sort()[0]||'';
+      out.push(aAction({
+        id:'docs-pending',
+        type:'Documents',
+        title:`${pendingDocs.length} controlled document${pendingDocs.length===1?'':'s'} awaiting approval / acceptance`,
+        detail:'Open Documents to review the current pending versions. This is grouped so a large document upload does not swamp the action list.',
+        owner:'Manager / Admin',
+        dueLabel:'Review required',
+        status:'Pending approval',
+        priority:'AMBER',
+        sortDate:oldest,
+        go:{view:'documents'}
+      }));
+    }
+
+    const overdueDocs=[],dueSoonDocs=[];
+    for(const d of activeDocs){
+      const v=aCurrentApprovedVersion(d.id);
+      if(!v?.review_date)continue;
+      const rd=String(v.review_date).slice(0,10);
+      const diff=(new Date(rd+'T12:00:00')-new Date(today+'T12:00:00'))/86400000;
+      if(diff<0)overdueDocs.push({d,v});
+      else if(diff<=30)dueSoonDocs.push({d,v});
+    }
+    for(const x of overdueDocs){
+      out.push(aAction({
+        id:'doc-review-'+x.d.id,
+        type:'Documents',
+        title:`Document review overdue · ${x.d.reference||aDocTitle(x.d)}`,
+        detail:aDocTitle(x.d),
+        owner:'Manager / Admin',
+        due:x.v.review_date,
+        status:'Review overdue',
+        priority:'RED',
+        go:{view:'documents',docId:x.d.id,search:x.d.reference||aDocTitle(x.d)}
+      }));
+    }
+    if(dueSoonDocs.length){
+      const earliest=dueSoonDocs.map(x=>x.v.review_date).sort()[0];
+      out.push(aAction({
+        id:'docs-review-soon',
+        type:'Documents',
+        title:`${dueSoonDocs.length} document review${dueSoonDocs.length===1?'':'s'} due within 30 days`,
+        detail:'Current approved documents approaching their review date.',
+        owner:'Manager / Admin',
+        due:earliest,
+        status:'Review due soon',
+        priority:'AMBER',
+        go:{view:'documents'}
+      }));
+    }
+
+    // Training: individual when manageable, grouped when many.
+    const overdueTraining=[];
+    for(const a of (ast.trainingAssignments||[])){
+      if(a.active===false)continue;
+      const t=(ast.training||[]).find(x=>x.id===a.training_session_id);
+      if(!t||t.status==='ARCHIVED')continue;
+      let st=null;
+      try{if(typeof assignmentStatus==='function')st=assignmentStatus(a,t)}catch(_e){}
+      if(st?.code==='OVERDUE')overdueTraining.push({a,t,st});
+    }
+    if(overdueTraining.length>12){
+      const earliest=overdueTraining.map(x=>x.st.due||x.a.due_date).filter(Boolean).sort()[0]||'';
+      out.push(aAction({
+        id:'training-overdue-group',
+        type:'Training',
+        title:`${overdueTraining.length} overdue training assignment${overdueTraining.length===1?'':'s'}`,
+        detail:'Open Compliance to work through the overdue training list.',
+        owner:'Multiple people',
+        due:earliest,
+        status:'Overdue',
+        priority:'RED',
+        go:{view:'compliance',status:'OVERDUE'}
+      }));
+    }else{
+      overdueTraining.forEach(x=>out.push(aAction({
+        id:'training-'+x.a.id,
+        type:'Training',
+        title:`Overdue training · ${x.t.reference?x.t.reference+' - ':''}${x.t.name||'Training'}`,
+        detail:'Training renewal or completion is overdue.',
+        owner:aPerson(x.a.user_id),
+        due:x.st.due||x.a.due_date,
+        status:'Overdue',
+        priority:'RED',
+        go:{view:'compliance',personId:x.a.user_id,status:'OVERDUE'}
+      })));
+    }
+
+    // PPE failures / replacements.
+    const ppeBad=new Set(['REPLACEMENT_REQUIRED','MISSING','BROKEN','DAMAGED','USED']);
+    for(const item of (ast.ppeCheckItems||[])){
+      if(!ppeBad.has(String(item.result||'').toUpperCase()))continue;
+      if(['RESOLVED','NOT_REQUIRED'].includes(String(item.action_status||'OPEN').toUpperCase()))continue;
+      const check=(ast.ppeChecks||[]).find(x=>x.id===item.check_id);
+      const red=['REPLACEMENT_REQUIRED','MISSING','BROKEN','DAMAGED'].includes(String(item.result||'').toUpperCase());
+      out.push(aAction({
+        id:'ppe-'+item.id,
+        type:'PPE',
+        title:`PPE action · ${item.ppe_name_snapshot||'PPE item'}`,
+        detail:`${String(item.result||'Issue').replaceAll('_',' ')}${item.comment?' · '+item.comment:''}`,
+        owner:aPerson(check?.user_id),
+        due:check?.due_date,
+        dueLabel:check?.due_date?'':'Action now',
+        status:item.action_status||'OPEN',
+        priority:red?'RED':'AMBER',
+        go:{view:'ppe',clickSelectors:[`[data-ppe-action="${item.id}"]`,`[data-update-ppe-action="${item.id}"]`]}
+      }));
+    }
+
+    // Outstanding PPE checks themselves.
+    for(const check of (ast.ppeChecks||[])){
+      if(check.submitted_at)continue;
+      if(!check.due_date)continue;
+      const overdue=String(check.due_date).slice(0,10)<today;
+      out.push(aAction({
+        id:'ppe-check-'+check.id,
+        type:'PPE',
+        title:`Monthly PPE check ${overdue?'overdue':'due'}`,
+        detail:'Monthly PPE inspection has not been submitted.',
+        owner:aPerson(check.user_id),
+        due:check.due_date,
+        status:overdue?'Overdue':'Due',
+        priority:overdue?'RED':'AMBER',
+        go:{view:'ppe'}
+      }));
+    }
+
+    // First Aid failures / replenishment.
+    const faBad=new Set(['LOW','MISSING','EXPIRED','DAMAGED']);
+    for(const item of (ast.firstAidCheckItems||[])){
+      if(!faBad.has(String(item.result||'').toUpperCase()))continue;
+      if(['REPLENISHED','NOT_REQUIRED'].includes(String(item.action_status||'OPEN').toUpperCase()))continue;
+      const check=(ast.firstAidChecks||[]).find(x=>x.id===item.check_id);
+      const box=(ast.firstAidBoxes||[]).find(x=>x.id===check?.box_id);
+      const red=['MISSING','EXPIRED','DAMAGED'].includes(String(item.result||'').toUpperCase());
+      out.push(aAction({
+        id:'fa-'+item.id,
+        type:'First Aid',
+        title:`First Aid action · ${item.item_name_snapshot||'First Aid item'}`,
+        detail:`${box?.name||'First Aid box'} · ${String(item.result||'Issue').replaceAll('_',' ')}`,
+        owner:aPerson(item.assigned_user_id||check?.assigned_user_id),
+        due:check?.due_date,
+        dueLabel:check?.due_date?'':'Replenish / resolve',
+        status:item.action_status||'OPEN',
+        priority:red?'RED':'AMBER',
+        go:{view:'firstAid',clickSelectors:[`[data-first-aid-order="${item.id}"]`]}
+      }));
+    }
+
+    // Due First Aid box checks.
+    for(const check of (ast.firstAidChecks||[])){
+      if(check.submitted_at||String(check.status||'').toUpperCase()!=='DUE')continue;
+      const box=(ast.firstAidBoxes||[]).find(x=>x.id===check.box_id);
+      const overdue=check.due_date&&String(check.due_date).slice(0,10)<today;
+      out.push(aAction({
+        id:'fa-check-'+check.id,
+        type:'First Aid',
+        title:`First Aid box check ${overdue?'overdue':'due'} · ${box?.name||'First Aid box'}`,
+        detail:box?.location||'Monthly First Aid check',
+        owner:aPerson(check.assigned_user_id),
+        due:check.due_date,
+        status:overdue?'Overdue':'Due',
+        priority:overdue?'RED':'AMBER',
+        go:{view:'firstAid'}
+      }));
+    }
+
+    // PTW / contractor actions.
+    for(const p of (ast.contractorPermits||[])){
+      const company=p.contractor_company||'Contractor';
+      const job=aclean(p.work_description||'Contractor work');
+      if(p.status==='AWAITING_APPROVAL'){
+        const late=!!(p.expected_start&&new Date(p.expected_start)<new Date());
+        out.push(aAction({
+          id:'ptw-approve-'+p.id,
+          type:'PTW',
+          title:`PTW awaiting Maintenance approval · ${company}`,
+          detail:job,
+          owner:'Maintenance',
+          dueLabel:p.expected_start?aFmtDateTime(p.expected_start):'Before work starts',
+          status:'Awaiting approval',
+          priority:late?'RED':'AMBER',
+          sortDate:p.expected_start||p.created_at,
+          go:{view:'onsite',clickSelectors:[`[data-permit-approve="${p.id}"]`,`[data-permit-view="${p.id}"]`]}
+        }));
+      }
+      if(p.status==='ACTIVE'&&p.expected_finish&&new Date(p.expected_finish)<new Date()){
+        out.push(aAction({
+          id:'ptw-overdue-'+p.id,
+          type:'PTW',
+          title:`Contractor over expected finish · ${company}`,
+          detail:job,
+          owner:'Maintenance',
+          dueLabel:aFmtDateTime(p.expected_finish),
+          status:'Check contractor status',
+          priority:'RED',
+          sortDate:p.expected_finish,
+          go:{view:'onsite',clickSelectors:[`[data-permit-view="${p.id}"]`]}
+        }));
+      }
+      if(p.status==='AWAITING_CLOSE'){
+        out.push(aAction({
+          id:'ptw-close-'+p.id,
+          type:'PTW',
+          title:`Contractor visit awaiting close-out · ${company}`,
+          detail:job+(p.access_key_issued_at&&!p.access_key_returned_at?' · Key/card still outstanding':''),
+          owner:'Maintenance',
+          dueLabel:'Close-out required',
+          status:'Awaiting close',
+          priority:p.access_key_issued_at&&!p.access_key_returned_at?'RED':'AMBER',
+          sortDate:p.contractor_signout_at||p.updated_at||p.created_at,
+          go:{view:'onsite',clickSelectors:[`[data-permit-close="${p.id}"]`,`[data-permit-view="${p.id}"]`]}
+        }));
+      }
+    }
+    return out;
+  }
+
+  async function aLoadCustom(){
+    if(Date.now()-aCustomLoadedAt<30000)return;
+    aCustomLoadedAt=Date.now();
+    try{
+      const [runs,items]=await Promise.all([
+        asb.from('custom_checklist_runs_v21032').select('*').order('due_date',{ascending:true}).limit(300),
+        asb.from('custom_checklist_run_items_v21032').select('*').eq('is_issue',true).order('created_at',{ascending:false}).limit(1000)
+      ]);
+      if(runs.error)throw runs.error;
+      if(items.error)throw items.error;
+      aCustomRuns=runs.data||[];
+      aCustomItems=items.data||[];
+    }catch(e){
+      console.warn('Unified Safety Actions custom checklist load',e);
+      aCustomRuns=[];aCustomItems=[];
+    }
+  }
+
+  async function aLoadKnowledge(){
+    try{
+      const r=await asb.rpc('monthly_knowledge_team_status_v21035');
+      aKnowledgeRows=r.error?[]:(r.data||[]);
+    }catch(_e){aKnowledgeRows=[]}
+  }
+
+  function aExtraActions(){
+    const out=[],today=aToday();
+    const runMap=new Map(aCustomRuns.map(r=>[r.id,r]));
+
+    for(const run of aCustomRuns){
+      if(run.submitted_at||String(run.status||'').toUpperCase()!=='DUE')continue;
+      const overdue=!!(run.due_date&&String(run.due_date).slice(0,10)<today);
+      out.push(aAction({
+        id:'custom-run-'+run.id,
+        type:'Checklist',
+        title:`Custom checklist ${overdue?'overdue':'due'} · ${run.template_name_snapshot||'Checklist'}`,
+        detail:run.location_snapshot||'Recurring safety check',
+        owner:aPerson(run.assigned_user_id),
+        due:run.due_date,
+        status:overdue?'Overdue':'Due',
+        priority:overdue?'RED':'AMBER',
+        go:{view:'checklists',clickSelectors:[`[data-cc-open-run="${run.id}"]`]}
+      }));
+    }
+
+    for(const item of aCustomItems){
+      if(['RESOLVED','NOT_REQUIRED'].includes(String(item.action_status||'OPEN').toUpperCase()))continue;
+      const run=runMap.get(item.run_id);
+      const overdue=!!(run?.due_date&&String(run.due_date).slice(0,10)<today);
+      out.push(aAction({
+        id:'custom-action-'+item.id,
+        type:'Checklist',
+        title:`Checklist action · ${item.item_label_snapshot||'Safety check issue'}`,
+        detail:`${run?.template_name_snapshot||'Custom checklist'}${item.action_label?' · '+item.action_label:item.note?' · '+item.note:''}`,
+        owner:aPerson(run?.assigned_user_id),
+        due:run?.due_date,
+        dueLabel:run?.due_date?'':'Action required',
+        status:item.action_status||'OPEN',
+        priority:overdue?'RED':'AMBER',
+        go:{view:'checklists',clickSelectors:[`[data-cc-action="${item.id}"]`]}
+      }));
+    }
+
+    for(const row of aKnowledgeRows){
+      if(row.status!=='OVERDUE')continue;
+      out.push(aAction({
+        id:'knowledge-'+row.user_id,
+        type:'Knowledge',
+        title:'Monthly Knowledge Check overdue',
+        detail:`${Number(row.questions_required||3)} ${String(row.difficulty||'MIXED').toLowerCase()} question${Number(row.questions_required||3)===1?'':'s'} required.`,
+        owner:row.display_name||aPerson(row.user_id),
+        dueLabel:'Previous month missed',
+        status:'Overdue',
+        priority:'RED',
+        go:{view:'compliance',anchor:'[id^="monthlyKnowledgeComplianceCardV"]'}
+      }));
+    }
+    return out;
+  }
+
+  function aSort(rows){
+    return rows.sort((a,b)=>{
+      const pa=a.priority==='RED'?0:1,pb=b.priority==='RED'?0:1;
+      if(pa!==pb)return pa-pb;
+      const da=String(a.sortDate||''),db=String(b.sortDate||'');
+      if(da!==db)return da.localeCompare(db);
+      return String(a.type).localeCompare(String(b.type));
+    });
+  }
+
+  async function aCollect(){
+    await Promise.all([aLoadCustom(),aLoadKnowledge()]);
+    return aSort([...aCoreActions(),...aExtraActions()]);
+  }
+
+  function aDueText(a){
+    if(a.dueLabel)return a.dueLabel;
+    return a.due?`Due ${aFmtDate(a.due)}`:'No fixed date';
+  }
+
+  function aRowHtml(a){
+    const tr=a.priority==='RED'?'red':'amber';
+    return `<div class="item-card compact safety-action-row traffic-${tr}" data-action-priority="${a.priority}" data-action-type="${aesc(a.type)}" data-action-search="${aesc((a.type+' '+a.title+' '+a.detail+' '+a.owner+' '+a.status).toLowerCase())}">
+      <div class="row-between safety-action-row-head">
+        <div><span class="safety-action-type">${aesc(a.type)}</span><strong>${aesc(a.title)}</strong><div class="muted">${aesc(a.detail)}</div></div>
+        <span class="badge ${tr==='red'?'overdue':'due'}">${a.priority==='RED'?'High':'Action'}</span>
+      </div>
+      <div class="safety-action-meta"><span><b>Owner:</b> ${aesc(a.owner)}</span><span><b>When:</b> ${aesc(aDueText(a))}</span><span><b>Status:</b> ${aesc(a.status)}</span></div>
+      <div class="actions"><button type="button" class="primary small" data-safety-action-go="${aesc(a.id)}">Go there</button></div>
+    </div>`;
+  }
+
+  function aFilter(){
+    const card=a$('unifiedSafetyActionsCardV21039');if(!card)return;
+    const priority=String(a$('safetyActionPriorityFilter')?.value||'ALL');
+    const type=String(a$('safetyActionTypeFilter')?.value||'ALL');
+    const q=String(a$('safetyActionSearch')?.value||'').trim().toLowerCase();
+    let shown=0;
+    card.querySelectorAll('.safety-action-row').forEach(row=>{
+      const okP=priority==='ALL'||row.dataset.actionPriority===priority;
+      const okT=type==='ALL'||row.dataset.actionType===type;
+      const okQ=!q||String(row.dataset.actionSearch||'').includes(q);
+      row.hidden=!(okP&&okT&&okQ);if(okP&&okT&&okQ)shown++;
+    });
+    const none=a$('safetyActionNoMatches');if(none)none.hidden=shown!==0;
+  }
+
+  async function aRender(){
+    if(!aIsManager()||aLoading)return;
+    const view=a$('complianceView');if(!view)return;
+    let card=a$('unifiedSafetyActionsCardV21039');
+    if(!card){
+      card=document.createElement('section');
+      card.id='unifiedSafetyActionsCardV21039';
+      card.className='section-card';
+      const stats=a$('complianceStats');
+      stats?.insertAdjacentElement('afterend',card)||view.prepend(card);
+    }
+    aLoading=true;
+    try{
+      card.innerHTML='<div class="muted">Loading unified Safety Actions…</div>';
+      aActions=await aCollect();
+      const red=aActions.filter(x=>x.priority==='RED').length,amber=aActions.filter(x=>x.priority==='AMBER').length;
+      const types=[...new Set(aActions.map(x=>x.type))].sort();
+      card.innerHTML=`<div class="row-between"><div><h3>Safety Actions</h3><p class="muted">One place for open safety work from documents, training, PPE, First Aid, checklists, contractor permits and monthly knowledge checks.</p></div><button id="refreshSafetyActionsBtn" type="button" class="secondary small">Refresh</button></div>
+        <div class="stats-grid safety-action-stats">
+          <div class="stat traffic-red"><strong>${red}</strong><span>High priority</span></div>
+          <div class="stat traffic-amber"><strong>${amber}</strong><span>Action required</span></div>
+          <div class="stat traffic-${aActions.length?'amber':'green'}"><strong>${aActions.length}</strong><span>Total open actions</span></div>
+        </div>
+        <div class="safety-action-filters">
+          <label>Priority<select id="safetyActionPriorityFilter"><option value="ALL">All</option><option value="RED">High / red</option><option value="AMBER">Action / amber</option></select></label>
+          <label>Type<select id="safetyActionTypeFilter"><option value="ALL">All types</option>${types.map(x=>`<option value="${aesc(x)}">${aesc(x)}</option>`).join('')}</select></label>
+          <label class="safety-action-search-label">Search<input id="safetyActionSearch" type="search" placeholder="Person, document, checklist, PTW…"></label>
+        </div>
+        <div id="safetyActionNoMatches" class="hint-box" hidden>No matching open safety actions.</div>
+        <div id="safetyActionList" class="card-list">${aActions.length?aActions.map(aRowHtml).join(''):'<div class="success-note"><strong>No open safety actions.</strong> Everything currently tracked here is clear.</div>'}</div>`;
+
+      a$('refreshSafetyActionsBtn')?.addEventListener('click',async()=>{aCustomLoadedAt=0;await aRenderForce()});
+      ['safetyActionPriorityFilter','safetyActionTypeFilter','safetyActionSearch'].forEach(id=>a$(id)?.addEventListener('input',aFilter));
+      card.querySelectorAll('[data-safety-action-go]').forEach(b=>b.addEventListener('click',()=>aGo(b.dataset.safetyActionGo)));
+      aRenderShortcut();
+    }catch(e){
+      card.innerHTML=`<div class="danger-note"><strong>Safety Actions could not load.</strong><br>${aesc(e?.message||e)}</div>`;
+    }finally{aLoading=false}
+  }
+
+  async function aRenderForce(){
+    aLoading=false;
+    return aRender();
+  }
+
+  function aRenderShortcut(){
+    if(!aIsManager())return;
+    const view=a$('mySafetyView');if(!view)return;
+    let box=a$('safetyActionsShortcutV21039');
+    if(!box){
+      box=document.createElement('div');box.id='safetyActionsShortcutV21039';
+      const anchor=a$('mySafetyStats');anchor?.insertAdjacentElement('afterend',box)||view.prepend(box);
+    }
+    const red=aActions.filter(x=>x.priority==='RED').length,amber=aActions.filter(x=>x.priority==='AMBER').length;
+    const tr=red?'red':amber?'amber':'green';
+    const summary=red?`${red} high-priority · ${amber} other action${amber===1?'':'s'}`:amber?`${amber} action${amber===1?'':'s'} requiring attention`:'No open safety actions';
+    box.innerHTML=`<button type="button" class="my-safety-onsite-button traffic-${tr}" id="openSafetyActionsBtnV21039"><span class="onsite-shortcut-main"><strong>Safety Actions</strong><span>${aesc(summary)}</span></span><span class="onsite-shortcut-status">${aActions.length}</span><span class="onsite-shortcut-action">Open</span></button>`;
+    a$('openSafetyActionsBtnV21039')?.addEventListener('click',async()=>{
+      try{if(typeof showView==='function')showView('compliance');else document.querySelector('#mainNav button[data-view="compliance"]')?.click()}catch(_e){}
+      setTimeout(()=>a$('unifiedSafetyActionsCardV21039')?.scrollIntoView({behavior:'smooth',block:'start'}),120);
+    });
+  }
+
+  async function aWaitClick(selectors){
+    for(let i=0;i<18;i++){
+      for(const sel of selectors||[]){
+        const el=document.querySelector(sel);
+        if(el){try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){};setTimeout(()=>el.click(),70);return true}
+      }
+      await new Promise(r=>setTimeout(r,120));
+    }
+    return false;
+  }
+
+  async function aGo(id){
+    const a=aActions.find(x=>x.id===id);if(!a)return;
+    const go=a.go||{};
+    try{
+      if(go.view){
+        if(typeof showView==='function')showView(go.view);
+        else document.querySelector(`#mainNav button[data-view="${go.view}"]`)?.click();
+      }
+      await new Promise(r=>setTimeout(r,120));
+
+      if(go.search&&go.view==='documents'){
+        const input=a$('documentSearch');
+        if(input){input.value=go.search;input.dispatchEvent(new Event('input',{bubbles:true}))}
+      }
+      if(go.personId&&go.view==='compliance'){
+        const p=a$('compliancePersonFilter');if(p){p.value=go.personId;p.dispatchEvent(new Event('input',{bubbles:true}))}
+        const s=a$('complianceStatusFilter');if(s&&go.status){s.value=go.status;s.dispatchEvent(new Event('input',{bubbles:true}))}
+      }else if(go.status&&go.view==='compliance'){
+        const s=a$('complianceStatusFilter');if(s){s.value=go.status;s.dispatchEvent(new Event('input',{bubbles:true}))}
+      }
+      if(go.anchor){
+        for(let i=0;i<15;i++){
+          const el=document.querySelector(go.anchor);
+          if(el){el.scrollIntoView({behavior:'smooth',block:'center'});return}
+          await new Promise(r=>setTimeout(r,100));
+        }
+      }
+      if(go.clickSelectors?.length){
+        const clicked=await aWaitClick(go.clickSelectors);
+        if(clicked)return;
+      }
+      if(go.view==='compliance'&&a$('unifiedSafetyActionsCardV21039'))a$('unifiedSafetyActionsCardV21039').scrollIntoView({behavior:'smooth',block:'start'});
+    }catch(e){aToast('Could not open action: '+(e?.message||e))}
+  }
+
+  function aAddHelpAction(){
+    const mod=core.roleAwareHelpV21038;
+    if(!mod?.actions||mod.actions.some(x=>x.id==='safety-actions'))return;
+    mod.actions.push({
+      id:'safety-actions',
+      roles:['manager','admin'],
+      group:'Management',
+      title:'Safety Actions',
+      desc:'Open the unified list of document, training, PPE, First Aid, checklist, PTW and knowledge actions.',
+      view:'compliance',
+      anchor:'#unifiedSafetyActionsCardV21039',
+      keywords:'safety actions priorities red amber overdue ppe first aid checklist permit ptw documents training'
+    });
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('#mainNav button[data-view]');
+    if(!b)return;
+    if(b.dataset.view==='compliance')setTimeout(aRender,60);
+    if(b.dataset.view==='mySafety')setTimeout(async()=>{if(!aActions.length)await aRender();else aRenderShortcut()},80);
+  },true);
+
+  window.addEventListener('pageshow',()=>setTimeout(()=>{if(a$('complianceView')?.classList.contains('active-view'))aRenderForce()},150));
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&a$('complianceView')?.classList.contains('active-view'))setTimeout(aRenderForce,180)});
+
+  const style=document.createElement('style');
+  style.id='unifiedSafetyActionsStylesV21039';
+  style.textContent=`
+    #unifiedSafetyActionsCardV21039{scroll-margin-top:10px}
+    .safety-action-stats{margin-top:12px}
+    .safety-action-filters{display:grid;grid-template-columns:180px 220px minmax(220px,1fr);gap:10px;margin:14px 0}
+    .safety-action-filters label{margin:0}.safety-action-search-label{min-width:0}
+    .safety-action-row{border-left-width:5px}.safety-action-row-head{align-items:flex-start;gap:10px}
+    .safety-action-row-head>div{min-width:0}.safety-action-row-head strong{display:block;margin:4px 0}
+    .safety-action-type{display:inline-flex;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5d7284}
+    .safety-action-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:.86rem;color:#4f6170}
+    #safetyActionsShortcutV21039{margin-top:10px}
+    @media(max-width:720px){.safety-action-filters{grid-template-columns:1fr}.safety-action-row-head{display:block}.safety-action-row-head .badge{display:inline-flex;margin-top:7px}}
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    aAddHelpAction();
+    if(aIsManager()){
+      aRender().then(aRenderShortcut);
+    }
+    aApplyVersion();
+  },750);
+
+  core.unifiedSafetyActionsV21039={render:aRenderForce,go:aGo,get actions(){return aActions}};
+})();
