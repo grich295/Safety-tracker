@@ -1371,3 +1371,357 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.unifiedSafetyActionsV21039={render:aRenderForce,go:aGo,get actions(){return aActions}};
 })();
+
+/* Safety Tracker v2.10.40 - automatic document-change impact review */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+
+  const ist=core.state, isb=core.sb;
+  const i$=id=>document.getElementById(id);
+  const iesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const iclean=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const iIsManager=()=>ist.profile?.report_only!==true&&['admin','manager'].includes(String(ist.profile?.role||'').toLowerCase());
+  const iPerson=id=>{
+    const p=(ist.people||[]).find(x=>x.id===id);
+    return p?.display_name||p?.email||'Unknown user';
+  };
+  const iToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+  const BUILD_START='2026-09-18T00:00:00Z';
+  let iBusy=false,iReviews=[],iCandidates=[];
+
+  function iApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.40';
+      window.SAFETY_BUILD.label='2.10.40 CLEAN';
+      window.SAFETY_BUILD.build='21040';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.40 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.40 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.40');
+  }
+  [0,500,1600,3200].forEach(ms=>setTimeout(iApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',iApplyVersion,{once:true});
+
+  function iDocTitle(d){
+    try{if(typeof documentDisplayTitle==='function')return documentDisplayTitle(d)}catch(_e){}
+    return d?.title||d?.name||d?.reference||'Document';
+  }
+  function iTypeLabel(d){
+    const m={RISK_ASSESSMENT:'RA',COSHH:'COSHH RA',SSW:'SSW',SDS:'SDS / MSDS',TOOLBOX_TALK:'Toolbox Talk'};
+    return m[d?.doc_type]||String(d?.doc_type||'Document').replaceAll('_',' ');
+  }
+  function iApproval(v){return String(v?.approval_status||'').toUpperCase()}
+  function iVersionTime(v){return v?.approval_at||v?.approved_at||v?.created_at||''}
+  function iSortedVersions(docId){
+    return (ist.versions||[]).filter(v=>v.document_id===docId).sort((a,b)=>new Date(iVersionTime(b)||0)-new Date(iVersionTime(a)||0));
+  }
+  function iApprovedCurrent(docId){
+    try{if(typeof approvedCurrentVersion==='function')return approvedCurrentVersion(docId)}catch(_e){}
+    return iSortedVersions(docId).find(v=>iApproval(v)==='APPROVED'&&v.status==='CURRENT')||
+      iSortedVersions(docId).find(v=>iApproval(v)==='APPROVED')||null;
+  }
+  function iPending(docId){
+    return iSortedVersions(docId).find(v=>iApproval(v)==='PENDING')||null;
+  }
+  function iHasOlderApproved(docId,versionId){
+    return iSortedVersions(docId).some(v=>v.id!==versionId&&iApproval(v)==='APPROVED');
+  }
+  function iDirectLinks(docId){
+    return (ist.documentLinks||[]).filter(l=>l.source_document_id===docId||l.target_document_id===docId);
+  }
+  function iOtherDoc(link,docId){
+    const other=link.source_document_id===docId?link.target_document_id:link.source_document_id;
+    return (ist.documents||[]).find(d=>d.id===other)||null;
+  }
+  function iTrainingForDocument(docId){
+    const ids=new Set();
+    (ist.training||[]).forEach(t=>{
+      if(t.status==='ARCHIVED')return;
+      if(t.source_document_id===docId)ids.add(t.id);
+    });
+    (ist.trainingDocumentLinks||[]).forEach(l=>{
+      if(l.document_id===docId)ids.add(l.training_session_id);
+    });
+    return [...ids].map(id=>(ist.training||[]).find(t=>t.id===id)).filter(t=>t&&t.status!=='ARCHIVED');
+  }
+  function iAssignmentsForTraining(trainingIds){
+    const set=new Set(trainingIds);
+    return (ist.trainingAssignments||[]).filter(a=>a.active!==false&&set.has(a.training_session_id));
+  }
+  function iArr(v){return [...new Set((v||[]).filter(Boolean).map(String))].sort()}
+  function iEqualArr(a,b){
+    const aa=iArr(a),bb=iArr(b);
+    return aa.length===bb.length&&aa.every((x,n)=>x===bb[n]);
+  }
+  function iSnapshotFor(doc,version,linkedDocs,training,assignments){
+    return {
+      source_document_id:doc.id,
+      source_reference:doc.reference||'',
+      source_title:iDocTitle(doc),
+      source_version_id:version.id,
+      source_version_label:version.version_label||'',
+      linked_document_ids:iArr(linkedDocs.map(x=>x.id)),
+      training_session_ids:iArr(training.map(x=>x.id)),
+      active_assignment_ids:iArr(assignments.map(x=>x.id)),
+      generated_at:new Date().toISOString()
+    };
+  }
+  function iReviewFor(versionId){return iReviews.find(r=>r.source_version_id===versionId)||null}
+  function iReviewCurrent(review,snapshot){
+    const old=review?.impact_snapshot||{};
+    return !!review&&
+      iEqualArr(old.linked_document_ids,snapshot.linked_document_ids)&&
+      iEqualArr(old.training_session_ids,snapshot.training_session_ids)&&
+      iEqualArr(old.active_assignment_ids,snapshot.active_assignment_ids);
+  }
+
+  function iCandidate(doc,version,stage){
+    const links=iDirectLinks(doc.id);
+    const linkedDocs=links.map(l=>iOtherDoc(l,doc.id)).filter(d=>d&&d.status!=='ARCHIVED');
+    const training=iTrainingForDocument(doc.id);
+    const assignments=iAssignmentsForTraining(training.map(t=>t.id));
+    const snapshot=iSnapshotFor(doc,version,linkedDocs,training,assignments);
+    const review=iReviewFor(version.id);
+    const current=iReviewCurrent(review,snapshot);
+    const staleTraining=stage==='APPROVED'&&training.filter(t=>t.source_document_id===doc.id&&t.source_document_version_id&&t.source_document_version_id!==version.id);
+    return {doc,version,stage,links,linkedDocs,training,assignments,snapshot,review,current,staleTraining};
+  }
+
+  function iCollect(){
+    const out=[];
+    for(const doc of (ist.documents||[]).filter(d=>d.status!=='ARCHIVED')){
+      const pending=iPending(doc.id);
+      if(pending&&iHasOlderApproved(doc.id,pending.id)){
+        out.push(iCandidate(doc,pending,'PENDING'));
+        continue;
+      }
+      const current=iApprovedCurrent(doc.id);
+      if(!current||!iHasOlderApproved(doc.id,current.id))continue;
+      const when=iVersionTime(current);
+      if(!when||new Date(when)<new Date(BUILD_START))continue;
+      out.push(iCandidate(doc,current,'APPROVED'));
+    }
+    return out.sort((a,b)=>{
+      const ao=a.staleTraining.length?0:a.current?2:1,bo=b.staleTraining.length?0:b.current?2:1;
+      if(ao!==bo)return ao-bo;
+      return String(a.doc.reference||iDocTitle(a.doc)).localeCompare(String(b.doc.reference||iDocTitle(b.doc)),undefined,{numeric:true});
+    });
+  }
+
+  async function iLoadReviews(){
+    const r=await isb.from('document_change_impact_reviews_v21040').select('*').order('reviewed_at',{ascending:false});
+    if(r.error)throw r.error;
+    iReviews=r.data||[];
+  }
+
+  function iState(c){
+    if(c.staleTraining.length)return {traffic:'red',label:'Training source mismatch',open:true};
+    if(c.current)return {traffic:'green',label:c.review.outcome==='FOLLOW_UP_REQUIRED'?'Reviewed · follow-up recorded':'Impact reviewed',open:false};
+    if(!c.linkedDocs.length&&!c.training.length)return {traffic:'green',label:'No linked impact found',open:false};
+    return {traffic:'amber',label:c.stage==='PENDING'?'Review before approval':'Impact review required',open:true};
+  }
+
+  function iImpactCount(c){
+    return c.linkedDocs.length+c.training.length;
+  }
+
+  function iCard(c){
+    const st=iState(c);
+    const linked=c.linkedDocs.slice(0,5).map(d=>`<span class="impact-chip">${iesc(d.reference||iTypeLabel(d))} · ${iesc(iDocTitle(d))}</span>`).join('');
+    const train=c.training.slice(0,5).map(t=>`<span class="impact-chip">${iesc(t.reference||'Training')} · ${iesc(t.name||'Training')}</span>`).join('');
+    const moreDocs=Math.max(0,c.linkedDocs.length-5),moreTrain=Math.max(0,c.training.length-5);
+    return `<div class="item-card document-impact-card traffic-${st.traffic}" data-impact-version="${iesc(c.version.id)}">
+      <div class="row-between">
+        <div>
+          <div class="impact-source-line"><span class="badge">${iesc(iTypeLabel(c.doc))}</span><strong>${iesc(c.doc.reference||'No reference')} · ${iesc(iDocTitle(c.doc))}</strong></div>
+          <div class="meta"><span>Replacement v${iesc(c.version.version_label||'—')}</span><span>${c.stage==='PENDING'?'Pending approval / acceptance':'Approved/current replacement'}</span><span>${iImpactCount(c)} linked impact${iImpactCount(c)===1?'':'s'}</span><span>${c.assignments.length} active assignment${c.assignments.length===1?'':'s'}</span></div>
+        </div>
+        <span class="badge ${st.traffic==='red'?'overdue':st.traffic==='amber'?'due':'complete'}">${iesc(st.label)}</span>
+      </div>
+      ${c.staleTraining.length?`<div class="danger-note compact"><strong>Training still points to an older document version.</strong> Review/synchronise before relying on the new approved version.</div>`:''}
+      ${c.linkedDocs.length?`<div class="impact-block"><strong>Direct linked documents</strong><div class="impact-chip-list">${linked}${moreDocs?`<span class="impact-chip">+${moreDocs} more</span>`:''}</div></div>`:'<div class="muted impact-empty">No direct linked documents.</div>'}
+      ${c.training.length?`<div class="impact-block"><strong>Training affected</strong><div class="impact-chip-list">${train}${moreTrain?`<span class="impact-chip">+${moreTrain} more</span>`:''}</div></div>`:'<div class="muted impact-empty">No linked/current training sessions.</div>'}
+      ${c.current&&c.review?.review_note?`<div class="success-note compact"><strong>Review note:</strong> ${iesc(c.review.review_note)}<br><span class="muted">${iesc(iPerson(c.review.reviewed_by))} · ${new Date(c.review.reviewed_at).toLocaleString('en-GB')}</span></div>`:''}
+      <div class="actions">
+        <button type="button" class="secondary" data-impact-open-source="${iesc(c.version.id)}">Open replacement PDF</button>
+        <button type="button" class="secondary" data-impact-open-links="${iesc(c.doc.id)}">Open direct links</button>
+        ${c.training.length?`<button type="button" class="secondary" data-impact-open-training="${iesc(c.training[0].id)}">Open affected training</button>`:''}
+        ${(st.open||c.current)&&iImpactCount(c)>0?`<button type="button" class="${st.open?'primary':'ghost'}" data-impact-review="${iesc(c.version.id)}">${c.current?'Review again':'Review impact'}</button>`:''}
+      </div>
+    </div>`;
+  }
+
+  function iRenderPanel(){
+    if(!iIsManager())return;
+    const holder=i$('documentApprovalOverview')?.querySelector('.section-card');
+    if(!holder)return;
+    let panel=i$('documentChangeImpactPanelV21040');
+    if(!panel){
+      panel=document.createElement('div');
+      panel.id='documentChangeImpactPanelV21040';
+      const pending=i$('pendingApprovalPanel');
+      pending?.insertAdjacentElement('afterend',panel)||holder.appendChild(panel);
+    }
+    const open=iCandidates.filter(c=>iState(c).open);
+    const reviewed=iCandidates.filter(c=>c.current);
+    const noImpact=iCandidates.filter(c=>!iState(c).open&&!c.current);
+    panel.innerHTML=`<div class="impact-heading">
+      <div><h3>Document Change Impact</h3><p class="muted">Replacement versions are checked automatically against <strong>direct document links</strong>, linked training and active assignments. Links are pairwise only — the app does not create indirect/cascading relationships.</p></div>
+      <div class="impact-counts"><span class="badge ${open.some(c=>iState(c).traffic==='red')?'overdue':open.length?'due':'complete'}">${open.length} to review</span><span class="badge complete">${reviewed.length} reviewed</span></div>
+    </div>
+    ${iCandidates.length?`<div class="card-list document-impact-list">${iCandidates.map(iCard).join('')}</div>`:'<div class="success-note"><strong>No replacement-version impact reviews are currently due.</strong> New versions will appear here automatically when a document already has an approved version.</div>'}
+    ${noImpact.length?`<div class="muted impact-footnote">${noImpact.length} replacement${noImpact.length===1?' has':'s have'} no direct linked document or training impact identified.</div>`:''}`;
+
+    panel.querySelectorAll('[data-impact-open-source]').forEach(b=>b.addEventListener('click',()=>{
+      const fake=document.createElement('button');fake.dataset.openDoc=b.dataset.impactOpenSource;fake.style.display='none';document.body.appendChild(fake);fake.click();fake.remove();
+    }));
+    panel.querySelectorAll('[data-impact-open-links]').forEach(b=>b.addEventListener('click',()=>{
+      const fake=document.createElement('button');fake.dataset.docLinks=b.dataset.impactOpenLinks;fake.style.display='none';document.body.appendChild(fake);fake.click();fake.remove();
+    }));
+    panel.querySelectorAll('[data-impact-open-training]').forEach(b=>b.addEventListener('click',()=>{
+      const fake=document.createElement('button');fake.dataset.viewTraining=b.dataset.impactOpenTraining;fake.style.display='none';document.body.appendChild(fake);fake.click();fake.remove();
+    }));
+    panel.querySelectorAll('[data-impact-review]').forEach(b=>b.addEventListener('click',()=>iOpenReview(b.dataset.impactReview)));
+  }
+
+  function iOpenReview(versionId){
+    const c=iCandidates.find(x=>x.version.id===versionId);
+    if(!c)return;
+    const docs=c.linkedDocs.length?c.linkedDocs.map(d=>`<div class="qa-row"><span><strong>${iesc(d.reference||iTypeLabel(d))}</strong> · ${iesc(iDocTitle(d))}</span><span>${iesc(iTypeLabel(d))}</span></div>`).join(''):'<div class="muted">No direct linked documents.</div>';
+    const training=c.training.length?c.training.map(t=>{
+      const assigned=(ist.trainingAssignments||[]).filter(a=>a.active!==false&&a.training_session_id===t.id).length;
+      return `<div class="qa-row"><span><strong>${iesc(t.reference||'Training')}</strong> · ${iesc(t.name||'Training')}</span><span>${assigned} assigned</span></div>`;
+    }).join(''):'<div class="muted">No linked training.</div>';
+    const note=c.review?.review_note||'';
+    const html=`<div class="hint-box"><strong>Replacement version:</strong> ${iesc(c.doc.reference||'')} · ${iesc(iDocTitle(c.doc))} · v${iesc(c.version.version_label||'—')}<br>${c.stage==='PENDING'?'The existing approved version remains in use until this replacement is approved.':'This replacement is now approved/current.'}</div>
+      <div class="section-card compact"><h4>Direct linked documents</h4>${docs}</div>
+      <div class="section-card compact"><h4>Affected training</h4>${training}</div>
+      ${c.staleTraining.length?`<div class="danger-note"><strong>${c.staleTraining.length} training source${c.staleTraining.length===1?' is':'s are'} still tied to an older version.</strong> Use the normal document/training sync controls before closing the follow-up.</div>`:''}
+      <label>Review note<textarea id="impactReviewNoteV21040" rows="4" placeholder="Optional for no change; explain the follow-up if action is required.">${iesc(note)}</textarea></label>
+      <div class="review-confirm-box"><label class="check-row"><input id="impactReviewAckV21040" type="checkbox"> I have reviewed the direct linked documents and training shown above against this replacement version.</label></div>
+      <div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="secondary" type="button" data-impact-save="FOLLOW_UP_REQUIRED" data-impact-version-id="${iesc(versionId)}">Follow-up required</button><button class="primary" type="button" data-impact-save="NO_LINKED_CHANGE" data-impact-version-id="${iesc(versionId)}">No linked changes needed</button></div>`;
+    if(typeof openModal==='function')openModal('Document Change Impact Review',html);
+    else if(window.openModal)window.openModal('Document Change Impact Review',html);
+  }
+
+  async function iSaveReview(versionId,outcome){
+    const c=iCandidates.find(x=>x.version.id===versionId);
+    if(!c)return;
+    if(!i$('impactReviewAckV21040')?.checked)return iToast('Confirm that you reviewed the linked documents and training first.');
+    const note=iclean(i$('impactReviewNoteV21040')?.value);
+    if(outcome==='FOLLOW_UP_REQUIRED'&&note.length<5)return iToast('Add a short note explaining the follow-up required.');
+    const payload={
+      source_document_id:c.doc.id,
+      source_version_id:c.version.id,
+      outcome,
+      review_note:note||null,
+      impact_snapshot:c.snapshot,
+      reviewed_by:ist.user.id,
+      reviewed_at:new Date().toISOString(),
+      updated_at:new Date().toISOString()
+    };
+    const existing=iReviewFor(c.version.id);
+    const r=existing
+      ?await isb.from('document_change_impact_reviews_v21040').update(payload).eq('id',existing.id)
+      :await isb.from('document_change_impact_reviews_v21040').insert(payload);
+    if(r.error)return iToast(r.error.message||'Impact review could not be saved.');
+    try{if(typeof closeModal==='function')closeModal()}catch(_e){}
+    await iRefresh();
+    iToast(outcome==='FOLLOW_UP_REQUIRED'?'Document impact reviewed — follow-up recorded.':'Document impact reviewed — no linked changes required.');
+  }
+
+  async function iRefresh(){
+    if(!iIsManager()||iBusy)return;
+    iBusy=true;
+    try{
+      await iLoadReviews();
+      iCandidates=iCollect();
+      iRenderPanel();
+      iRenderSafetyAction();
+      iAddHelpAction();
+    }catch(e){
+      console.warn('Document change impact review',e);
+      const panel=i$('documentChangeImpactPanelV21040');
+      if(panel)panel.innerHTML=`<div class="danger-note">Document Change Impact could not load: ${iesc(e?.message||e)}</div>`;
+    }finally{iBusy=false}
+  }
+
+  function iOpenCount(){return iCandidates.filter(c=>iState(c).open).length}
+  function iRedCount(){return iCandidates.filter(c=>iState(c).open&&iState(c).traffic==='red').length}
+
+  function iRenderSafetyAction(){
+    if(!iIsManager())return;
+    const host=i$('unifiedSafetyActionsCardV21039');if(!host)return;
+    let row=i$('documentImpactSafetyActionV21040');
+    const open=iOpenCount(),red=iRedCount();
+    if(!open){row?.remove();return}
+    if(!row){
+      row=document.createElement('div');row.id='documentImpactSafetyActionV21040';
+      const list=i$('safetyActionList');
+      list?.insertAdjacentElement('beforebegin',row)||host.appendChild(row);
+    }
+    row.className=`item-card compact traffic-${red?'red':'amber'} document-impact-action-summary`;
+    row.innerHTML=`<div class="row-between"><div><span class="safety-action-type">Documents</span><strong>${open} document-change impact review${open===1?'':'s'} open</strong><div class="muted">Replacement documents have direct linked documents or training that need checking.</div></div><span class="badge ${red?'overdue':'due'}">${red?`${red} high`:'Action'}</span></div><div class="actions"><button type="button" class="primary small" id="openDocumentImpactFromActionsV21040">Go there</button></div>`;
+    i$('openDocumentImpactFromActionsV21040')?.addEventListener('click',()=>{
+      try{if(typeof showView==='function')showView('documents');else document.querySelector('#mainNav button[data-view="documents"]')?.click()}catch(_e){}
+      setTimeout(()=>i$('documentChangeImpactPanelV21040')?.scrollIntoView({behavior:'smooth',block:'start'}),120);
+    });
+  }
+
+  function iAddHelpAction(){
+    const mod=core.roleAwareHelpV21038;
+    if(!mod?.actions||mod.actions.some(x=>x.id==='document-change-impact'))return;
+    mod.actions.push({
+      id:'document-change-impact',
+      roles:['manager','admin'],
+      group:'Documents',
+      title:'Document Change Impact',
+      desc:'Review direct linked documents and training affected by a replacement document version.',
+      view:'documents',
+      anchor:'#documentChangeImpactPanelV21040',
+      keywords:'document change impact new version replacement linked documents training review'
+    });
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    if(b.dataset.impactSave){
+      e.preventDefault();e.stopPropagation();
+      return iSaveReview(b.dataset.impactVersionId,b.dataset.impactSave);
+    }
+    if(b.dataset.view==='documents'||b.closest?.('[data-view="documents"]'))setTimeout(iRefresh,80);
+    if(b.dataset.view==='compliance'||b.closest?.('[data-view="compliance"]'))setTimeout(iRenderSafetyAction,180);
+  },true);
+
+  window.addEventListener('pageshow',()=>setTimeout(()=>{
+    if(i$('documentsView')?.classList.contains('active-view'))iRefresh();
+    if(i$('complianceView')?.classList.contains('active-view'))iRenderSafetyAction();
+  },160));
+
+  const style=document.createElement('style');
+  style.id='documentImpactStylesV21040';
+  style.textContent=`
+    #documentChangeImpactPanelV21040{margin-top:14px;scroll-margin-top:10px}
+    .impact-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+    .impact-heading h3{margin:0 0 4px}.impact-heading p{margin:0}
+    .impact-counts{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+    .document-impact-card{border-left-width:5px}.impact-source-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .impact-block{margin-top:10px}.impact-chip-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+    .impact-chip{display:inline-flex;padding:5px 8px;border-radius:999px;background:#eef3f6;font-size:.8rem;max-width:100%}
+    .impact-empty{margin-top:8px}.impact-footnote{margin-top:8px}
+    .document-impact-action-summary{margin:10px 0}
+    @media(max-width:700px){.impact-heading{display:block}.impact-counts{justify-content:flex-start;margin-top:9px}.document-impact-card .row-between{display:block}.document-impact-card .row-between>.badge{display:inline-flex;margin-top:7px}}
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    iApplyVersion();
+    iAddHelpAction();
+    if(iIsManager())iRefresh();
+  },900);
+
+  core.documentChangeImpactV21040={refresh:iRefresh,get candidates(){return iCandidates}};
+})();
