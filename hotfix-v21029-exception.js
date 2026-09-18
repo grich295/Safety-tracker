@@ -544,3 +544,247 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
     refreshAdmin:kRefreshAdmin,saveConfig:kSaveConfig
   };
 })();
+
+/* Safety Tracker v2.10.38 - role-aware action Help with direct Go there buttons */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state)return;
+
+  const hstate=core.state;
+  const h$=id=>document.getElementById(id);
+  const hesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const hclean=v=>String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const htoast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+
+  function hApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.38';
+      window.SAFETY_BUILD.label='2.10.38 CLEAN';
+      window.SAFETY_BUILD.build='21038';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.38 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.38 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.38');
+  }
+  [0,350,1200].forEach(ms=>setTimeout(hApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',hApplyVersion,{once:true});
+
+  function hRole(){
+    try{
+      if(typeof isAdmin==='function'&&isAdmin())return 'admin';
+      if(typeof isManager==='function'&&isManager())return 'manager';
+    }catch(_e){}
+    return 'user';
+  }
+
+  function hCanView(view){
+    try{return typeof canAccessView==='function'?canAccessView(view):true}catch(_e){return true}
+  }
+
+  const ACTIONS=[
+    // User / day-to-day
+    {id:'my-safety',roles:['user','manager','admin'],group:'Everyday',title:'See what I need to do',desc:'Open your live safety dashboard and outstanding items.',view:'mySafety',keywords:'my safety due overdue traffic lights actions'},
+    {id:'hs-training',roles:['user','manager','admin'],group:'Training',title:'Complete H&S training',desc:'Open your assigned RA, COSHH RA, SSW and Toolbox Talk training.',view:'hsTraining',keywords:'training risk assessment coshh ssw toolbox talk complete sign'},
+    {id:'standalone-training',roles:['user','manager','admin'],group:'Training',title:'Open standalone training',desc:'Policies, inductions, refreshers and other non-document-driven training.',view:'training',keywords:'standalone training induction refresher policy'},
+    {id:'monthly-knowledge',roles:['user','manager','admin'],group:'Training',title:'Monthly Knowledge Check',desc:'Go straight to this month’s random safety questions and status.',view:'mySafety',anchor:'[id^="monthlyKnowledgeCardV"]',keywords:'monthly questions quiz knowledge check difficulty random'},
+    {id:'awareness',roles:['user','manager','admin'],group:'Everyday',title:'Safety Awareness',desc:'Open your current safety awareness reading and status.',view:'awareness',keywords:'awareness reading annual refresher'},
+    {id:'checklists',roles:['user','manager','admin'],group:'Checks',title:'Open safety checklists',desc:'PPE, First Aid and custom recurring checks in one place.',view:'checklists',keywords:'checklists checks ppe first aid custom recurring'},
+    {id:'ppe',roles:['user','manager','admin'],group:'Checks',title:'Complete PPE check',desc:'Open the monthly PPE check directly.',view:'ppe',keywords:'ppe monthly missing damaged replacement'},
+    {id:'first-aid',roles:['user','manager','admin'],group:'Checks',title:'Complete First Aid check',desc:'Open assigned First Aid box checks directly.',view:'firstAid',keywords:'first aid monthly box check missing low expired damaged'},
+    {id:'onsite',roles:['user','manager','admin'],group:'Contractors',title:"Who's On Site",desc:'Open current contractor attendance and permit status.',view:'onsite',keywords:'contractor onsite on site permit ptw evacuation'},
+    {id:'asbestos-user',roles:['user','manager','admin'],group:'Work controls',title:'Asbestos Lookup',desc:'Open the location-based asbestos lookup when access is available.',view:'asbestos',keywords:'asbestos acm survey amp location maintenance',conditional:()=>hCanView('asbestos')},
+
+    // Manager
+    {id:'documents',roles:['manager','admin'],group:'Documents',title:'Review safety documents',desc:'Open controlled RA, COSHH RA, SSW, TBT and SDS records.',view:'documents',keywords:'documents approve review register versions ra coshh ssw tbt sds'},
+    {id:'approvals',roles:['manager','admin'],group:'Documents',title:'Document approvals',desc:'Jump to the pending/current document-control overview.',view:'documents',anchor:'#documentApprovalOverview',keywords:'approve pending document approval current review'},
+    {id:'create-doc',roles:['manager','admin'],group:'Documents',title:'Create a safety document',desc:'Open Risk Assessment, COSHH RA, SSW and Toolbox Talk creation.',view:'creator',keywords:'create document ra coshh ssw toolbox tbt'},
+    {id:'people',roles:['manager','admin'],group:'People',title:'People & assignments',desc:'Open users and their safety assignments.',view:'people',keywords:'people users assignment department training person'},
+    {id:'compliance',roles:['manager','admin'],group:'Management',title:'Compliance overview',desc:'Open team training and safety compliance status.',view:'compliance',keywords:'compliance matrix team status overdue due'},
+    {id:'monthly-team',roles:['manager','admin'],group:'Training',title:'Monthly Knowledge team status',desc:'Jump directly to monthly knowledge-check completion for the team.',view:'compliance',anchor:'[id^="monthlyKnowledgeComplianceCardV"]',keywords:'monthly questions team results compliance knowledge'},
+    {id:'instructor',roles:['manager','admin'],group:'Training',title:'Instructor / group attendance',desc:'Open instructor-led training and attendance recording.',view:'instructor',keywords:'instructor attendance group toolbox training'},
+    {id:'reports',roles:['manager','admin'],group:'Reports',title:'Open Reports',desc:'Open compliance reports and archived evidence.',view:'reports',keywords:'reports pdf excel archive'},
+    {id:'evidence-pack',roles:['manager','admin'],group:'Reports',title:'Build a Person Evidence Pack',desc:'Jump directly to the evidence-pack builder.',view:'reports',anchor:'.evidence-report-section',click:'#evidencePackBtn',keywords:'evidence pack person training documents proof'},
+    {id:'ptw-reports',roles:['manager','admin'],group:'Reports',title:'Contractor Permit reports',desc:'Jump directly to PTW/contractor reporting.',view:'reports',anchor:'.contractor-report-section',keywords:'contractor permit ptw report csv pdf'},
+    {id:'review-questions',roles:['manager','admin'],group:'Training',title:'Review generated monthly questions',desc:'Open the question reviewer for current safety material.',view:'compliance',custom:'review-questions',keywords:'review questions monthly quiz generated correct answers'},
+
+    // Admin
+    {id:'admin-home',roles:['admin'],group:'Admin setup',title:'Admin controls',desc:'Open the main Safety Tracker administration area.',view:'admin',keywords:'admin settings setup'},
+    {id:'add-user',roles:['admin'],group:'Admin setup',title:'Add a user',desc:'Open People and start the invite-user form.',view:'people',click:'#inviteUserBtn',keywords:'add user invite employee person new user'},
+    {id:'departments',roles:['admin'],group:'Admin setup',title:'Departments',desc:'Jump directly to department setup.',view:'admin',anchor:'#departmentList',closest:'.section-card',keywords:'department create edit assign users'},
+    {id:'viewer',roles:['admin'],group:'Admin setup',title:'Guest / Viewer access',desc:'Jump directly to viewer-account controls.',view:'admin',anchor:'#viewerAccessAdminCard',keywords:'guest viewer username password expiry access'},
+    {id:'new-viewer',roles:['admin'],group:'Admin setup',title:'Create a Viewer account',desc:'Open the new temporary Viewer account form immediately.',view:'admin',click:'[data-new-viewer]',keywords:'create viewer guest username password'},
+    {id:'monthly-settings',roles:['admin'],group:'Training',title:'Monthly Knowledge settings',desc:'Jump directly to ON/OFF, question count and difficulty settings.',view:'admin',anchor:'[id^="monthlyKnowledgeAdminCardV"]',keywords:'monthly questions settings on off difficulty number'},
+    {id:'document-switch',roles:['admin'],group:'Documents',title:'Document Creation ON/OFF',desc:'Jump directly to the Document Creation switch.',view:'admin',anchor:'#adminDocumentCreationToggleBtn',closest:'.section-card',keywords:'document creation switch on off'},
+    {id:'checklist-builder',roles:['admin'],group:'Checks',title:'Checklist Builder',desc:'Open the custom Checklist Builder directly.',view:'checklists',custom:'checklist-builder',keywords:'custom checklist builder create new questions checks'},
+    {id:'new-checklist',roles:['admin'],group:'Checks',title:'Create a new checklist',desc:'Open a blank custom checklist setup form.',view:'checklists',custom:'new-checklist',keywords:'new checklist create custom recurring adhoc'},
+    {id:'site-locations',roles:['admin'],group:'Admin setup',title:'Site locations',desc:'Jump directly to the location hierarchy used by PTW and asbestos.',view:'admin',anchor:'#siteLocationList',closest:'.section-card',keywords:'site locations floor room area ptw asbestos'},
+    {id:'asbestos-sources',roles:['admin'],group:'Admin setup',title:'Asbestos source documents',desc:'Jump directly to AMP, survey and reinspection uploads.',view:'admin',anchor:'#asbestosSourceAdminList',closest:'.section-card',keywords:'asbestos source amp survey upload reinspection'},
+    {id:'force-sync',roles:['admin'],group:'System',title:'Force Sync & Review',desc:'Jump directly to the repair/synchronisation control.',view:'admin',anchor:'#forceSyncBtn',closest:'.section-card',keywords:'force sync review repair links training'},
+    {id:'bulk-import',roles:['admin'],group:'System',title:'Bulk Import',desc:'Jump directly to bulk PDF analysis and import.',view:'admin',anchor:'#bulkImportFiles',closest:'.section-card',keywords:'bulk import pdf upload documents'},
+    {id:'storage-cleanup',roles:['admin'],group:'System',title:'Storage Cleanup',desc:'Jump directly to the orphan-file storage scan.',view:'admin',anchor:'#storageCleanupBtn',closest:'.section-card',keywords:'storage cleanup orphan files'},
+    {id:'diagnostics',roles:['admin'],group:'System',title:'Build diagnostics',desc:'Jump directly to current build and system diagnostics.',view:'admin',anchor:'#buildDiagnostics',closest:'.section-card',keywords:'diagnostics version build schema errors system'}
+  ];
+
+  function hAllowedActions(){
+    const role=hRole();
+    return ACTIONS.filter(a=>a.roles.includes(role)||(
+      role==='admin'&&a.roles.includes('manager')
+    )||(
+      role==='manager'&&a.roles.includes('user')
+    )||(
+      role==='admin'&&a.roles.includes('user')
+    )).filter(a=>!a.conditional||a.conditional()).filter(a=>!a.view||hCanView(a.view));
+  }
+
+  function hRoleLabel(){
+    const role=hRole();
+    if(role==='admin')return 'Admin Help';
+    if(role==='manager')return 'Manager Help';
+    return 'User Help';
+  }
+
+  function hCard(a){
+    return `<article class="role-help-action" data-help-search="${hesc(hclean([a.title,a.desc,a.group,a.keywords].join(' ')))}">
+      <div class="role-help-action-copy"><span class="role-help-group">${hesc(a.group)}</span><h3>${hesc(a.title)}</h3><p>${hesc(a.desc)}</p></div>
+      <button class="primary role-help-go" type="button" data-role-help-go="${hesc(a.id)}">Go there</button>
+    </article>`;
+  }
+
+  function hRender(){
+    const root=h$('helpContent');
+    if(!root)return;
+    const actions=hAllowedActions();
+    const role=hRole();
+    root.innerHTML=`<div class="role-help-shell">
+      <div class="role-help-hero">
+        <div><span class="role-help-role">${hesc(hRoleLabel())}</span><h3>What do you want to do?</h3><p>Search for the task. Safety Tracker will take you directly to the right screen or control.</p></div>
+        <div class="role-help-search-wrap"><input id="roleHelpSearch" type="search" autocomplete="off" placeholder="Try: add user, monthly questions, PPE, viewer, SDS, PTW…"><button id="roleHelpClear" class="ghost small" type="button">Clear</button></div>
+      </div>
+      <div id="roleHelpNoResults" class="hint-box" hidden>No matching help action. Try a shorter word such as <strong>training</strong>, <strong>checklist</strong>, <strong>document</strong> or <strong>contractor</strong>.</div>
+      <div id="roleHelpActions" class="role-help-grid">${actions.map(hCard).join('')}</div>
+      <div class="help-card role-help-note"><h3>Traffic-light colours</h3><p><strong>Green</strong> = complete/current. <strong>Amber</strong> = due or action required. <strong>Red</strong> = overdue/problem. <strong>Grey</strong> = inactive, historical or switched off.</p></div>
+      <div class="help-card role-help-note"><h3>Safety notice</h3><p>Safety Tracker supports safety management and record keeping. It does not replace current legislation, approved risk controls, manufacturer instructions, competent supervision or site-specific judgement.</p></div>
+    </div>`;
+
+    const search=h$('roleHelpSearch'),clear=h$('roleHelpClear'),no=h$('roleHelpNoResults');
+    const filter=()=>{
+      const q=hclean(search?.value||'');
+      let shown=0;
+      root.querySelectorAll('.role-help-action').forEach(card=>{
+        const ok=!q||String(card.dataset.helpSearch||'').includes(q);
+        card.hidden=!ok;if(ok)shown++;
+      });
+      if(no)no.hidden=shown!==0;
+    };
+    search?.addEventListener('input',filter);
+    clear?.addEventListener('click',()=>{if(search){search.value='';search.focus()}filter()});
+    root.querySelectorAll('[data-role-help-go]').forEach(b=>b.addEventListener('click',()=>hGo(b.dataset.roleHelpGo)));
+  }
+
+  async function hWaitFor(selector,{click=false,closest='',tries=14,delay=120}={}){
+    for(let i=0;i<tries;i++){
+      let el=document.querySelector(selector);
+      if(el){
+        if(closest)el=el.closest(closest)||el;
+        try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){}
+        if(click){setTimeout(()=>{try{el.click()}catch(_e){}},80)}
+        return el;
+      }
+      await new Promise(r=>setTimeout(r,delay));
+    }
+    return null;
+  }
+
+  function hMonthlyModule(){
+    return core.monthlyKnowledgeV21037||core.monthlyKnowledgeV21036||core.monthlyKnowledgeV21035||null;
+  }
+
+  async function hCustomAction(action){
+    if(action==='review-questions'){
+      const mod=hMonthlyModule();
+      if(mod?.review){mod.review();return true}
+      return false;
+    }
+    if(action==='checklist-builder'){
+      const tab=await hWaitFor('[data-cc-tab="builder"]',{tries:20,delay:150});
+      if(tab){tab.click();await hWaitFor('#ccPanelBody',{tries:10});return true}
+      return false;
+    }
+    if(action==='new-checklist'){
+      const tab=await hWaitFor('[data-cc-tab="builder"]',{tries:20,delay:150});
+      if(tab)tab.click();
+      const add=await hWaitFor('[data-cc-new]',{tries:20,delay:150});
+      if(add){add.click();return true}
+      return false;
+    }
+    return false;
+  }
+
+  async function hGo(id){
+    const a=ACTIONS.find(x=>x.id===id);
+    if(!a)return;
+    if(a.view&&!hCanView(a.view))return htoast('That area is not available for your current role.');
+    try{
+      if(a.view){
+        if(typeof showView==='function')showView(a.view);
+        else document.querySelector(`#mainNav button[data-view="${a.view}"]`)?.click();
+      }
+      await new Promise(r=>setTimeout(r,100));
+
+      if(a.custom){
+        const ok=await hCustomAction(a.custom);
+        if(!ok)htoast('The destination is still loading. Open Help and try Go there again.');
+        return;
+      }
+
+      if(a.click){
+        const el=await hWaitFor(a.click,{click:true,tries:16,delay:120});
+        if(!el)htoast('The destination is still loading. Open Help and try Go there again.');
+        return;
+      }
+
+      if(a.anchor){
+        const el=await hWaitFor(a.anchor,{closest:a.closest||'',tries:16,delay:120});
+        if(!el)htoast('The destination is open, but that control is still loading.');
+      }
+    }catch(e){
+      console.error('Role Help navigation',e);
+      htoast('Could not open that area: '+(e?.message||e));
+    }
+  }
+
+  const hRenderHelp=hRender;
+  try{renderHelp=hRenderHelp}catch(_e){}
+  window.renderHelp=hRenderHelp;
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('#mainNav button[data-view="help"]');
+    if(b)setTimeout(hRender,40);
+  },true);
+
+  const style=document.createElement('style');
+  style.id='roleAwareHelpStylesV21038';
+  style.textContent=`
+    .role-help-shell{display:grid;gap:14px}
+    .role-help-hero{display:grid;gap:14px;padding:16px;border:1px solid #d8e0e6;border-radius:14px;background:#f7fafc}
+    .role-help-role{display:inline-flex;padding:5px 9px;border-radius:999px;background:#17324d;color:#fff;font-weight:800;font-size:.8rem}
+    .role-help-hero h3{margin:8px 0 4px}.role-help-hero p{margin:0;color:#5f6f7f}
+    .role-help-search-wrap{display:flex;gap:8px;align-items:center}.role-help-search-wrap input{flex:1;min-width:0}
+    .role-help-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+    .role-help-action{border:1px solid #d8e0e6;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;justify-content:space-between;gap:12px}
+    .role-help-action h3{margin:4px 0 5px;font-size:1rem}.role-help-action p{margin:0;color:#607182;line-height:1.45}
+    .role-help-group{font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:#5b7185}
+    .role-help-go{width:100%;min-height:42px}.role-help-note{margin:0}
+    @media(max-width:640px){.role-help-grid{grid-template-columns:1fr}.role-help-search-wrap{align-items:stretch}.role-help-search-wrap .ghost{flex:0 0 auto}}
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    hApplyVersion();
+    const active=document.querySelector('#helpView.active-view');
+    if(active)hRender();
+  },450);
+
+  core.roleAwareHelpV21038={render:hRender,go:hGo,actions:ACTIONS};
+})();

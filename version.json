@@ -1,6 +1,6 @@
 {
-  "version": "2.10.37",
-  "build_id": "v21037-monthly-knowledge-flicker-fix-20260918",
+  "version": "2.10.38",
+  "build_id": "v21038-role-aware-action-help-20260918",
   "clean": true,
-  "notes": "Fixes the Monthly Knowledge Check screen flickering on mobile by removing the self-triggering whole-DOM MutationObserver. Knowledge cards now refresh only on startup, navigation and app resume. Monthly questions still open in the standard Safety Tracker modal after the user taps the knowledge-check button; the modal is forced to start at the top on mobile. Existing automatic question-bank generation, ON/OFF, 1-10 question setting and Easy/Standard/Hard/Mixed difficulty remain unchanged. No SQL migration required."
+  "notes": "Adds role-aware action Help for Users, Managers and Admins. Help now has task search and direct Go there buttons that navigate to the correct Safety Tracker screen, subsection or form rather than telling the user which menus/buttons to press. Includes direct routes for training, monthly knowledge checks, PPE, First Aid, checklists, contractor/PTW, document control, compliance, reports, evidence packs, users, departments, viewers, Checklist Builder, monthly question settings, site locations, bulk import, sync, storage cleanup and diagnostics. Includes the v2.10.37 knowledge-card flicker fix. No SQL migration required."
 }

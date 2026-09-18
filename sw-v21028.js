@@ -1,5 +1,5 @@
-const SHELL_CACHE='safety-shell-v21037-knowledge-flicker-fix';
-const RUNTIME_CACHE='safety-runtime-v21037-knowledge-flicker-fix';
+const SHELL_CACHE='safety-shell-v21038-role-help';
+const RUNTIME_CACHE='safety-runtime-v21038-role-help';
 const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21029-core.js','./hotfix-v21029-ui.js','./hotfix-v21029-exception.js','./hotfix-v21030-ptw.js','./hotfix-v21031-ptw-stability.js','./hotfix-v21032-checklists.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
