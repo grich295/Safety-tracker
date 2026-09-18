@@ -1,6 +1,6 @@
 {
-  "version": "2.10.44",
-  "build_id": "v21044-navigation-tidy-20260918",
+  "version": "2.10.45",
+  "build_id": "v21045-version-cache-tidy-20260918",
   "clean": true,
-  "notes": "Navigation tidy only. Reduces the crowded top navigation by grouping related functions without removing any existing capability. H&S Training becomes the Training hub with H&S Training, Standalone, Awareness and Instructor sub-navigation. Checklists becomes Checks with Custom Checks, PPE and First Aid. Documents gains Library, Register, Approvals, Change Impact and Create sub-navigation. Reports becomes Management for Managers/Admins with Safety Actions, Compliance, People, Calendar, Reports, Knowledge and Admin. Standard users get the same simpler Training/Checks grouping while role permissions remain unchanged. Direct Go there links continue to work. No SQL migration required. Includes all v2.10.43 Safety Calendar and prior fixes."
+  "notes": "Housekeeping stage 2 only: centralises visible build/version identity and JavaScript cache-busting around version.json. index.html now reads version.json with no-store, creates the single SAFETY_BUILD value, applies all visible version labels from it, and loads the existing app/hotfix scripts in the same order using the current build_id as their cache token. Older feature hotfixes no longer overwrite the build number with their own historical versions. version.json is also included in the offline shell cache. No workflow, database or navigation behaviour is intentionally changed. Includes all v2.10.44 navigation tidy and prior features."
 }

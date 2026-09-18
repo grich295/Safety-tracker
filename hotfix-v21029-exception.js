@@ -57,7 +57,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
     if(window.SAFETY_BUILD){
       window.SAFETY_BUILD.version=KVER;
       window.SAFETY_BUILD.label=KVER+' CLEAN';
-      window.SAFETY_BUILD.build='21037';
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
     document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+KVER+' CLEAN');
@@ -558,14 +558,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function hApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.38';
-      window.SAFETY_BUILD.label='2.10.38 CLEAN';
-      window.SAFETY_BUILD.build='21038';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.38 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.38 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.38');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,350,1200].forEach(ms=>setTimeout(hApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',hApplyVersion,{once:true});
@@ -812,14 +812,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function aApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.39';
-      window.SAFETY_BUILD.label='2.10.39 CLEAN';
-      window.SAFETY_BUILD.build='21039';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.39 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.39 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.39');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,500,1400,2800].forEach(ms=>setTimeout(aApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',aApplyVersion,{once:true});
@@ -1392,14 +1392,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function iApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.40';
-      window.SAFETY_BUILD.label='2.10.40 CLEAN';
-      window.SAFETY_BUILD.build='21040';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.40 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.40 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.40');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,500,1600,3200].forEach(ms=>setTimeout(iApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',iApplyVersion,{once:true});
@@ -1740,14 +1740,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function mApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.41';
-      window.SAFETY_BUILD.label='2.10.41 CLEAN';
-      window.SAFETY_BUILD.build='21041';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.41 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.41 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.41');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,500,1700,3300].forEach(ms=>setTimeout(mApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',mApplyVersion,{once:true});
@@ -1972,14 +1972,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function tApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.42';
-      window.SAFETY_BUILD.label='2.10.42 CLEAN';
-      window.SAFETY_BUILD.build='21042';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.42 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.42 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.42');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,500,1700,3400].forEach(ms=>setTimeout(tApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',tApplyVersion,{once:true});
@@ -2247,14 +2247,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function cApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.43';
-      window.SAFETY_BUILD.label='2.10.43 CLEAN';
-      window.SAFETY_BUILD.build='21043';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.43 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.43 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.43');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
   [0,500,1800,3500].forEach(ms=>setTimeout(cApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',cApplyVersion,{once:true});
@@ -2690,14 +2690,14 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   function nApplyVersion(){
     if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version='2.10.44';
-      window.SAFETY_BUILD.label='2.10.44 CLEAN';
-      window.SAFETY_BUILD.build='21044';
+      /* version supplied centrally by version.json */
+      /* label supplied centrally by version.json */
+      /* build supplied centrally by version.json */
       try{window.applySafetyBuildLabel?.()}catch(_e){}
     }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.44 CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.44 CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.44');
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.label||''));
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+(window.SAFETY_BUILD?.version||''));
   }
 
   function nOriginalNav(view){return document.querySelector(`#mainNav button[data-view="${view}"]`)}
@@ -2992,4 +2992,15 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   },ms));
 
   core.navigationTidyV21044={apply:nApplyTopNav,ensureHubs:nEnsureHubs,go:nGoHubAction};
+})();
+
+
+/* Safety Tracker v2.10.45 - central version/cache label guard */
+(function(){
+  function applyCentralBuildV21045(){
+    try{window.applySafetyBuildLabel?.()}catch(_e){}
+  }
+  [0,120,350,800,1600,3200,5000].forEach(ms=>setTimeout(applyCentralBuildV21045,ms));
+  document.addEventListener('DOMContentLoaded',applyCentralBuildV21045,{once:true});
+  window.addEventListener('pageshow',applyCentralBuildV21045);
 })();
