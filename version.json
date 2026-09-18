@@ -1,6 +1,6 @@
 {
-  "version": "2.10.41",
-  "build_id": "v21041-monthly-knowledge-analytics-20260918",
+  "version": "2.10.42",
+  "build_id": "v21042-toolbox-talk-suggestions-20260918",
   "clean": true,
-  "notes": "Adds Monthly Knowledge Analytics under Reports for Managers/Admins. Shows live current-month completion, first-attempt pass rate, average score, incorrect-answer count, repeated weak topics, topic accuracy, Easy/Standard/Hard performance and monthly history with 3/6/12/24-month filters. Analytics are aggregate learning indicators and do not expose correct answer text or replace formal training/compliance status. Role-aware Help gains a direct Go there entry. Includes all v2.10.40 Document Change Impact, v2.10.39 Unified Safety Actions, v2.10.38 Help and v2.10.37 flicker fixes."
+  "notes": "Adds Suggested Toolbox Talks to Monthly Knowledge Analytics. A suggestion appears only when the same topic has at least two incorrect answers from at least two different people in the selected 3/6/12/24-month period. Existing linked Toolbox Talks are detected and offered for re-delivery instead of encouraging duplicates. Where approved RA/COSHH/SSW source documents exist, Manager/Admin can open a pre-filled Toolbox Talk creator form; nothing is saved, approved or assigned until the manager chooses to continue through the normal controlled-document workflow. Unsupported topics without approved controlled sources cannot auto-create a draft. Role-aware Help gains a direct Go there entry. Includes all v2.10.41 analytics and prior fixes."
 }

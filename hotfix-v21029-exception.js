@@ -1957,3 +1957,273 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
 
   core.monthlyKnowledgeAnalyticsV21041={render:mRenderForce};
 })();
+
+/* Safety Tracker v2.10.42 - Toolbox Talk suggestions from Monthly Knowledge Analytics */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+
+  const tst=core.state, tsb=core.sb;
+  const t$=id=>document.getElementById(id);
+  const tesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const tIsManager=()=>tst.profile?.report_only!==true&&['admin','manager'].includes(String(tst.profile?.role||'').toLowerCase());
+  const tToast=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+  let tBusy=false,tMonths=12,tTopics=[];
+
+  function tApplyVersion(){
+    if(window.SAFETY_BUILD){
+      window.SAFETY_BUILD.version='2.10.42';
+      window.SAFETY_BUILD.label='2.10.42 CLEAN';
+      window.SAFETY_BUILD.build='21042';
+      try{window.applySafetyBuildLabel?.()}catch(_e){}
+    }
+    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v2.10.42 CLEAN');
+    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v2.10.42 CLEAN');
+    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v2.10.42');
+  }
+  [0,500,1700,3400].forEach(ms=>setTimeout(tApplyVersion,ms));
+  document.addEventListener('DOMContentLoaded',tApplyVersion,{once:true});
+
+  function tCleanTopic(topic){
+    const raw=String(topic||'Safety topic').replace(/\s+/g,' ').trim();
+    const parts=raw.split(' - ');
+    if(parts.length>=3&&parts[0].toUpperCase()===parts[1].toUpperCase())return [parts[0],...parts.slice(2)].join(' - ');
+    return raw;
+  }
+  function tTraining(id){return (tst.training||[]).find(x=>x.id===id)||null}
+  function tKind(t){return String(t?.source_kind||t?.session_type||'').toUpperCase()}
+  function tLinkedDocIds(trainingId){
+    return (tst.trainingDocumentLinks||[]).filter(x=>x.training_session_id===trainingId).map(x=>x.document_id).filter(Boolean)
+  }
+  function tExistingToolbox(topic){
+    const ids=Array.isArray(topic.training_session_ids)?topic.training_session_ids:[];
+    for(const id of ids){
+      const tr=tTraining(id);
+      if(tr&&tKind(tr)==='TOOLBOX_TALK'&&tr.status!=='ARCHIVED')return tr;
+    }
+    const docs=new Set(Array.isArray(topic.source_document_ids)?topic.source_document_ids:[]);
+    if(!docs.size)return null;
+    return (tst.training||[]).find(tr=>{
+      if(tKind(tr)!=='TOOLBOX_TALK'||tr.status==='ARCHIVED')return false;
+      return tLinkedDocIds(tr.id).some(id=>docs.has(id));
+    })||null;
+  }
+  function tPrimarySourceTraining(topic){
+    const ids=Array.isArray(topic.training_session_ids)?topic.training_session_ids:[];
+    return ids.map(tTraining).find(Boolean)||null;
+  }
+  function tApprovedSourceDocIds(topic){
+    const ids=Array.isArray(topic.source_document_ids)?topic.source_document_ids:[];
+    return ids.filter(id=>{
+      const d=(tst.documents||[]).find(x=>x.id===id);
+      if(!d||d.status==='ARCHIVED')return false;
+      try{return !!approvedCurrentVersion(id)}catch(_e){
+        return (tst.versions||[]).some(v=>v.document_id===id&&v.status==='CURRENT'&&String(v.approval_status||'').toUpperCase()==='APPROVED');
+      }
+    });
+  }
+  function tSuggestions(){
+    return tTopics.filter(x=>x.toolbox_talk_suggested===true&&Number(x.wrong_answers||0)>=2&&Number(x.people||0)>=2)
+      .sort((a,b)=>Number(b.wrong_answers||0)-Number(a.wrong_answers||0)||Number(a.accuracy_percent||0)-Number(b.accuracy_percent||0));
+  }
+  function tTraffic(topic){
+    const acc=Number(topic.accuracy_percent||0);
+    return acc<60?'red':'amber';
+  }
+
+  async function tLoad(){
+    const r=await tsb.rpc('monthly_knowledge_analytics_v21041',{p_months:tMonths});
+    if(r.error)throw new Error(r.error.message);
+    tTopics=Array.isArray(r.data?.topics)?r.data.topics:[];
+  }
+
+  function tOpenTraining(trainingId){
+    if(!trainingId)return;
+    try{
+      if(typeof showView==='function')showView('training');
+      const fake=document.createElement('button');
+      fake.dataset.viewTraining=trainingId;fake.hidden=true;document.body.appendChild(fake);fake.click();fake.remove();
+    }catch(e){tToast('Could not open the Toolbox Talk: '+(e?.message||e))}
+  }
+
+  function tSourceSummary(topic){
+    const ids=tApprovedSourceDocIds(topic);
+    if(!ids.length)return 'No approved RA/COSHH/SSW source is linked to this knowledge topic.';
+    return ids.map(id=>{
+      const d=(tst.documents||[]).find(x=>x.id===id);
+      return d?(d.reference||d.title||'Source document'):id;
+    }).join(' · ');
+  }
+
+  function tCreateDraft(topic){
+    const sourceIds=tApprovedSourceDocIds(topic);
+    if(!sourceIds.length){
+      return tToast('No approved controlled source document is linked to this topic. Review the source training first rather than creating an unsupported Toolbox Talk.');
+    }
+    if(typeof showCreatorWizard!=='function'){
+      return tToast('Document Creator is not available in this session.');
+    }
+
+    const cleanTopic=tCleanTopic(topic.topic);
+    const draft={
+      doc_type:'TOOLBOX_TALK',
+      title:`Refresher - ${cleanTopic}`.slice(0,150),
+      source_document_ids:sourceIds,
+      questionnaire:{
+        title:`Refresher - ${cleanTopic}`.slice(0,150),
+        version:'1',
+        task:`Reinforce the current approved controls for ${cleanTopic} after repeated Monthly Knowledge Check misses.`,
+        hazards:`Monthly Knowledge Analytics recorded ${Number(topic.wrong_answers||0)} incorrect answers from ${Number(topic.people||0)} people on this topic. Review the approved source documents and focus the briefing on the safety controls that may have been misunderstood.`,
+        controls:'Use only the current approved controls in the selected source documents. Reinforce the critical do/don’t rules, authorisation, PPE, work-area controls and stop-work requirements that actually apply.',
+        steps:'Explain the relevant current controls in plain language.\nAsk attendees to describe the safe method back in their own words.\nCorrect misunderstandings before the task is carried out.\nRecord any questions or follow-up actions raised during the talk.',
+        ppe:'Use the current approved source-document PPE/work-area requirements. Do not add PPE or controls that are not supported by the approved source.',
+        emergency:'Use the current approved source-document emergency, stop-work and reporting requirements.',
+        questions:'What are the key controls for this task?\nWhen must work stop and be reported?\nWhat PPE, competence or authorisation is required before starting?',
+        actions:`Suggested by Monthly Knowledge Analytics after ${Number(topic.wrong_answers||0)} incorrect answers from ${Number(topic.people||0)} people. Manager/Instructor must review the current approved source documents before approval.`,
+        sourceEvidence:`Monthly Knowledge Analytics suggestion only. Topic: ${cleanTopic}. Incorrect answers: ${Number(topic.wrong_answers||0)}. People affected: ${Number(topic.people||0)}. Accuracy: ${Number(topic.accuracy_percent||0)}%.`,
+        flags:{group_task:true,instructor_needed:true}
+      }
+    };
+
+    showCreatorWizard('TOOLBOX_TALK',draft);
+    setTimeout(()=>{
+      const body=t$('modalBody');
+      if(!body)return;
+      const note=document.createElement('div');
+      note.className='hint-box tbt-suggestion-banner-v21042';
+      note.innerHTML=`<strong>Suggested from Monthly Knowledge Analytics</strong><br>${tesc(cleanTopic)} was missed ${Number(topic.wrong_answers||0)} times by ${Number(topic.people||0)} people. This form is only pre-filled — nothing has been saved, approved or assigned. Review the approved source documents before using it.`;
+      body.prepend(note);
+    },30);
+  }
+
+  function tOpenSource(topic){
+    const tr=tPrimarySourceTraining(topic);
+    if(tr){
+      try{
+        if(typeof showView==='function')showView('hsTraining');
+        const fake=document.createElement('button');fake.dataset.viewTraining=tr.id;fake.hidden=true;document.body.appendChild(fake);fake.click();fake.remove();
+        return;
+      }catch(_e){}
+    }
+    const did=tApprovedSourceDocIds(topic)[0];
+    if(did){
+      const doc=(tst.documents||[]).find(x=>x.id===did);
+      try{
+        if(typeof showView==='function')showView('documents');
+        const input=t$('documentSearch');
+        if(input){input.value=doc?.reference||doc?.title||'';input.dispatchEvent(new Event('input',{bubbles:true}))}
+      }catch(_e){}
+      return;
+    }
+    tToast('No source training or controlled document is available to open.');
+  }
+
+  function tCard(topic,index){
+    const existing=tExistingToolbox(topic),sources=tApprovedSourceDocIds(topic),tr=tTraffic(topic),clean=tCleanTopic(topic.topic);
+    let action='';
+    if(existing){
+      action=`<div class="success-note compact"><strong>Existing linked Toolbox Talk found.</strong> Consider re-delivering the existing approved talk before creating a duplicate.</div>
+        <div class="actions"><button type="button" class="secondary" data-tbt-open-source="${index}">Review source</button><button type="button" class="primary" data-tbt-open-existing="${tesc(existing.id)}">Open existing Toolbox Talk</button></div>`;
+    }else if(sources.length){
+      action=`<div class="actions"><button type="button" class="secondary" data-tbt-open-source="${index}">Review source</button><button type="button" class="primary" data-tbt-create-draft="${index}">Create Toolbox Talk draft</button></div>`;
+    }else{
+      action=`<div class="pending-use-warning compact"><strong>Suggestion only — no controlled source document is linked.</strong> Review the source training first. Safety Tracker will not create an unsupported Toolbox Talk draft.</div>
+        <div class="actions"><button type="button" class="secondary" data-tbt-open-source="${index}">Review source training</button></div>`;
+    }
+    return `<div class="item-card tbt-suggestion-card traffic-${tr}">
+      <div class="row-between">
+        <div><span class="tbt-suggestion-label">Suggested Toolbox Talk</span><strong>${tesc(clean)}</strong><div class="meta"><span>${Number(topic.wrong_answers||0)} incorrect answers</span><span>${Number(topic.people||0)} people</span><span>${Number(topic.accuracy_percent||0)}% correct</span></div></div>
+        <span class="badge ${tr==='red'?'overdue':'due'}">${tr==='red'?'Strong signal':'Consider'}</span>
+      </div>
+      <p class="muted"><strong>Approved source:</strong> ${tesc(tSourceSummary(topic))}</p>
+      ${action}
+    </div>`;
+  }
+
+  function tRender(){
+    if(!tIsManager())return;
+    const reports=t$('reportsView');if(!reports)return;
+    const anchor=t$('monthlyKnowledgeAnalyticsCardV21041')||reports.querySelector('.monthly-report-section');
+    if(!anchor)return;
+    let card=t$('toolboxTalkSuggestionsCardV21042');
+    if(!card){
+      card=document.createElement('section');
+      card.id='toolboxTalkSuggestionsCardV21042';
+      card.className='section-card report-manager-content';
+      anchor.insertAdjacentElement('afterend',card);
+    }
+    const suggestions=tSuggestions();
+    card.innerHTML=`<div class="row-between"><div><h3>Suggested Toolbox Talks</h3><p class="muted">Safety Tracker suggests a Toolbox Talk only when the same knowledge topic has been answered incorrectly at least twice by at least two different people in the selected analytics period. Suggestions never auto-create, approve or assign training.</p></div><span class="badge ${suggestions.length?'due':'complete'}">${suggestions.length} suggestion${suggestions.length===1?'':'s'}</span></div>
+      ${suggestions.length?`<div class="card-list" style="margin-top:12px">${suggestions.map(tCard).join('')}</div>`:'<div class="success-note" style="margin-top:12px"><strong>No Toolbox Talk suggested yet.</strong> There is not enough repeated multi-person evidence in the selected period.</div>'}`;
+
+    card.querySelectorAll('[data-tbt-create-draft]').forEach(b=>b.addEventListener('click',()=>tCreateDraft(suggestions[Number(b.dataset.tbtCreateDraft)])));
+    card.querySelectorAll('[data-tbt-open-source]').forEach(b=>b.addEventListener('click',()=>tOpenSource(suggestions[Number(b.dataset.tbtOpenSource)])));
+    card.querySelectorAll('[data-tbt-open-existing]').forEach(b=>b.addEventListener('click',()=>tOpenTraining(b.dataset.tbtOpenExisting)));
+    tAddHelpAction();
+  }
+
+  async function tRefresh(){
+    if(!tIsManager()||tBusy)return;
+    tBusy=true;
+    try{
+      const period=t$('monthlyKnowledgeAnalyticsPeriodV21041');
+      if(period?.value)tMonths=Number(period.value||12);
+      await tLoad();
+      tRender();
+    }catch(e){
+      console.warn('Toolbox Talk suggestions',e);
+      const card=t$('toolboxTalkSuggestionsCardV21042');
+      if(card)card.innerHTML=`<div class="danger-note"><strong>Toolbox Talk suggestions could not load.</strong><br>${tesc(e?.message||e)}</div>`;
+    }finally{tBusy=false}
+  }
+
+  function tAddHelpAction(){
+    const mod=core.roleAwareHelpV21038;
+    if(!mod?.actions||mod.actions.some(x=>x.id==='toolbox-talk-suggestions'))return;
+    mod.actions.push({
+      id:'toolbox-talk-suggestions',
+      roles:['manager','admin'],
+      group:'Training',
+      title:'Suggested Toolbox Talks',
+      desc:'See repeated Monthly Knowledge weak topics and open or draft the relevant Toolbox Talk.',
+      view:'reports',
+      anchor:'#toolboxTalkSuggestionsCardV21042',
+      keywords:'suggested toolbox talk tbt weak topic monthly knowledge repeated wrong answers'
+    });
+  }
+
+  document.addEventListener('change',e=>{
+    if(e.target?.id==='monthlyKnowledgeAnalyticsPeriodV21041'){
+      tMonths=Number(e.target.value||12);
+      setTimeout(tRefresh,120);
+    }
+  },true);
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    if(b.dataset.view==='reports'||b.closest?.('[data-view="reports"]'))setTimeout(tRefresh,180);
+    if(b.id==='refreshMonthlyKnowledgeAnalyticsV21041')setTimeout(tRefresh,220);
+  },true);
+
+  window.addEventListener('pageshow',()=>setTimeout(()=>{
+    if(t$('reportsView')?.classList.contains('active-view'))tRefresh();
+  },220));
+
+  const style=document.createElement('style');
+  style.id='toolboxTalkSuggestionStylesV21042';
+  style.textContent=`
+    #toolboxTalkSuggestionsCardV21042{scroll-margin-top:10px}
+    .tbt-suggestion-card{border-left-width:5px}.tbt-suggestion-label{display:block;font-size:.73rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5c7183;margin-bottom:4px}
+    .tbt-suggestion-banner-v21042{margin-bottom:12px}
+    @media(max-width:700px){.tbt-suggestion-card>.row-between{display:block}.tbt-suggestion-card>.row-between>.badge{display:inline-flex;margin-top:7px}}
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    tApplyVersion();
+    tAddHelpAction();
+    if(tIsManager()&&t$('reportsView')?.classList.contains('active-view'))tRefresh();
+  },1100);
+
+  core.toolboxTalkSuggestionsV21042={refresh:tRefresh};
+})();
