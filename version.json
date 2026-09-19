@@ -1,6 +1,6 @@
 {
-  "version": "2.10.74",
-  "build_id": "v21074-register-pdf-pages-20260919",
+  "version": "2.10.75",
+  "build_id": "v21075-document-creation-toggle-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.74 CLEAN. Improves the Approved / Current Document Register PDF so each controlled register section starts on a fresh page: Risk Assessments, COSHH Risk Assessments, Safe Systems of Work, MSDS / Safety Data Sheets and Toolbox Talks. Each section has its own heading, repeated column header and page numbering for a cleaner printable register. Includes the v2.10.72 calendar label de-duplication and v2.10.73 SSW/TBT Register download shortcuts. No database or controlled-record changes."
+  "notes": "Safety Tracker v2.10.75 CLEAN. Fixes the Document Creation ON/OFF button. The safety_tracker_settings table is keyed by setting_key, but the previous frontend looked for a non-existent id field and therefore attempted to insert a duplicate document_creation_enabled setting, causing the safety_tracker_settings_pkey error. The toggle now updates the existing document_creation_enabled row by setting_key and only inserts it if it is genuinely missing. Existing documents and records are unchanged. All v2.10.74 register/download/calendar fixes remain unchanged."
 }

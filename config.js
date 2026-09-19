@@ -22,4 +22,5 @@ f('hotfix-v21069-positions-responsibilities.js?v=v21071-hs-officer-notice-202609
 f('hotfix-v21072-calendar-label-dedupe.js?v=v21072-calendar-label-dedupe-20260919','safety-v21072');
 f('hotfix-v21073-register-downloads.js?v=v21073-register-downloads-20260919','safety-v21073');
 f('hotfix-v21074-register-pdf-pages.js?v=v21074-register-pdf-pages-20260919','safety-v21074');
+f('hotfix-v21075-document-creation-toggle.js?v=v21075-document-creation-toggle-20260919','safety-v21075');
 })();
