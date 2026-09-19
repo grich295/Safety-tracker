@@ -10,4 +10,5 @@ f('hotfix-v21057-linked-impact.js?v=v21057-linked-impact-20260919','safety-v2105
 f('hotfix-v21058-app-created-ssw-revision.js?v=v21058-ssw-revision-20260919','safety-v21058');
 f('hotfix-v21059-app-created-tbt-revision.js?v=v21059-tbt-revision-20260919','safety-v21059');
 f('hotfix-v21060-refresher-method.js?v=v21060-refresher-method-20260919','safety-v21060');
+f('hotfix-v21061-retrain-now.js?v=v21061-retrain-now-20260919','safety-v21061');
 })();
