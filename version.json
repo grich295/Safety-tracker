@@ -1,6 +1,6 @@
 {
-  "version": "2.10.71",
-  "build_id": "v21071-hs-officer-notice-20260919",
+  "version": "2.10.72",
+  "build_id": "v21072-calendar-label-dedupe-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.71 CLEAN. Clarifies document scope: every controlled RA, COSHH RA, SSW and Toolbox Talk should be explicitly scoped to either Whole hotel / Everyone once or the relevant department; whole-hotel material is not duplicated into every department and person-specific assignment is treated as an exception. Department responsible-manager changes continue to show a warning and automatically flag all controlled RA/COSHH/SSW/TBT material assigned to that department for full review. Initial department-manager assignment does not trigger a review. Changing the overall H&S Manager / Officer no longer triggers a hotel-wide full review. Instead, the new H&S Manager / Officer receives a visible My Safety responsibility message explaining that they are responsible for overseeing controlled H&S documents, monitoring outstanding reviews and training/compliance actions, and ensuring relevant department managers complete required reviews; the message can be acknowledged. Positions and six-month default/Manager-editable training frequency remain unchanged. Supabase migration hs_manager_change_notice_no_full_review_v21071 applied."
+  "notes": "Safety Tracker v2.10.72 CLEAN. Small display-only calendar correction: where a training record already contains its controlled reference in the training name, the Safety Calendar no longer prints the same reference twice (for example SSW-001 \u00b7 SSW-001 - ...). The underlying training record, assignment, evidence, due date and document linkage are unchanged. All v2.10.71 responsibility and document-scope rules remain unchanged."
 }
