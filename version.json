@@ -1,6 +1,6 @@
 {
-  "version": "2.10.55",
-  "build_id": "v21055-training-packs-20260919",
+  "version": "2.10.56",
+  "build_id": "v21056-review-audit-20260919",
   "clean": true,
-  "notes": "Adds linked training packs with completion evidence reused across packs while current; enforces per-user RA/COSHH -> SSW -> Toolbox Talk prerequisites; Toolbox Talks are always instructor-led; pack training requirements use the strictest applicable method for each person; adds RA/COSHH residual-risk training guidance (low self-training, high instructor-led, medium/unclear manager judgement) and requires a recorded reason when a Manager selects self-training against a high-risk instructor-led recommendation. Pack decisions are version/link aware and retained for audit. Supabase migration training_pack_decisions_v21055 applied. Includes v2.10.54 and earlier fixes."
+  "notes": "Small additive review-audit build. Makes formal controlled-document review history visible in Document details, including review date/time, reviewer, outcome, next review date and note for RA/COSHH RA/SSW and other non-SDS controlled documents. Adds the same formal controlled-review workflow and immutable audit history for approved Toolbox Talks, including Reviewed/no change, New version required and Other action outcomes. A no-change review updates the next review date without creating a fake new version; action-required reviews flag the current TBT for follow-up while keeping its existing controlled record/history. Supabase migration training_controlled_reviews_v21056 applied. This is phase 1 only; linked RA/COSHH impact review/modify actions, refresher-method controls and ad-hoc retraining remain for the next small builds. Includes v2.10.55 and earlier fixes."
 }

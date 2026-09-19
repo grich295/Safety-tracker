@@ -4,7 +4,6 @@ window.SAFETY_TRACKER_CONFIG = {
 };
 
 // v2.10.55 additive training-pack hotfix loader.
-// Kept here so the large baseline file and index do not need to be touched.
 (function(){
   if(window.__SAFETY_V21055_SCRIPT_REQUESTED)return;
   window.__SAFETY_V21055_SCRIPT_REQUESTED=true;
@@ -14,6 +13,23 @@ window.SAFETY_TRACKER_CONFIG = {
     s.src='hotfix-v21055-training-packs.js?v=v21055-training-packs-20260919';
     s.async=false;
     s.dataset.safetyV21055='1';
+    s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
+    (document.body||document.head||document.documentElement).appendChild(s);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});
+  else load();
+})();
+
+// v2.10.56 small review-audit hotfix loader.
+(function(){
+  if(window.__SAFETY_V21056_SCRIPT_REQUESTED)return;
+  window.__SAFETY_V21056_SCRIPT_REQUESTED=true;
+  const load=()=>{
+    if(document.querySelector('script[data-safety-v21056]'))return;
+    const s=document.createElement('script');
+    s.src='hotfix-v21056-review-audit.js?v=v21056-review-audit-20260919';
+    s.async=false;
+    s.dataset.safetyV21056='1';
     s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
     (document.body||document.head||document.documentElement).appendChild(s);
   };
