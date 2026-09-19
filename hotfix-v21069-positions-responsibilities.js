@@ -1,4 +1,4 @@
-/* Safety Tracker v2.10.69 CLEAN
+/* Safety Tracker v2.10.71 CLEAN
    Manual positions, multiple-position cross-training, responsibility ownership
    and company 6-month training / annual controlled-review policy.
 */
@@ -29,8 +29,8 @@
     if(window.__SAFETY_V21069_INSTALLED)return;
     window.__SAFETY_V21069_INSTALLED=true;
 
-    const BUILD='2.10.69';
-    const core={loadAll,renderAdmin,renderPeople,showSetRole,showDocDetails,saveRole};
+    const BUILD='2.10.71';
+    const core={loadAll,renderAdmin,renderPeople,showSetRole,showDocDetails,saveRole,renderMySafety};
     let loading69=null,observer69=null;
 
     state.positions69=state.positions69||[];
@@ -39,6 +39,7 @@
     state.manualDepartments69=state.manualDepartments69||[];
     state.responsibilities69=state.responsibilities69||[];
     state.reviewTriggers69=state.reviewTriggers69||[];
+    state.responsibilityNotices71=state.responsibilityNotices71||[];
 
     const $69=id=>document.getElementById(id);
     const esc69=v=>{try{return esc(v)}catch(_e){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}};
@@ -69,9 +70,20 @@
       return loading69;
     }
 
+    async function loadResponsibilityNotices71(){
+      if(!state.user||state.offline||!navigator.onLine)return;
+      try{
+        const r=await sb.from('safety_responsibility_notifications_v21071')
+          .select('*')
+          .eq('user_id',state.user.id)
+          .order('created_at',{ascending:false});
+        if(!r.error)state.responsibilityNotices71=r.data||[];
+      }catch(e){console.warn('H&S responsibility notice',e)}
+    }
+
     loadAll=async function(){
       const out=await core.loadAll.apply(this,arguments);
-      await load69(true);
+      await Promise.all([load69(true),loadResponsibilityNotices71()]);
       return out;
     };
     try{window.loadAll=loadAll}catch(_e){}
@@ -137,7 +149,7 @@
 
       card.innerHTML=`
         <div class="row-between"><div><h3>Positions & Responsibilities</h3><p class="muted">Create your own positions. Nothing is pre-set. A person can hold several positions for cross-training, with one marked Main/Default. Each position belongs to one department. Cross-training comes from assigning a user multiple positions, and those departments feed the existing training rules automatically.</p></div><button type="button" class="primary" data-new-position69>New position</button></div>
-        <div class="hint-box"><strong>No duplication:</strong> a whole-hotel RA/COSHH/SSW/TBT should use <strong>Everyone</strong> once. Department requirements are attached to the department once. If a person holds positions across departments, their requirements are merged and the same controlled item is not duplicated.</div>
+        <div class="hint-box"><strong>Document scope:</strong> every controlled RA/COSHH RA/SSW/TBT should have a clear scope — either <strong>Whole hotel / Everyone</strong> once, or the relevant <strong>Department</strong>. Do not duplicate whole-hotel documents into each department. Person-specific assignment is for genuine exceptions only.</div>
         <div class="section-card compact">
           <h4>Company H&S responsibility</h4>
           <p class="muted">The overall H&S Manager can also be a department manager or hold any other position.</p>
@@ -156,7 +168,7 @@
           <div class="card-list">
             <div class="item-card compact traffic-green"><strong>Training frequency</strong><div class="muted">New training defaults to every 6 months to save setup time. Manager/Admin can change the frequency for each training item whenever required.</div></div>
             <div class="item-card compact traffic-green"><strong>Controlled-document review</strong><div class="muted">RA, COSHH RA, SSW and Toolbox Talk: at least annually.</div></div>
-            <div class="item-card compact traffic-green"><strong>Manager change</strong><div class="muted">Changing an existing department responsible manager flags that department's controlled material for full review. Changing the overall H&S Manager flags all controlled H&S material.</div></div>
+            <div class="item-card compact traffic-green"><strong>Manager change</strong><div class="muted">Changing an existing department responsible manager automatically flags ALL controlled RA/COSHH RA/SSW/TBT material assigned to that department for full review, after a warning confirmation. Changing the overall H&S Manager / Officer does NOT trigger a hotel-wide review; the new holder is notified that they are responsible for oversight, outstanding reviews and training/compliance actions.</div></div>
           </div>
         </div>
         <div class="section-card compact">
@@ -181,6 +193,37 @@
       return out;
     };
     try{window.renderAdmin=renderAdmin}catch(_e){}
+
+    function renderResponsibilityNotice71(){
+      const view=$69('mySafetyView');if(!view)return;
+      let box=$69('responsibilityNotice71');
+      const notices=(state.responsibilityNotices71||[]).filter(x=>!x.acknowledged_at);
+      if(!notices.length){if(box)box.remove();return}
+      const n=notices[0];
+      if(!box){
+        box=document.createElement('div');
+        box.id='responsibilityNotice71';
+        box.className='section-card traffic-amber';
+        const heading=view.querySelector('.page-heading');
+        if(heading)heading.insertAdjacentElement('afterend',box);else view.insertAdjacentElement('afterbegin',box);
+      }
+      box.innerHTML=`<div class="row-between"><div><h3>H&S responsibility assigned</h3><p>${esc69(n.message)}</p><p class="muted">Assigned ${esc69(fmtDateTime(n.created_at))}</p></div><button type="button" class="primary" data-ack-responsibility71="${n.id}">Acknowledge</button></div>`;
+    }
+
+    renderMySafety=function(){
+      const out=core.renderMySafety.apply(this,arguments);
+      setTimeout(renderResponsibilityNotice71,0);
+      return out;
+    };
+    try{window.renderMySafety=renderMySafety}catch(_e){}
+
+    async function acknowledgeResponsibility71(id){
+      const r=await sb.rpc('ack_safety_responsibility_notice_v21071',{p_notice_id:id});
+      if(r.error)return toast69(r.error.message);
+      await loadResponsibilityNotices71();
+      renderResponsibilityNotice71();
+      toast69('H&S responsibility acknowledged.');
+    }
 
     function decoratePeople69(){
       if(!admin69())return;
@@ -268,10 +311,63 @@
       await refresh(p.active===false?'Position restored.':'Position archived. Existing history is retained.');
     }
 
+    function departmentReviewCount69(dep){
+      const docIds=new Set((state.documentAudiences||[])
+        .filter(a=>a.target_type==='DEPARTMENT'&&a.department_id===dep)
+        .map(a=>a.document_id));
+      const docs=(state.documents||[]).filter(d=>docIds.has(d.id)&&d.status!=='ARCHIVED'&&['RISK_ASSESSMENT','COSHH','SSW'].includes(String(d.doc_type||'').toUpperCase()));
+      const tbtIds=new Set((state.trainingAudiences||[])
+        .filter(a=>a.target_type==='DEPARTMENT'&&a.department_id===dep)
+        .map(a=>a.training_session_id));
+      const tbts=(state.training||[]).filter(t=>tbtIds.has(t.id)&&t.status!=='ARCHIVED'&&String(t.source_kind||t.session_type||'').toUpperCase()==='TOOLBOX_TALK');
+      return {docs:docs.length,tbts:tbts.length,total:docs.length+tbts.length};
+    }
+
     async function setResponsibility69(type,dep=null,userId=null){
-      const r=await sb.rpc('set_safety_responsibility_v21069',{p_responsibility_type:type,p_department_id:dep,p_user_id:userId||null});
+      const existing=currentResponsibility69(type,dep);
+      const nextId=userId||null;
+
+      if(type==='DEPARTMENT_MANAGER' && existing && existing.user_id!==nextId){
+        const oldName=personLabel69(existing.user_id);
+        const newName=nextId?personLabel69(nextId):'Not assigned';
+        const count=departmentReviewCount69(dep);
+        const ok=confirm(
+          `WARNING — DEPARTMENT RESPONSIBLE MANAGER CHANGE
+
+`+
+          `Changing ${deptLabel69(dep)} from ${oldName} to ${newName} will automatically flag ALL controlled H&S material assigned to this department for full review.
+
+`+
+          `Currently matched: ${count.total} controlled item${count.total===1?'':'s'} (${count.docs} RA/COSHH/SSW + ${count.tbts} Toolbox Talk${count.tbts===1?'':'s'}).
+
+`+
+          `Existing approved versions remain current while the review is completed. No replacement versions are created automatically.
+
+Continue?`
+        );
+        if(!ok)return;
+      }
+
+      if(type==='HS_MANAGER' && existing && existing.user_id!==nextId){
+        const oldName=personLabel69(existing.user_id);
+        const newName=nextId?personLabel69(nextId):'Not assigned';
+        const ok=confirm(
+          `Change overall H&S Manager / Officer from ${oldName} to ${newName}?
+
+`+
+          `This change will NOT trigger a full review of all hotel documents. `+
+          `The new H&S Manager / Officer will receive a responsibility message telling them they are responsible for overseeing controlled H&S documents, outstanding reviews and training/compliance actions.
+
+Continue?`
+        );
+        if(!ok)return;
+      }
+
+      const r=await sb.rpc('set_safety_responsibility_v21069',{p_responsibility_type:type,p_department_id:dep,p_user_id:nextId});
       if(r.error)return toast69(r.error.message);
-      await refresh(type==='HS_MANAGER'?'H&S Manager responsibility saved.':'Department responsible manager saved.');
+      await refresh(type==='HS_MANAGER'
+        ? 'H&S Manager / Officer responsibility saved. The new holder has been notified; no hotel-wide review was triggered.'
+        : 'Department responsible manager saved. Any required department review flags have been created automatically.');
     }
 
     async function runReviewTrigger69(){
@@ -471,10 +567,12 @@
       if(b.hasAttribute('data-save-hs-manager69')){e.preventDefault();setResponsibility69('HS_MANAGER',null,$69('hsManager69')?.value||null);return}
       if(b.dataset.saveDeptManager69){e.preventDefault();setResponsibility69('DEPARTMENT_MANAGER',b.dataset.saveDeptManager69,$69('deptManager69_'+b.dataset.saveDeptManager69)?.value||null);return}
       if(b.hasAttribute('data-run-review-trigger69')){e.preventDefault();runReviewTrigger69();return}
+      if(b.dataset.ackResponsibility71){e.preventDefault();acknowledgeResponsibility71(b.dataset.ackResponsibility71);return}
     },true);
 
-    load69().then(()=>{
+    Promise.all([load69(),loadResponsibilityNotices71()]).then(()=>{
       observe69();
+      try{renderMySafety()}catch(_e){}
       if(admin69()){try{renderPeople();renderAdmin69()}catch(_e){}}
     });
 
