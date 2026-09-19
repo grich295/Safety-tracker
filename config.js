@@ -18,4 +18,5 @@ f('hotfix-v21065-strictest-method-wins.js?v=v21065-strictest-method-wins-2026091
 f('hotfix-v21066-temporary-unsuitable.js?v=v21066-temporary-unsuitable-20260919','safety-v21066');
 f('hotfix-v21067-change-control-workflow.js?v=v21067-change-control-workflow-20260919','safety-v21067');
 f('hotfix-v21068-regression-hardening.js?v=v21068-regression-hardening-20260919','safety-v21068');
+f('hotfix-v21069-positions-responsibilities.js?v=v21069-user-multiple-positions-final-20260919','safety-v21069');
 })();
