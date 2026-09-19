@@ -2960,7 +2960,10 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       nMarkHub('checks',({checklists:'custom',ppe:'ppe',firstAid:'firstaid'})[view]);
     }
     if(['documents','creator'].includes(view)){
-      nMarkHub('documents',view==='creator'?'create':'library');
+      let key='library';
+      if(view==='creator')key='create';
+      else if((core.state.documentIndex||'ALL')==='REGISTER')key='register';
+      nMarkHub('documents',key);
     }
     if(['reports','compliance','people','admin'].includes(view)){
       nMarkHub('management',({reports:'reports',compliance:'compliance',people:'people',admin:'admin'})[view]);
@@ -3011,7 +3014,18 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       const s=n$('documentStatusFilter');if(s)s.value='ACTIVE';
       const q=n$('documentSearch');if(q)q.value='';
       nShow('documents');
-      nRenderDocumentsNow();nMarkHub('documents','register');return;
+      const openRegister=()=>{
+        core.state.documentIndex='REGISTER';
+        const st=n$('documentStatusFilter');if(st)st.value='ACTIVE';
+        const ty=n$('documentTypeFilter');if(ty)ty.value='';
+        const sq=n$('documentSearch');if(sq)sq.value='';
+        nRenderDocumentsNow();
+        nMarkHub('documents','register');
+        nScroll('#documentIndexContext');
+      };
+      openRegister();
+      [60,180,420].forEach(ms=>setTimeout(openRegister,ms));
+      return;
     }
     if(action==='docs:upload'){
       nShow('documents');
@@ -3049,7 +3063,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       setTimeout(()=>n$('reportsView')?.querySelector('.page-heading')?.scrollIntoView({behavior:'smooth',block:'start'}),80);return;
     }
     if(action==='management:knowledge'){
-      nShow('reports');nMarkHub('management','knowledge');nScroll('#monthlyKnowledgeAnalyticsCardV21041');return;
+      nShow('reports');nMarkHub('management','knowledge');nScroll('#knowledgeHubV21051');return;
     }
   }
 
@@ -4099,4 +4113,244 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   }catch(_e){}
 
   injectStyleV21050();
+})();
+
+
+/* Safety Tracker v2.10.51 - unified Knowledge Checks hub
+   Keeps the actual user quiz on My Safety, but gives Manager/Admin one clear
+   Knowledge screen instead of scattering status, analytics, review and settings.
+*/
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+  const st=core.state,sb=core.sb;
+  const $k=id=>document.getElementById(id);
+  const escK=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const isManagerK=()=>st.profile?.report_only!==true&&['admin','manager'].includes(String(st.profile?.role||'').toLowerCase());
+  const isAdminK=()=>st.profile?.report_only!==true&&String(st.profile?.role||'').toLowerCase()==='admin';
+  let busy=false;
+
+  function showK(view){
+    try{
+      if(typeof showView==='function')showView(view);
+      else document.querySelector(`#mainNav button[data-view="${view}"]`)?.click();
+    }catch(_e){}
+  }
+  function scrollK(sel){
+    let n=0;
+    const tick=()=>{
+      const el=document.querySelector(sel);
+      if(el){try{el.scrollIntoView({behavior:'smooth',block:'start'})}catch(_e){};return}
+      if(++n<16)setTimeout(tick,100);
+    };
+    setTimeout(tick,60);
+  }
+  function statusLabelK(v){
+    return ({CURRENT:'Complete',DUE:'Due',OVERDUE:'Overdue',PREPARING:'Preparing',OFF:'Off'})[String(v||'OFF').toUpperCase()]||String(v||'');
+  }
+
+  async function loadK(){
+    if(!isManagerK()||busy)return;
+    const reports=$k('reportsView');if(!reports)return;
+    let hub=$k('knowledgeHubV21051');
+    if(!hub){
+      hub=document.createElement('section');
+      hub.id='knowledgeHubV21051';
+      hub.className='section-card knowledge-hub-v21051';
+      const analytics=$k('monthlyKnowledgeAnalyticsCardV21041');
+      if(analytics?.parentNode)analytics.parentNode.insertBefore(hub,analytics);
+      else{
+        const stats=$k('reportStats');
+        stats?.insertAdjacentElement('afterend',hub)||reports.appendChild(hub);
+      }
+    }
+    busy=true;
+    hub.innerHTML='<div class="muted">Loading Knowledge Checks…</div>';
+    try{
+      const settingsP=sb.rpc('get_monthly_knowledge_settings_v21035');
+      const meP=sb.rpc('monthly_knowledge_status_v21035');
+      const teamP=sb.rpc('monthly_knowledge_team_status_v21035');
+      const [settingsR,meR,teamR]=await Promise.all([settingsP,meP,teamP]);
+      if(settingsR.error)throw new Error(settingsR.error.message);
+      if(meR.error)throw new Error(meR.error.message);
+      if(teamR.error)throw new Error(teamR.error.message);
+
+      const settings=Array.isArray(settingsR.data)?settingsR.data[0]||{}:settingsR.data||{};
+      const me=Array.isArray(meR.data)?meR.data[0]||{}:meR.data||{};
+      const team=teamR.data||[];
+      const complete=team.filter(x=>String(x.status).toUpperCase()==='CURRENT').length;
+      const due=team.filter(x=>String(x.status).toUpperCase()==='DUE').length;
+      const overdue=team.filter(x=>String(x.status).toUpperCase()==='OVERDUE').length;
+      const preparing=team.filter(x=>String(x.status).toUpperCase()==='PREPARING').length;
+      const ready=team.filter(x=>!['PREPARING','OFF'].includes(String(x.status).toUpperCase())).length;
+      const pct=ready?Math.round(complete/ready*100):0;
+      const qpm=Number(settings.questions_per_month||settings.questions_required||3);
+      const diff=String(settings.difficulty||'MIXED').replaceAll('_',' ');
+
+      hub.innerHTML=`
+        <div class="row-between knowledge-hub-head-v21051">
+          <div>
+            <h3>Knowledge Checks</h3>
+            <p class="muted">One place for your monthly check, team completion, question review and analytics.</p>
+          </div>
+          <span class="badge ${settings.enabled?'complete':'muted'}">${settings.enabled?'ON':'OFF'}</span>
+        </div>
+
+        <div class="stats-grid knowledge-hub-stats-v21051">
+          <div class="stat traffic-${String(me.status).toUpperCase()==='CURRENT'?'green':String(me.status).toUpperCase()==='OVERDUE'?'red':String(me.status).toUpperCase()==='DUE'?'amber':'neutral'}">
+            <strong>${escK(statusLabelK(me.status))}</strong><span>My check</span>
+          </div>
+          <div class="stat traffic-${pct>=95?'green':pct>=80?'amber':'red'}">
+            <strong>${pct}%</strong><span>Team complete</span>
+          </div>
+          <div class="stat traffic-amber"><strong>${due}</strong><span>Due</span></div>
+          <div class="stat traffic-${overdue?'red':'green'}"><strong>${overdue}</strong><span>Overdue</span></div>
+          <div class="stat traffic-neutral"><strong>${preparing}</strong><span>Preparing</span></div>
+        </div>
+
+        <div class="hint-box knowledge-hub-rule-v21051">
+          <strong>${qpm} question${qpm===1?'':'s'} per month · ${escK(diff)}</strong><br>
+          Questions come from current assigned safety information. Formal training renewal dates are not changed by a knowledge check.
+        </div>
+
+        <div class="knowledge-hub-actions-v21051">
+          <button type="button" class="primary" data-khub="my">My monthly check</button>
+          <button type="button" class="secondary" data-khub="team">Team status</button>
+          <button type="button" class="secondary" data-khub="review">Review questions</button>
+          <button type="button" class="secondary" data-khub="analytics">Analytics</button>
+          ${isAdminK()?'<button type="button" class="ghost" data-khub="settings">Settings</button>':''}
+        </div>
+
+        <div class="knowledge-hub-explain-v21051">
+          <div><strong>My monthly check</strong><span>Take or review your own current check.</span></div>
+          <div><strong>Team status</strong><span>See who is complete, due, overdue or still preparing.</span></div>
+          <div><strong>Review questions</strong><span>Inspect generated questions and remove unsuitable ones.</span></div>
+          <div><strong>Analytics</strong><span>Look for repeated weak topics and trends over time.</span></div>
+        </div>
+      `;
+    }catch(e){
+      hub.innerHTML=`<div class="danger-note"><strong>Knowledge Checks could not load.</strong><br>${escK(e.message||e)}</div>`;
+    }finally{busy=false}
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-khub]');
+    if(!b)return;
+    const a=b.dataset.khub;
+    if(a==='my'){
+      showK('mySafety');scrollK('[id^="monthlyKnowledgeCardV"]');return;
+    }
+    if(a==='team'){
+      showK('compliance');scrollK('[id^="monthlyKnowledgeComplianceCardV"]');return;
+    }
+    if(a==='review'){
+      try{
+        const mod=core.monthlyKnowledgeV21037||core.monthlyKnowledgeV21036||core.monthlyKnowledgeV21035;
+        if(mod?.review)return mod.review();
+      }catch(_e){}
+      return;
+    }
+    if(a==='analytics'){
+      scrollK('#monthlyKnowledgeAnalyticsCardV21041');return;
+    }
+    if(a==='settings'){
+      showK('admin');scrollK('[id^="monthlyKnowledgeAdminCardV"]');return;
+    }
+  },true);
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('button');
+    if(!b)return;
+    if(b.dataset.view==='reports'||b.dataset.navHubAction==='management:knowledge'){
+      setTimeout(loadK,80);
+      setTimeout(loadK,500);
+    }
+  },true);
+
+  window.addEventListener('pageshow',()=>setTimeout(()=>{
+    if($k('reportsView')?.classList.contains('active-view'))loadK();
+  },180));
+
+  const style=document.createElement('style');
+  style.id='knowledgeHubStyleV21051';
+  style.textContent=`
+    #knowledgeHubV21051{scroll-margin-top:10px}
+    .knowledge-hub-stats-v21051{margin-top:12px}
+    .knowledge-hub-rule-v21051{margin-top:12px}
+    .knowledge-hub-actions-v21051{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    .knowledge-hub-explain-v21051{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .knowledge-hub-explain-v21051>div{border:1px solid #d8e0e6;border-radius:10px;padding:10px;display:grid;gap:3px}
+    .knowledge-hub-explain-v21051 span{font-size:.86rem;color:#607182}
+    @media(max-width:680px){
+      .knowledge-hub-head-v21051{display:block}
+      .knowledge-hub-head-v21051>.badge{display:inline-block;margin-top:8px}
+      .knowledge-hub-actions-v21051{display:grid;grid-template-columns:1fr}
+      .knowledge-hub-actions-v21051 button{width:100%}
+      .knowledge-hub-explain-v21051{grid-template-columns:1fr}
+    }
+  `;
+  document.head.appendChild(style);
+
+  setTimeout(()=>{
+    if(isManagerK()&&$k('reportsView')?.classList.contains('active-view'))loadK();
+  },1100);
+
+  core.knowledgeHubV21051={render:loadK};
+})();
+
+
+/* Safety Tracker v2.10.52 - hard Register navigation repair */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state)return;
+
+  function openRegisterV21052(){
+    try{
+      core.state.documentIndex='REGISTER';
+      const type=document.getElementById('documentTypeFilter');
+      const status=document.getElementById('documentStatusFilter');
+      const search=document.getElementById('documentSearch');
+      if(type)type.value='';
+      if(status)status.value='ACTIVE';
+      if(search)search.value='';
+
+      if(typeof showView==='function')showView('documents');
+
+      const render=()=>{
+        core.state.documentIndex='REGISTER';
+        if(status)status.value='ACTIVE';
+        if(type)type.value='';
+        if(search)search.value='';
+        try{if(typeof renderDocuments==='function')renderDocuments()}catch(_e){}
+        document.querySelectorAll('.nav-hub-v21044[data-nav-hub="documents"] .nav-hub-button')
+          .forEach(b=>b.classList.toggle('active',b.dataset.navHubKey==='register'));
+        const ctx=document.getElementById('documentIndexContext');
+        if(ctx){
+          try{ctx.scrollIntoView({behavior:'smooth',block:'start'})}catch(_e){}
+        }
+      };
+      render();
+      [50,140,320,700].forEach(ms=>setTimeout(render,ms));
+    }catch(e){
+      try{(window.toast||core.toast)?.('Could not open the Document Register: '+(e?.message||e))}catch(_e){}
+    }
+  }
+
+  document.addEventListener('click',e=>{
+    const hub=e.target.closest?.('[data-nav-hub-action="docs:register"]');
+    if(hub){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      openRegisterV21052();
+      return;
+    }
+    const card=e.target.closest?.('[data-doc-index="REGISTER"]');
+    if(card){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      openRegisterV21052();
+    }
+  },true);
+
+  core.openDocumentRegisterV21052=openRegisterV21052;
 })();

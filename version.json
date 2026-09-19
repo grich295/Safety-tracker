@@ -1,6 +1,6 @@
 {
-  "version": "2.10.50",
-  "build_id": "v21050-creator-repeatable-lines-20260919",
+  "version": "2.10.52",
+  "build_id": "v21052-register-hard-fix-20260919",
   "clean": true,
-  "notes": "Improves the in-app RA/COSHH RA/SSW/Toolbox Talk creator by replacing checklist-style free-text boxes with repeatable one-line entries. Each item has a + Add button and a - remove button; Enter adds the next line. Existing drafts remain compatible because values continue to be stored as newline-separated text. Applied to structured hazards/controls/actions, SSW sequence/pre-start/stop/completion items, and Toolbox Talk controls/reminders/questions/actions while retaining narrative and SDS-source fields as normal text areas. Includes v2.10.49 Register/upload repairs and v2.10.48 PTW Viewer privacy masking. No database migration required."
+  "notes": "Hard-fixes Document Register navigation on mobile and desktop. Register now survives Documents view re-rendering, remains visibly selected, resets conflicting filters, renders after navigation settles, and both the top Register pill and the large Register card use a capture-level fallback. Also includes the v2.10.51 Knowledge Checks hub, v2.10.50 repeatable creator lines, v2.10.49 upload/register improvements and v2.10.48 PTW Viewer privacy masking. No database migration required."
 }
