@@ -165,7 +165,7 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   const core=window.SafetyTrackerV2;
   if(!core||!core.sb||!core.state)return;
 
-  const KVER='2.10.37';
+  const KVER=String(window.SAFETY_BUILD?.version||'2.10.47');
   const ksb=core.sb, ks=core.state;
   const k$=id=>document.getElementById(id);
   const kesc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -178,15 +178,9 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   let kQuiz=null,kBuildBusy=false,kAutoTimer=null,kLastAutoScan=0,kMyLoading=false,kAdminLoading=false,kTeamLoading=false;
 
   function kApplyVersion(){
-    if(window.SAFETY_BUILD){
-      window.SAFETY_BUILD.version=KVER;
-      window.SAFETY_BUILD.label=KVER+' CLEAN';
-      /* build supplied centrally by version.json */
-      try{window.applySafetyBuildLabel?.()}catch(_e){}
-    }
-    document.querySelectorAll('.build-badge').forEach(el=>el.textContent='Safety Tracker v'+KVER+' CLEAN');
-    document.querySelectorAll('.dashboard-version').forEach(el=>el.textContent='v'+KVER+' CLEAN');
-    document.querySelectorAll('.brand-line .version,.demo-brand-line .version').forEach(el=>el.textContent='v'+KVER);
+    // Version identity is owned centrally by version.json / SAFETY_BUILD.
+    // Monthly Knowledge must never overwrite the app version with its own feature version.
+    try{window.applySafetyBuildLabel?.()}catch(_e){}
   }
   [0,350,1000,2500].forEach(ms=>setTimeout(kApplyVersion,ms));
   document.addEventListener('DOMContentLoaded',kApplyVersion,{once:true});
@@ -3650,4 +3644,13 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   installHandlers();
   setTimeout(()=>{if($('checklistsView')?.classList.contains('active-view'))renderChecklistExtension()},800);
   window.SafetyTrackerV21032={loadCustomChecklists,renderChecklistExtension,showPpeCheckV21032,showFirstAidCheckV21032};
+})();
+
+/* Safety Tracker v2.10.47 - stop Monthly Knowledge from overwriting central app version */
+(function(){
+  function applyV21047CentralVersion(){
+    try{window.applySafetyBuildLabel?.()}catch(_e){}
+  }
+  [0,120,350,800,1600,3200].forEach(ms=>setTimeout(applyV21047CentralVersion,ms));
+  window.addEventListener('pageshow',applyV21047CentralVersion);
 })();

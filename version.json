@@ -1,6 +1,6 @@
 {
-  "version": "2.10.46",
-  "build_id": "v21046-clean-baseline-20260918",
+  "version": "2.10.47",
+  "build_id": "v21047-central-version-fix-20260919",
   "clean": true,
-  "notes": "Housekeeping stage 3: consolidates the six active hotfix scripts into one current baseline file, hotfix-v21046-baseline.js, while keeping app-v21028.js, bulk import and demo files separate so startup behaviour remains close to the proven live architecture. index.html now loads five local app scripts instead of ten, and the offline service-worker shell caches the same reduced active set. No database, workflow, permission or navigation logic is intentionally changed. The old individual hotfix files may remain in the repository for now but are no longer referenced by the live app; they can be archived in the final repository-cleanup stage after this build is verified."
+  "notes": "Fixes a stale Monthly Knowledge feature-level version writer that was overwriting the central Safety Tracker build label with v2.10.37. The app version is now owned only by version.json / SAFETY_BUILD, and Monthly Knowledge only asks the central label renderer to refresh. Service-worker cache namespace is bumped so phones pull the corrected build. No workflow, database, navigation, permissions or safety logic changed. Includes all v2.10.46 clean-baseline functionality."
 }
