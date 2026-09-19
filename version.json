@@ -1,6 +1,6 @@
 {
-  "version": "2.10.65",
-  "build_id": "v21065-strictest-method-wins-20260919",
+  "version": "2.10.66",
+  "build_id": "v21066-temporary-unsuitable-20260919",
   "clean": true,
-  "notes": "Small training-method precedence hardening. The strictest current requirement now always wins across replacement-version training impact, linked training-pack decisions and per-person overrides. A replacement version marked Self-training can still be upgraded to Instructor-led when a valid linked pack or individual override requires it. A No-retraining carry-forward cannot incorrectly preserve a prior self-training completion when the person's current pack now requires instructor-led evidence; it only carries as complete when the prior evidence itself satisfies the current instructor requirement. Existing instructor-led completion can still be carried where No retraining was deliberately selected. Toolbox Talks remain instructor-led always. No database migration was required."
+  "notes": "Small linked-control safety build. In the RA/COSHH linked-impact screen a Manager can now mark a linked SSW or Toolbox Talk Temporarily unsuitable for use, with a mandatory reason and immutable audit record. While the block is active the current item remains readable for reference/history, but its training cannot be completed, signed, attendance-confirmed, admin-excepted or used as a valid prerequisite; affected assignments and compliance views show red/blocked. Retrain now is also unavailable on blocked material. A Manager can clear the block with a recorded reason, or it clears automatically when a replacement SSW version or replacement TBT is approved. Block and clear history is retained with who/when/why. Supabase migration temporary_suitability_block_v21066 applied. This completes the planned temporarily-unsuitable/block-use piece."
 }

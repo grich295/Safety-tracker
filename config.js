@@ -15,4 +15,5 @@ f('hotfix-v21062-revision-training-impact.js?v=v21062-revision-training-impact-2
 f('hotfix-v21063-pack-version-awareness.js?v=v21063-pack-version-awareness-20260919','safety-v21063');
 f('hotfix-v21064-source-training-guard.js?v=v21064-source-training-guard-20260919','safety-v21064');
 f('hotfix-v21065-strictest-method-wins.js?v=v21065-strictest-method-wins-20260919','safety-v21065');
+f('hotfix-v21066-temporary-unsuitable.js?v=v21066-temporary-unsuitable-20260919','safety-v21066');
 })();
