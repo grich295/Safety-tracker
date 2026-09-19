@@ -1,6 +1,6 @@
 {
-  "version": "2.10.63",
-  "build_id": "v21063-pack-version-awareness-20260919",
+  "version": "2.10.64",
+  "build_id": "v21064-source-training-guard-20260919",
   "clean": true,
-  "notes": "Small additive training-pack validation hardening. Every new training-pack method decision now snapshots the exact approved/current version of every document in the pack, not only the root RA/COSHH version and document IDs. If any linked SSW/RA/COSHH later moves to a new approved version, the existing pack method decision is treated as stale and the Manager must review the pack method again. This prevents an older risk/training-method decision silently carrying across a changed linked controlled version. Existing link-change and root-version staleness checks remain in place. Toolbox Talk replacement sessions were already version-aware because a replacement TBT creates a new training-session ID. Supabase migration training_pack_version_snapshot_v21063 applied. There were no existing training-pack decision rows to migrate."
+  "notes": "Small validation-hardening build. A live auto-managed training record is now only allowed when its exact source RA/COSHH/SSW version is approved/current. Validation found 37 legacy auto-managed source-training records attached to pending-only RA/SSW documents; none had active assignments. Those 37 records were archived directly in Supabase, with no user training completions or active assignments removed. The database now blocks recurrence, and Manager/Admin load performs a safety cleanup check for any legacy invalid auto-managed source training. Post-cleanup validation shows 20 active auto-managed source-training records and 0 invalid active records. Supabase migration guard_unapproved_auto_training_v21064 applied."
 }
