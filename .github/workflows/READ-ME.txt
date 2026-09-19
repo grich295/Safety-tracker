@@ -1,0 +1,12 @@
+The workflow file is intentionally visible at the ZIP root.
+
+1. Extract the ZIP.
+2. Upload cleanup-legacy-runtime.yml to the root of the Safety-tracker GitHub repo and commit it.
+3. Open that uploaded file in GitHub and choose Edit.
+4. Change its filename/path to:
+   .github/workflows/cleanup-legacy-runtime.yml
+5. Commit the rename.
+6. Open the Actions tab and run:
+   One-time Safety Tracker legacy runtime cleanup
+
+The earlier ZIP looked empty on some Android file managers because folders beginning with a dot, such as .github, are hidden.
