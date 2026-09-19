@@ -1,6 +1,6 @@
 {
-  "version": "2.10.48",
-  "build_id": "v21048-ptw-viewer-privacy-20260919",
+  "version": "2.10.49",
+  "build_id": "v21049-doc-register-upload-20260919",
   "clean": true,
-  "notes": "Restores PTW privacy masking for Viewer/Report Viewer access. Contractor, signer, approver, close-out and staff names in PTW report data are rendered as ### for privacy-only viewer modes, and PTW signature images are suppressed. Admin/Manager operational PTW records remain unchanged. No database migration required. Includes all v2.10.47 functionality."
+  "notes": "Fixes the Documents Register button so it opens reliably even after the Pending Approval filter was used. Adds obvious Upload PDF and Admin Bulk Upload shortcuts to the Documents hub. Normal controlled PDF upload is now available independently of the Document Creation ON/OFF switch; that switch controls only the in-app RA/COSHH RA/SSW/Toolbox Talk creator. Includes the v2.10.48 PTW Viewer privacy masking and all v2.10.47 fixes. No database migration required."
 }

@@ -2914,6 +2914,8 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       const docBtns=[
         nHubButton('documents','library','Library','docs:library',true),
         nHubButton('documents','register','Register','docs:register',true),
+        nHubButton('documents','upload','Upload PDF','docs:upload',true),
+        nHubButton('documents','bulk','Bulk Upload','docs:bulk',nIsAdmin()),
         nHubButton('documents','approvals','Approvals','docs:approvals',true),
         nHubButton('documents','impact','Change Impact','docs:impact',true),
         nHubButton('documents','create','Create','view:creator',nCan('creator')&&nDocCreationOn())
@@ -3004,11 +3006,27 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       nRenderDocumentsNow();nMarkHub('documents','library');return;
     }
     if(action==='docs:register'){
-      nShow('documents');
       core.state.documentIndex='REGISTER';
       const t=n$('documentTypeFilter');if(t)t.value='';
+      const s=n$('documentStatusFilter');if(s)s.value='ACTIVE';
       const q=n$('documentSearch');if(q)q.value='';
+      nShow('documents');
       nRenderDocumentsNow();nMarkHub('documents','register');return;
+    }
+    if(action==='docs:upload'){
+      nShow('documents');
+      setTimeout(()=>{
+        const b=n$('newDocumentBtn');
+        if(b){b.click();nMarkHub('documents','upload')}
+        else nToast('Upload control is not available for this account.');
+      },60);
+      return;
+    }
+    if(action==='docs:bulk'){
+      if(!nIsAdmin())return nToast('Bulk Upload is available to Admin accounts.');
+      nShow('admin');
+      nScroll('#bulkImportFiles');
+      return;
     }
     if(action==='docs:approvals'){
       nShow('documents');
@@ -3713,4 +3731,117 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
     name:value=>ptwPrivacyViewerV21048()&&value?'###':value,
     permit:ptwPrivacyCopyV21048
   };
+})();
+
+
+/* Safety Tracker v2.10.49 - Documents Register and upload navigation repair */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core)return;
+
+  // REGISTER must not be cancelled by the Pending Approval status filter.
+  try{
+    if(typeof renderDocuments==='function'){
+      const originalRenderDocumentsV21049=renderDocuments;
+      renderDocuments=function(){
+        try{
+          if((core.state.documentIndex||'ALL')==='REGISTER'){
+            const status=document.getElementById('documentStatusFilter');
+            if(status&&status.value==='PENDING')status.value='ACTIVE';
+          }
+        }catch(_e){}
+        return originalRenderDocumentsV21049.apply(this,arguments);
+      };
+      window.renderDocuments=renderDocuments;
+    }
+  }catch(_e){}
+
+  // "Document Creation" controls the in-app RA/COSHH/SSW/TBT creator only.
+  // Uploading an already-prepared controlled PDF remains available to Manager/Admin.
+  try{
+    if(typeof requireDocumentCreation==='function'){
+      const originalRequireDocumentCreationV21049=requireDocumentCreation;
+      const uploadModalActive=()=>{
+        const modal=document.getElementById('modal');
+        return !!(
+          window.__safetyPdfUploadOpeningV21049 ||
+          (modal?.open && document.getElementById('docFile'))
+        );
+      };
+      const patchedRequireDocumentCreationV21049=function(){
+        if(uploadModalActive())return true;
+        return originalRequireDocumentCreationV21049.apply(this,arguments);
+      };
+      requireDocumentCreation=patchedRequireDocumentCreationV21049;
+      window.requireDocumentCreation=patchedRequireDocumentCreationV21049;
+    }
+  }catch(_e){}
+
+  // Flag the standard upload action before the original click handler runs.
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('#newDocumentBtn,[data-nav-hub-action="docs:upload"]');
+    if(!b)return;
+    window.__safetyPdfUploadOpeningV21049=true;
+    setTimeout(()=>{window.__safetyPdfUploadOpeningV21049=false},800);
+  },true);
+
+  function tidyDocumentUploadUiV21049(){
+    const b=document.getElementById('newDocumentBtn');
+    if(b){
+      b.textContent='Upload PDF';
+      b.title='Upload a new controlled PDF or a replacement version. It will enter Pending approval.';
+    }
+    const intro=document.getElementById('documentsIntro');
+    if(intro)intro.textContent='Controlled safety documents. Use Upload PDF for one document, or Bulk Upload for large batches.';
+  }
+
+  function explainCreationSettingV21049(){
+    for(const id of ['documentCreationStateNote','adminDocumentCreationStateNote']){
+      const note=document.getElementById(id);
+      if(note && /Document creation is OFF/i.test(note.textContent||'')){
+        note.innerHTML='<strong>Document creation is OFF.</strong> The in-app RA/COSHH RA/SSW/Toolbox Talk creator is disabled. Normal PDF uploads remain available from Documents.';
+      }
+    }
+  }
+
+  function updateHelpV21049(){
+    const h=document.getElementById('helpContent');
+    if(!h)return;
+    h.innerHTML=h.innerHTML.replace(
+      'When OFF, the Create Safety Doc tile is hidden to save space and new generated/uploaded safety documents are blocked. Existing Documents, approvals, Register, links and Training remain available.',
+      'When OFF, the in-app Create Safety Doc generator is hidden. Normal controlled PDF upload remains available from Documents, while existing Documents, approvals, Register, links and Training continue normally.'
+    );
+  }
+
+  try{
+    if(typeof updateDocumentCreationUi==='function'){
+      const originalUpdateDocumentCreationUiV21049=updateDocumentCreationUi;
+      updateDocumentCreationUi=function(){
+        const r=originalUpdateDocumentCreationUiV21049.apply(this,arguments);
+        tidyDocumentUploadUiV21049();
+        explainCreationSettingV21049();
+        return r;
+      };
+      window.updateDocumentCreationUi=updateDocumentCreationUi;
+    }
+  }catch(_e){}
+
+  try{
+    if(typeof renderHelp==='function'){
+      const originalRenderHelpV21049=renderHelp;
+      renderHelp=function(){
+        const r=originalRenderHelpV21049.apply(this,arguments);
+        updateHelpV21049();
+        return r;
+      };
+      window.renderHelp=renderHelp;
+    }
+  }catch(_e){}
+
+  [0,250,800,1800].forEach(ms=>setTimeout(()=>{
+    tidyDocumentUploadUiV21049();
+    explainCreationSettingV21049();
+    updateHelpV21049();
+  },ms));
+  window.addEventListener('pageshow',()=>setTimeout(tidyDocumentUploadUiV21049,120));
 })();
