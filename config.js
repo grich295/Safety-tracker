@@ -23,4 +23,7 @@ f('hotfix-v21072-calendar-label-dedupe.js?v=v21072-calendar-label-dedupe-2026091
 f('hotfix-v21073-register-downloads.js?v=v21073-register-downloads-20260919','safety-v21073');
 f('hotfix-v21074-register-pdf-pages.js?v=v21074-register-pdf-pages-20260919','safety-v21074');
 f('hotfix-v21075-document-creation-toggle.js?v=v21075-document-creation-toggle-20260919','safety-v21075');
+f('hotfix-v21076-help-document-links.js?v=v21076-help-document-links-20260919','safety-v21076');
+f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safety-v21077');
+f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
 })();

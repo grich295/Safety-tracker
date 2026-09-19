@@ -1,6 +1,6 @@
 {
-  "version": "2.10.75",
-  "build_id": "v21075-document-creation-toggle-20260919",
+  "version": "2.10.78",
+  "build_id": "v21078-ssw-ppe-tools-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.75 CLEAN. Fixes the Document Creation ON/OFF button. The safety_tracker_settings table is keyed by setting_key, but the previous frontend looked for a non-existent id field and therefore attempted to insert a duplicate document_creation_enabled setting, causing the safety_tracker_settings_pkey error. The toggle now updates the existing document_creation_enabled row by setting_key and only inserts it if it is genuinely missing. Existing documents and records are unchanged. All v2.10.74 register/download/calendar fixes remain unchanged."
+  "notes": "Safety Tracker v2.10.78 CLEAN. Improves the Safe System of Work creator. PPE is now selected from a checkbox list built from the active PPE catalogue used by Monthly PPE Checks, with optional PPE notes for task-specific detail. Tools / equipment is now a separate field and a separate section in the generated SSW PDF. Existing SSW drafts are backward-compatible: legacy PPE text is matched to current PPE catalogue names where possible and retained as notes otherwise. Also includes v2.10.77 Employees wording and v2.10.76 Help document-link routing fixes. No database migration."
 }
