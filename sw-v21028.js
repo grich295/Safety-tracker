@@ -1,6 +1,6 @@
-const SHELL_CACHE='safety-shell-v21059-tbt-revision';
-const RUNTIME_CACHE='safety-runtime-v21059-tbt-revision';
-const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21046-baseline.js','./hotfix-v21055-training-packs.js','./hotfix-v21056-review-audit.js','./hotfix-v21057-linked-impact.js','./hotfix-v21058-app-created-ssw-revision.js','./hotfix-v21059-app-created-tbt-revision.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest','./version.json'];
+const SHELL_CACHE='safety-shell-v21060-refresher-method';
+const RUNTIME_CACHE='safety-runtime-v21060-refresher-method';
+const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21046-baseline.js','./hotfix-v21055-training-packs.js','./hotfix-v21056-review-audit.js','./hotfix-v21057-linked-impact.js','./hotfix-v21058-app-created-ssw-revision.js','./hotfix-v21059-app-created-tbt-revision.js','./hotfix-v21060-refresher-method.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest','./version.json'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
