@@ -1,6 +1,6 @@
 {
-  "version": "2.10.78",
-  "build_id": "v21078-ssw-ppe-tools-20260919",
+  "version": "2.10.79",
+  "build_id": "v21079-management-tiles-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.78 CLEAN. Improves the Safe System of Work creator. PPE is now selected from a checkbox list built from the active PPE catalogue used by Monthly PPE Checks, with optional PPE notes for task-specific detail. Tools / equipment is now a separate field and a separate section in the generated SSW PDF. Existing SSW drafts are backward-compatible: legacy PPE text is matched to current PPE catalogue names where possible and retained as notes otherwise. Also includes v2.10.77 Employees wording and v2.10.76 Help document-link routing fixes. No database migration."
+  "notes": "Safety Tracker v2.10.79 CLEAN. Replaces the oversized Management landing experience with a clean large-tile home. Opening Management now shows large tiles for Safety Actions, Compliance, People & Positions, Calendar, Reports & Evidence, Knowledge Checks and, for Admin, Admin & Setup. The old horizontal Management pill-scroll is hidden. Detailed information stays inside the selected section, and each Management detail screen has a clear Back to Management button. No database change. Built on the verified v2.10.78 SSW PPE/tools update."
 }

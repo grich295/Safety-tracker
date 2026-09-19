@@ -26,4 +26,5 @@ f('hotfix-v21075-document-creation-toggle.js?v=v21075-document-creation-toggle-2
 f('hotfix-v21076-help-document-links.js?v=v21076-help-document-links-20260919','safety-v21076');
 f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safety-v21077');
 f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
+f('hotfix-v21079-management-tiles.js?v=v21079-management-tiles-20260919','safety-v21079');
 })();
