@@ -1,6 +1,6 @@
 {
-  "version": "2.10.49",
-  "build_id": "v21049-doc-register-upload-20260919",
+  "version": "2.10.50",
+  "build_id": "v21050-creator-repeatable-lines-20260919",
   "clean": true,
-  "notes": "Fixes the Documents Register button so it opens reliably even after the Pending Approval filter was used. Adds obvious Upload PDF and Admin Bulk Upload shortcuts to the Documents hub. Normal controlled PDF upload is now available independently of the Document Creation ON/OFF switch; that switch controls only the in-app RA/COSHH RA/SSW/Toolbox Talk creator. Includes the v2.10.48 PTW Viewer privacy masking and all v2.10.47 fixes. No database migration required."
+  "notes": "Improves the in-app RA/COSHH RA/SSW/Toolbox Talk creator by replacing checklist-style free-text boxes with repeatable one-line entries. Each item has a + Add button and a - remove button; Enter adds the next line. Existing drafts remain compatible because values continue to be stored as newline-separated text. Applied to structured hazards/controls/actions, SSW sequence/pre-start/stop/completion items, and Toolbox Talk controls/reminders/questions/actions while retaining narrative and SDS-source fields as normal text areas. Includes v2.10.49 Register/upload repairs and v2.10.48 PTW Viewer privacy masking. No database migration required."
 }

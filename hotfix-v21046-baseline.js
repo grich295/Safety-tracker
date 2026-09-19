@@ -3845,3 +3845,258 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   },ms));
   window.addEventListener('pageshow',()=>setTimeout(tidyDocumentUploadUiV21049,120));
 })();
+
+
+/* Safety Tracker v2.10.50 - Creator repeatable line editors
+   Structured lists now use one line per item with + / - controls.
+   Draft storage remains backwards compatible: values are stored as newline-separated text.
+*/
+(function(){
+  const LIST_FIELDS_V21050 = {
+    RA: [
+      ['creatorHazards','Hazard'],
+      ['creatorControls','Control measure'],
+      ['creatorFurtherControls','Further control / action'],
+      ['creatorEmergency','Emergency / stop-work / reporting point']
+    ],
+    COSHH: [
+      ['creatorControls','Control measure'],
+      ['creatorFurtherControls','Additional site control / action'],
+      ['creatorEmergency','Emergency / stop-work / reporting point']
+    ],
+    SSW: [
+      ['creatorCompetence','Competence / authorisation requirement'],
+      ['creatorPpe','PPE / tool / equipment requirement'],
+      ['creatorPrestart','Pre-start / work-area control'],
+      ['creatorSteps','Safe work step'],
+      ['creatorStop','Stop-work condition'],
+      ['creatorEmergency','Emergency / incident response point'],
+      ['creatorCompletion','Completion / housekeeping / hand-back step']
+    ],
+    TOOLBOX_TALK: [
+      ['creatorHazards','Hazard / reason this matters'],
+      ['creatorControls','Key control point'],
+      ['creatorSteps','Safe working reminder'],
+      ['creatorPpe','PPE / work-area control'],
+      ['creatorEmergency','Emergency / stop-work / reporting point'],
+      ['creatorQuestions','Check-understanding question'],
+      ['creatorActions','Action / point raised']
+    ]
+  };
+
+  function currentCreatorTypeV21050(){
+    try{
+      return String(window.creatorWorking?.type || creatorWorking?.type || '').toUpperCase();
+    }catch(_e){
+      return '';
+    }
+  }
+
+  function splitLinesV21050(value){
+    const raw=String(value||'').replace(/\r/g,'').trim();
+    if(!raw)return [''];
+    const rows=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(x=>
+      x.replace(/^\s*(?:[-•▪‣]\s*|\d+[.)]\s*)/,'').trim()
+    ).filter(Boolean);
+    return rows.length?rows:[''];
+  }
+
+  function escapeHtmlV21050(value){
+    return String(value??'').replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  function syncEditorToTextareaV21050(editor){
+    if(!editor)return;
+    const id=editor.dataset.creatorListFor;
+    const ta=document.getElementById(id);
+    if(!ta)return;
+    const vals=[...editor.querySelectorAll('.creator-line-input-v21050')]
+      .map(x=>String(x.value||'').trim()).filter(Boolean);
+    ta.value=vals.join('\n');
+    editor.querySelectorAll('.creator-line-row-v21050').forEach((row,i)=>{
+      const input=row.querySelector('.creator-line-input-v21050');
+      const remove=row.querySelector('.creator-line-remove-v21050');
+      if(input){
+        input.placeholder=`${editor.dataset.itemLabel||'Item'} ${i+1}`;
+        input.setAttribute('aria-label',`${editor.dataset.itemLabel||'Item'} ${i+1}`);
+      }
+      if(remove)remove.setAttribute('aria-label',`Remove ${editor.dataset.itemLabel||'item'} ${i+1}`);
+    });
+  }
+
+  function syncAllEditorsV21050(){
+    document.querySelectorAll('.creator-list-editor-v21050').forEach(syncEditorToTextareaV21050);
+  }
+
+  function addRowV21050(editor,value='',focus=true,afterRow=null){
+    if(!editor)return;
+    const rows=editor.querySelector('.creator-line-rows-v21050');
+    if(!rows)return;
+    const row=document.createElement('div');
+    row.className='creator-line-row-v21050';
+    row.innerHTML=`<input type="text" class="creator-line-input-v21050" value="${escapeHtmlV21050(value)}"><button type="button" class="creator-line-remove-v21050" title="Remove this line">−</button>`;
+    if(afterRow?.parentNode===rows)rows.insertBefore(row,afterRow.nextSibling);
+    else rows.appendChild(row);
+    syncEditorToTextareaV21050(editor);
+    if(focus)row.querySelector('.creator-line-input-v21050')?.focus();
+  }
+
+  function setEditorValuesV21050(editor,value){
+    if(!editor)return;
+    const rows=editor.querySelector('.creator-line-rows-v21050');
+    if(!rows)return;
+    rows.innerHTML='';
+    for(const v of splitLinesV21050(value))addRowV21050(editor,v,false);
+    syncEditorToTextareaV21050(editor);
+  }
+
+  function makeLineEditorV21050(id,itemLabel){
+    const ta=document.getElementById(id);
+    if(!ta || ta.dataset.creatorListConvertedV21050==='1')return;
+    const label=ta.closest('label');
+    if(!label)return;
+
+    ta.dataset.creatorListConvertedV21050='1';
+    ta.hidden=true;
+    ta.style.display='none';
+
+    const editor=document.createElement('div');
+    editor.className='creator-list-editor-v21050';
+    editor.dataset.creatorListFor=id;
+    editor.dataset.itemLabel=itemLabel;
+    editor.innerHTML=`<div class="creator-line-rows-v21050"></div><button type="button" class="creator-line-add-v21050">+ Add ${escapeHtmlV21050(itemLabel.toLowerCase())}</button>`;
+    label.insertBefore(editor,ta);
+    setEditorValuesV21050(editor,ta.value);
+  }
+
+  function installCreatorListsV21050(){
+    const type=currentCreatorTypeV21050();
+    const fields=LIST_FIELDS_V21050[type]||[];
+    for(const [id,label] of fields)makeLineEditorV21050(id,label);
+  }
+
+  function refreshEditorForTextareaV21050(id){
+    const ta=document.getElementById(id);
+    const editor=document.querySelector(`.creator-list-editor-v21050[data-creator-list-for="${id}"]`);
+    if(ta&&editor)setEditorValuesV21050(editor,ta.value);
+  }
+
+  function injectStyleV21050(){
+    if(document.getElementById('creatorLineEditorStyleV21050'))return;
+    const st=document.createElement('style');
+    st.id='creatorLineEditorStyleV21050';
+    st.textContent=`
+      .creator-list-editor-v21050{display:grid;gap:8px;margin-top:6px}
+      .creator-line-rows-v21050{display:grid;gap:7px}
+      .creator-line-row-v21050{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:7px;align-items:center}
+      .creator-line-input-v21050{width:100%;min-width:0;margin:0}
+      .creator-line-remove-v21050{width:42px;height:42px;padding:0;font-size:24px;line-height:1;border-radius:10px}
+      .creator-line-add-v21050{justify-self:start;margin-top:1px}
+      @media(max-width:640px){
+        .creator-line-row-v21050{grid-template-columns:minmax(0,1fr) 44px}
+        .creator-line-remove-v21050{width:44px;height:44px}
+        .creator-line-add-v21050{width:100%}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  document.addEventListener('click',e=>{
+    const add=e.target.closest?.('.creator-line-add-v21050');
+    if(add){
+      e.preventDefault();e.stopPropagation();
+      addRowV21050(add.closest('.creator-list-editor-v21050'),'');
+      return;
+    }
+    const remove=e.target.closest?.('.creator-line-remove-v21050');
+    if(remove){
+      e.preventDefault();e.stopPropagation();
+      const editor=remove.closest('.creator-list-editor-v21050');
+      const row=remove.closest('.creator-line-row-v21050');
+      const rows=[...editor.querySelectorAll('.creator-line-row-v21050')];
+      if(rows.length<=1){
+        const input=row.querySelector('.creator-line-input-v21050');
+        if(input){input.value='';input.focus();}
+      }else{
+        row.remove();
+      }
+      syncEditorToTextareaV21050(editor);
+    }
+  },true);
+
+  document.addEventListener('input',e=>{
+    const input=e.target.closest?.('.creator-line-input-v21050');
+    if(input)syncEditorToTextareaV21050(input.closest('.creator-list-editor-v21050'));
+  },true);
+
+  document.addEventListener('keydown',e=>{
+    const input=e.target.closest?.('.creator-line-input-v21050');
+    if(!input)return;
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      const editor=input.closest('.creator-list-editor-v21050');
+      const row=input.closest('.creator-line-row-v21050');
+      addRowV21050(editor,'',true,row);
+    }
+  },true);
+
+  // Wrap the creator opening so every fresh/new/edited draft gets the list UI.
+  try{
+    if(typeof showCreatorWizard==='function'){
+      const originalShowCreatorWizardV21050=showCreatorWizard;
+      showCreatorWizard=function(){
+        const r=originalShowCreatorWizardV21050.apply(this,arguments);
+        injectStyleV21050();
+        setTimeout(installCreatorListsV21050,0);
+        setTimeout(installCreatorListsV21050,80);
+        return r;
+      };
+      window.showCreatorWizard=showCreatorWizard;
+    }
+  }catch(_e){}
+
+  // Ensure dynamic rows are copied back to the existing questionnaire strings
+  // immediately before the draft is collected/saved.
+  try{
+    if(typeof creatorCollect==='function'){
+      const originalCreatorCollectV21050=creatorCollect;
+      creatorCollect=function(){
+        syncAllEditorsV21050();
+        return originalCreatorCollectV21050.apply(this,arguments);
+      };
+      window.creatorCollect=creatorCollect;
+    }
+  }catch(_e){}
+
+  // SDS auto-fill can populate a converted control field. Refresh its visible rows.
+  try{
+    if(typeof creatorSetIfBlank==='function'){
+      const originalCreatorSetIfBlankV21050=creatorSetIfBlank;
+      creatorSetIfBlank=function(id,value){
+        const r=originalCreatorSetIfBlankV21050.apply(this,arguments);
+        refreshEditorForTextareaV21050(id);
+        return r;
+      };
+      window.creatorSetIfBlank=creatorSetIfBlank;
+    }
+  }catch(_e){}
+
+  try{
+    if(typeof creatorReadSources==='function'){
+      const originalCreatorReadSourcesV21050=creatorReadSources;
+      creatorReadSources=async function(){
+        const r=await originalCreatorReadSourcesV21050.apply(this,arguments);
+        setTimeout(()=>{
+          const type=currentCreatorTypeV21050();
+          for(const [id] of (LIST_FIELDS_V21050[type]||[]))refreshEditorForTextareaV21050(id);
+        },0);
+        return r;
+      };
+      window.creatorReadSources=creatorReadSources;
+    }
+  }catch(_e){}
+
+  injectStyleV21050();
+})();

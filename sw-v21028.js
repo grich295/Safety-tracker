@@ -1,5 +1,5 @@
-const SHELL_CACHE='safety-shell-v21049-doc-register-upload';
-const RUNTIME_CACHE='safety-runtime-v21049-doc-register-upload';
+const SHELL_CACHE='safety-shell-v21050-creator-repeatable-lines';
+const RUNTIME_CACHE='safety-runtime-v21050-creator-repeatable-lines';
 const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21046-baseline.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest','./version.json'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
