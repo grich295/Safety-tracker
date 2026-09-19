@@ -1,5 +1,5 @@
-const SHELL_CACHE='safety-shell-v21047-central-version-fix';
-const RUNTIME_CACHE='safety-runtime-v21047-central-version-fix';
+const SHELL_CACHE='safety-shell-v21048-ptw-viewer-privacy';
+const RUNTIME_CACHE='safety-runtime-v21048-ptw-viewer-privacy';
 const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21046-baseline.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest','./version.json'];
 const RUNTIME=[
 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',

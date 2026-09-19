@@ -1,6 +1,6 @@
 {
-  "version": "2.10.47",
-  "build_id": "v21047-central-version-fix-20260919",
+  "version": "2.10.48",
+  "build_id": "v21048-ptw-viewer-privacy-20260919",
   "clean": true,
-  "notes": "Fixes a stale Monthly Knowledge feature-level version writer that was overwriting the central Safety Tracker build label with v2.10.37. The app version is now owned only by version.json / SAFETY_BUILD, and Monthly Knowledge only asks the central label renderer to refresh. Service-worker cache namespace is bumped so phones pull the corrected build. No workflow, database, navigation, permissions or safety logic changed. Includes all v2.10.46 clean-baseline functionality."
+  "notes": "Restores PTW privacy masking for Viewer/Report Viewer access. Contractor, signer, approver, close-out and staff names in PTW report data are rendered as ### for privacy-only viewer modes, and PTW signature images are suppressed. Admin/Manager operational PTW records remain unchanged. No database migration required. Includes all v2.10.47 functionality."
 }

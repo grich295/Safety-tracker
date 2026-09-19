@@ -3654,3 +3654,63 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   [0,120,350,800,1600,3200].forEach(ms=>setTimeout(applyV21047CentralVersion,ms));
   window.addEventListener('pageshow',applyV21047CentralVersion);
 })();
+
+
+/* Safety Tracker v2.10.48 - PTW Viewer privacy: personal names render as ### */
+(function(){
+  function ptwPrivacyViewerV21048(){
+    try{
+      if(typeof isReportViewer==='function' && isReportViewer()) return true;
+    }catch(_e){}
+    try{
+      return !!sessionStorage.getItem('safetyViewerV21023');
+    }catch(_e){}
+    return false;
+  }
+
+  function ptwPrivacyCopyV21048(p){
+    if(!p || !ptwPrivacyViewerV21048()) return p;
+    const q={...p};
+    [
+      'contractor_name',
+      'contractor_signin_signed_name',
+      'contractor_signout_signed_name',
+      'maintenance_approved_name',
+      'maintenance_closed_name',
+      'signed_in_by_name'
+    ].forEach(k=>{
+      if(q[k]) q[k]='###';
+    });
+
+    // A Viewer must never receive/display signature images from PTW evidence.
+    [
+      'contractor_signin_signature',
+      'contractor_signout_signature',
+      'maintenance_approval_signature',
+      'maintenance_close_signature'
+    ].forEach(k=>{
+      if(k in q) q[k]=null;
+    });
+
+    // Older PTW rows may contain these contact fields.
+    if('contractor_mobile' in q && q.contractor_mobile) q.contractor_mobile='###';
+    if('contractor_email' in q && q.contractor_email) q.contractor_email='###';
+
+    return q;
+  }
+
+  if(typeof permitReportRows==='function'){
+    const originalPermitReportRowsV21048=permitReportRows;
+    permitReportRows=function(){
+      const rows=originalPermitReportRowsV21048.apply(this,arguments)||[];
+      return ptwPrivacyViewerV21048()?rows.map(ptwPrivacyCopyV21048):rows;
+    };
+  }
+
+  // Exported helper for future PTW viewer surfaces.
+  window.ptwPrivacyV21048={
+    active:ptwPrivacyViewerV21048,
+    name:value=>ptwPrivacyViewerV21048()&&value?'###':value,
+    permit:ptwPrivacyCopyV21048
+  };
+})();
