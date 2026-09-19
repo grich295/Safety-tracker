@@ -1,6 +1,6 @@
 {
-  "version": "2.10.52",
-  "build_id": "v21052-register-hard-fix-20260919",
+  "version": "2.10.54",
+  "build_id": "v21054-all-document-downloads-20260919",
   "clean": true,
-  "notes": "Hard-fixes Document Register navigation on mobile and desktop. Register now survives Documents view re-rendering, remains visibly selected, resets conflicting filters, renders after navigation settles, and both the top Register pill and the large Register card use a capture-level fallback. Also includes the v2.10.51 Knowledge Checks hub, v2.10.50 repeatable creator lines, v2.10.49 upload/register improvements and v2.10.48 PTW Viewer privacy masking. No database migration required."
+  "notes": "Expands Documents so Manager/Admin can deliberately export any controlled files, not only approved/current ones. Adds Documents > Downloads with type and scope selectors for approved/current, all active latest regardless of approval, pending/unapproved, archived latest, or every stored version/full history; supports all document types including RA, COSHH RA, SSW, SDS/MSDS, Toolbox Talks, Policies, Procedures and Other. Each selection can be downloaded as a ZIP of separate PDFs plus INDEX.csv, or as an index PDF/CSV. Adds quick full-library active, pending and full-history exports. All Links PDF/CSV now includes both document-to-document links and Training/Toolbox Talk-to-document links. Documents > Linking is now a general all-document linking centre with search/type filtering and access to the Chemical/COSHH completeness check. Includes all v2.10.53 fixes and earlier features. No database migration required."
 }

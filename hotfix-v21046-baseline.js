@@ -2914,6 +2914,8 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       const docBtns=[
         nHubButton('documents','library','Library','docs:library',true),
         nHubButton('documents','register','Register','docs:register',true),
+        nHubButton('documents','linking','Linking','docs:linking',true),
+        nHubButton('documents','downloads','Downloads','docs:downloads',true),
         nHubButton('documents','upload','Upload PDF','docs:upload',true),
         nHubButton('documents','bulk','Bulk Upload','docs:bulk',nIsAdmin()),
         nHubButton('documents','approvals','Approvals','docs:approvals',true),
@@ -3025,6 +3027,29 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
       };
       openRegister();
       [60,180,420].forEach(ms=>setTimeout(openRegister,ms));
+      return;
+    }
+    if(action==='docs:linking'){
+      nShow('documents');
+      setTimeout(()=>{
+        try{
+          if(typeof window.openDocumentLinkingV21054==='function')window.openDocumentLinkingV21054();
+          else if(typeof showChemicalLinking==='function')showChemicalLinking();
+          else nToast('Linking screen is not available in this session.');
+        }catch(e){nToast(e?.message||'Could not open linking.')}
+        nMarkHub('documents','linking');
+      },80);
+      return;
+    }
+    if(action==='docs:downloads'){
+      nShow('documents');
+      setTimeout(()=>{
+        try{
+          if(typeof window.openDocumentDownloadsV21054==='function')window.openDocumentDownloadsV21054();
+          else nToast('Downloads screen is not available in this session.');
+        }catch(e){nToast(e?.message||'Could not open Downloads.')}
+        nMarkHub('documents','downloads');
+      },80);
       return;
     }
     if(action==='docs:upload'){
@@ -4353,4 +4378,745 @@ window.__SAFETY_HOTFIX='v2.10.29-live';
   },true);
 
   core.openDocumentRegisterV21052=openRegisterV21052;
+})();
+
+
+/* Safety Tracker v2.10.53 - Register downloads + visible Linking */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+  const st=core.state,sb=core.sb;
+
+  const esc53=v=>String(v??'').replace(/[&<>"']/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+
+  function toast53(msg){
+    try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}
+  }
+
+  function clean53(v){
+    return String(v??'').replace(/\s+/g,' ').trim();
+  }
+
+  function safeName53(v){
+    const x=clean53(v).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+    return x||'document';
+  }
+
+  function saveBlob53(blob,name){
+    try{
+      if(typeof downloadBlob==='function')return downloadBlob(blob,name);
+    }catch(_e){}
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=name;a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{try{a.remove()}catch(_e){};try{URL.revokeObjectURL(url)}catch(_e){}},30000);
+  }
+
+  // Restore the generic PDF table helper that Register/Document Activity already call.
+  window.pdfTable=function(title,rows,fileName){
+    if(!window.jspdf?.jsPDF)throw new Error('PDF library did not load.');
+    const {jsPDF}=window.jspdf;
+    const data=Array.isArray(rows)?rows:[];
+    const keys=data.length?Object.keys(data[0]):[];
+    const landscape=keys.length>=6;
+    const doc=new jsPDF({orientation:landscape?'landscape':'portrait',unit:'mm',format:'a4'});
+    doc.setFontSize(16);
+    doc.text(String(title||'Safety Tracker Report'),14,15);
+    doc.setFontSize(8);
+    doc.text(`Generated ${new Date().toLocaleString('en-GB')}`,14,21);
+    if(!keys.length){
+      doc.setFontSize(10);doc.text('No records.',14,30);
+    }else{
+      const header=keys.map(k=>String(k).replaceAll('_',' ').replace(/\b\w/g,m=>m.toUpperCase()));
+      const body=data.map(r=>keys.map(k=>{
+        const v=r?.[k];
+        if(v===null||v===undefined)return '';
+        if(Array.isArray(v))return v.join('; ');
+        if(typeof v==='object')return JSON.stringify(v);
+        return String(v);
+      }));
+      doc.autoTable({
+        head:[header],
+        body,
+        startY:26,
+        theme:'grid',
+        styles:{fontSize:landscape?6.5:7,cellPadding:1.7,valign:'top',overflow:'linebreak'},
+        headStyles:{fillColor:[218,232,242],textColor:[20,30,40]},
+        margin:{left:10,right:10}
+      });
+    }
+    doc.save(fileName||`safety-report-${new Date().toISOString().slice(0,10)}.pdf`);
+  };
+
+  function docType53(kind){
+    return ({
+      RISK_ASSESSMENT:'Risk Assessment',
+      COSHH:'COSHH Risk Assessment',
+      SSW:'Safe System of Work',
+      SDS:'SDS / MSDS',
+      TOOLBOX_TALK:'Toolbox Talk'
+    })[kind]||kind||'Document';
+  }
+
+  function approvedVersion53(docId){
+    try{return core.approvedCurrentVersion?.(docId)||null}catch(_e){return null}
+  }
+
+  function documentTitle53(d){
+    try{
+      if(typeof documentDisplayTitle==='function')return documentDisplayTitle(d);
+    }catch(_e){}
+    return d?.title||'';
+  }
+
+  function allLinkRows53(){
+    const docs=new Map((st.documents||[]).map(d=>[d.id,d]));
+    return (st.documentLinks||[]).map(l=>{
+      const a=docs.get(l.source_document_id),b=docs.get(l.target_document_id);
+      if(!a||!b)return null;
+      return {
+        source_reference:a.reference||'',
+        source_title:documentTitle53(a),
+        source_type:docType53(a.doc_type),
+        relationship:String(l.link_type||'RELATED').replaceAll('_',' '),
+        linked_reference:b.reference||'',
+        linked_title:documentTitle53(b),
+        linked_type:docType53(b.doc_type),
+        source_status:approvedVersion53(a.id)?'Approved/current':'Pending / not current',
+        linked_status:approvedVersion53(b.id)?'Approved/current':'Pending / not current'
+      };
+    }).filter(Boolean).sort((x,y)=>
+      String(x.source_reference||x.source_title).localeCompare(String(y.source_reference||y.source_title),undefined,{numeric:true}) ||
+      String(x.linked_reference||x.linked_title).localeCompare(String(y.linked_reference||y.linked_title),undefined,{numeric:true})
+    );
+  }
+
+  function downloadLinksPdf53(){
+    try{
+      const rows=allLinkRows53();
+      window.pdfTable(
+        'Safety Tracker - Document Links Register',
+        rows,
+        `safety-document-links-${new Date().toISOString().slice(0,10)}.pdf`
+      );
+      if(!rows.length)toast53('Links report downloaded. No document links are currently recorded.');
+    }catch(e){toast53('Links PDF failed: '+(e?.message||e))}
+  }
+
+  async function downloadTypePack53(kind,label){
+    if(!window.JSZip)return toast53('ZIP library did not load. Refresh and try again.');
+    const docs=(st.documents||[]).filter(d=>d.status!=='ARCHIVED'&&d.doc_type===kind)
+      .map(d=>({d,v:approvedVersion53(d.id)})).filter(x=>x.v?.storage_path)
+      .sort((a,b)=>String(a.d.reference||documentTitle53(a.d)).localeCompare(String(b.d.reference||documentTitle53(b.d)),undefined,{numeric:true}));
+    if(!docs.length)return toast53(`No approved/current ${label} files are available.`);
+
+    const zip=new JSZip();
+    let ok=0,failed=0;
+    toast53(`Building ${label} ZIP…`);
+    for(const {d,v} of docs){
+      try{
+        const r=await sb.storage.from('safety-files').download(v.storage_path);
+        if(r.error||!r.data){failed++;continue}
+        const ref=d.reference?d.reference+' - ':'';
+        const version=v.version_label?` - v${v.version_label}`:'';
+        zip.file(`${safeName53(ref+documentTitle53(d)+version)}.pdf`,r.data);
+        ok++;
+      }catch(_e){failed++}
+    }
+    if(!ok)return toast53(`Could not download any ${label} files.`);
+    zip.file('README.txt',
+      `Safety Tracker ${label} pack\nGenerated ${new Date().toLocaleString('en-GB')}\n`+
+      `${ok} approved/current PDF file${ok===1?'':'s'} included.\n`+
+      `${failed?failed+' file(s) could not be downloaded.\n':''}`+
+      `Each controlled document remains a separate PDF inside this ZIP.\n`
+    );
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    saveBlob53(blob,`Safety-Tracker-${safeName53(label).replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.zip`);
+    toast53(`${label} ZIP ready: ${ok} separate PDF${ok===1?'':'s'}${failed?`, ${failed} failed`:''}.`);
+  }
+
+  function enhanceRegister53(){
+    const list=document.getElementById('documentsList');
+    if(!list)return;
+    const toolbar=list.querySelector('.register-toolbar');
+    if(!toolbar||toolbar.dataset.v21053==='1')return;
+    toolbar.dataset.v21053='1';
+
+    const actions=document.createElement('div');
+    actions.className='register-extra-actions-v21053';
+    actions.innerHTML=`
+      <button type="button" class="secondary" data-reg53="ra">RA downloads</button>
+      <button type="button" class="secondary" data-reg53="coshh">COSHH RA downloads</button>
+      <button type="button" class="secondary" data-reg53="links">Download links PDF</button>
+      <button type="button" class="secondary" data-reg53="linking">Open Linking</button>
+    `;
+    toolbar.appendChild(actions);
+  }
+
+  // Keep buttons present whenever the Register re-renders due to filters/search.
+  try{
+    if(typeof renderDocumentRegister==='function'){
+      const originalRenderDocumentRegister53=renderDocumentRegister;
+      renderDocumentRegister=function(){
+        const r=originalRenderDocumentRegister53.apply(this,arguments);
+        enhanceRegister53();
+        return r;
+      };
+      window.renderDocumentRegister=renderDocumentRegister;
+    }
+  }catch(_e){}
+
+  // Existing register may already be on screen when this hotfix loads.
+  [0,100,350,900].forEach(ms=>setTimeout(enhanceRegister53,ms));
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-reg53]');
+    if(!b)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const a=b.dataset.reg53;
+    if(a==='ra')return window.openDocumentDownloadsV21054?.('RISK_ASSESSMENT')||downloadTypePack53('RISK_ASSESSMENT','Risk Assessments');
+    if(a==='coshh')return window.openDocumentDownloadsV21054?.('COSHH')||downloadTypePack53('COSHH','COSHH Risk Assessments');
+    if(a==='links')return window.downloadAllLinksPdfV21054?.()||downloadLinksPdf53();
+    if(a==='linking'){
+      try{
+        if(typeof showChemicalLinking==='function')return showChemicalLinking();
+      }catch(err){return toast53(err?.message||'Could not open linking.')}
+      return toast53('Linking screen is not available.');
+    }
+  },true);
+
+  // Add the links-report button to the existing Chemical/COSHH Linking modal too.
+  try{
+    if(typeof showChemicalLinking==='function'){
+      const originalShowChemicalLinking53=showChemicalLinking;
+      showChemicalLinking=async function(){
+        const r=await originalShowChemicalLinking53.apply(this,arguments);
+        setTimeout(()=>{
+          const body=document.getElementById('modalBody');
+          if(!body||body.querySelector('[data-reg53="links"]'))return;
+          const row=document.createElement('div');
+          row.className='actions';
+          row.innerHTML='<button type="button" class="secondary" data-reg53="links">Download all links PDF</button>';
+          body.prepend(row);
+        },0);
+        return r;
+      };
+      window.showChemicalLinking=showChemicalLinking;
+    }
+  }catch(_e){}
+
+  const style=document.createElement('style');
+  style.id='registerDownloadsStyleV21053';
+  style.textContent=`
+    .register-toolbar{gap:10px;flex-wrap:wrap}
+    .register-extra-actions-v21053{display:flex;gap:8px;flex-wrap:wrap;width:100%;margin-top:8px}
+    @media(max-width:680px){
+      .register-extra-actions-v21053{display:grid;grid-template-columns:1fr}
+      .register-extra-actions-v21053 button{width:100%}
+    }
+  `;
+  document.head.appendChild(style);
+
+  core.registerDownloadsV21053={
+    enhance:enhanceRegister53,
+    links:downloadLinksPdf53,
+    pack:downloadTypePack53
+  };
+})();
+
+
+/* Safety Tracker v2.10.54 - comprehensive Document Downloads and Linking centre */
+(function(){
+  const core=window.SafetyTrackerV2;
+  if(!core||!core.state||!core.sb)return;
+  const st=core.state,sb=core.sb;
+  const $54=id=>document.getElementById(id);
+  const isManager54=()=>st.profile?.report_only!==true&&['admin','manager'].includes(String(st.profile?.role||'').toLowerCase());
+  const esc54=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clean54=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const today54=()=>new Date().toISOString().slice(0,10);
+  const toast54=msg=>{try{return (window.toast||core.toast)?.(msg)}catch(_e){console.log(msg)}};
+
+  function safe54(v){
+    return clean54(v).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||'document';
+  }
+  function saveBlob54(blob,name){
+    try{if(typeof downloadBlob==='function')return downloadBlob(blob,name)}catch(_e){}
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=name;a.style.display='none';document.body.appendChild(a);a.click();
+    setTimeout(()=>{try{a.remove()}catch(_e){};try{URL.revokeObjectURL(url)}catch(_e){}},30000);
+  }
+  function csv54(rows){
+    const data=Array.isArray(rows)?rows:[];
+    const keys=data.length?Object.keys(data[0]):[];
+    const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+    return [keys.map(q).join(','),...data.map(r=>keys.map(k=>q(Array.isArray(r[k])?r[k].join('; '):r[k])).join(','))].join('\r\n');
+  }
+  function docType54(kind){
+    return ({
+      RISK_ASSESSMENT:'Risk Assessment',
+      COSHH:'COSHH Risk Assessment',
+      SSW:'Safe System of Work',
+      SDS:'SDS / MSDS',
+      TOOLBOX_TALK:'Toolbox Talk',
+      POLICY:'Policy',
+      PROCEDURE:'Procedure',
+      OTHER:'Other'
+    })[kind]||kind||'Document';
+  }
+  function docTitle54(d){
+    try{if(typeof documentDisplayTitle==='function')return documentDisplayTitle(d)}catch(_e){}
+    return d?.title||'';
+  }
+  function trainingRef54(t){
+    return t?.reference||(String(t?.name||'').match(/\bTBT-\d{3}\b/i)?.[0]?.toUpperCase()||'');
+  }
+  function versionApproval54(v){
+    const a=String(v?.approval_status||'').toUpperCase();
+    return a||'UNAPPROVED';
+  }
+  function versionSort54(a,b){return new Date(b?.created_at||0)-new Date(a?.created_at||0)}
+  function latestVersionAny54(docId){
+    return (st.versions||[]).filter(v=>v.document_id===docId&&v.storage_path).sort(versionSort54)[0]||null;
+  }
+  function approvedCurrent54(docId){
+    return (st.versions||[]).filter(v=>v.document_id===docId&&v.storage_path&&String(v.status||'').toUpperCase()==='CURRENT'&&String(v.approval_status||'').toUpperCase()==='APPROVED').sort(versionSort54)[0]||null;
+  }
+  function pendingVersions54(docId){
+    return (st.versions||[]).filter(v=>v.document_id===docId&&v.storage_path&&String(v.approval_status||'').toUpperCase()==='PENDING').sort(versionSort54);
+  }
+  function latestTrainingFile54(trainingId){
+    return (st.trainingFiles||[]).filter(f=>f.training_session_id===trainingId&&f.storage_path).sort(versionSort54)[0]||null;
+  }
+  function tbtSessions54(includeArchived=true){
+    return (st.training||[]).filter(t=>(String(t.source_kind||t.session_type||'').toUpperCase()==='TOOLBOX_TALK')&&(includeArchived||String(t.status||'').toUpperCase()!=='ARCHIVED'));
+  }
+  function typeMatches54(kind,selected){
+    return selected==='ALL'||kind===selected;
+  }
+
+  function selectedFileEntries54(type='ALL',scope='ACTIVE_LATEST'){
+    const entries=[];
+
+    // Controlled Documents.
+    for(const d of (st.documents||[])){
+      if(!typeMatches54(String(d.doc_type||'').toUpperCase(),type))continue;
+      const archived=String(d.status||'').toUpperCase()==='ARCHIVED';
+      let versions=[];
+      if(scope==='APPROVED_CURRENT'){
+        if(archived)continue;
+        const v=approvedCurrent54(d.id);if(v)versions=[v];
+      }else if(scope==='ACTIVE_LATEST'){
+        if(archived)continue;
+        const v=latestVersionAny54(d.id);if(v)versions=[v];
+      }else if(scope==='PENDING'){
+        if(archived)continue;
+        versions=pendingVersions54(d.id);
+      }else if(scope==='ARCHIVED_LATEST'){
+        if(!archived)continue;
+        const v=latestVersionAny54(d.id);if(v)versions=[v];
+      }else if(scope==='ALL_VERSIONS'){
+        versions=(st.versions||[]).filter(v=>v.document_id===d.id&&v.storage_path).sort(versionSort54);
+      }
+      for(const v of versions){
+        entries.push({
+          source:'DOCUMENT',
+          type:String(d.doc_type||'OTHER').toUpperCase(),
+          reference:d.reference||'',
+          title:docTitle54(d),
+          record_status:d.status||'',
+          approval_status:versionApproval54(v),
+          version:v.version_label||'',
+          issue_date:v.issue_date||'',
+          review_date:v.review_date||'',
+          created_at:v.created_at||'',
+          storage_path:v.storage_path,
+          original_file:v.file_name||'',
+          document_id:d.id,
+          file_id:v.id
+        });
+      }
+    }
+
+    // Toolbox Talks are training-controlled rather than documents.
+    if(type==='ALL'||type==='TOOLBOX_TALK'){
+      for(const t of tbtSessions54(true)){
+        const archived=String(t.status||'').toUpperCase()==='ARCHIVED';
+        const approval=String(t.approval_status||'NOT_REQUIRED').toUpperCase();
+        let files=[];
+        if(scope==='APPROVED_CURRENT'){
+          if(archived||!['APPROVED','LEGACY'].includes(approval))continue;
+          const f=latestTrainingFile54(t.id);if(f)files=[f];
+        }else if(scope==='ACTIVE_LATEST'){
+          if(archived)continue;
+          const f=latestTrainingFile54(t.id);if(f)files=[f];
+        }else if(scope==='PENDING'){
+          if(archived||approval!=='PENDING')continue;
+          const f=latestTrainingFile54(t.id);if(f)files=[f];
+        }else if(scope==='ARCHIVED_LATEST'){
+          if(!archived)continue;
+          const f=latestTrainingFile54(t.id);if(f)files=[f];
+        }else if(scope==='ALL_VERSIONS'){
+          files=(st.trainingFiles||[]).filter(f=>f.training_session_id===t.id&&f.storage_path).sort(versionSort54);
+        }
+        for(const f of files){
+          entries.push({
+            source:'TOOLBOX_TALK',
+            type:'TOOLBOX_TALK',
+            reference:trainingRef54(t),
+            title:t.name||'Toolbox Talk',
+            record_status:t.status||'',
+            approval_status:approval,
+            version:'',
+            issue_date:t.delivered_date||'',
+            review_date:t.review_date||'',
+            created_at:f.created_at||'',
+            storage_path:f.storage_path,
+            original_file:f.file_name||'',
+            training_session_id:t.id,
+            file_id:f.id
+          });
+        }
+      }
+    }
+
+    return entries.sort((a,b)=>
+      String(a.type).localeCompare(String(b.type)) ||
+      String(a.reference||a.title).localeCompare(String(b.reference||b.title),undefined,{numeric:true}) ||
+      new Date(b.created_at||0)-new Date(a.created_at||0)
+    );
+  }
+
+  function scopeLabel54(scope){
+    return ({
+      APPROVED_CURRENT:'Approved / current only',
+      ACTIVE_LATEST:'All active - latest file regardless of approval',
+      PENDING:'Pending / unapproved only',
+      ARCHIVED_LATEST:'Archived - latest file',
+      ALL_VERSIONS:'Every stored version / full history'
+    })[scope]||scope;
+  }
+
+  function entryIndexRows54(entries){
+    return entries.map(e=>({
+      type:docType54(e.type),
+      reference:e.reference||'',
+      title:e.title||'',
+      record_status:e.record_status||'',
+      approval_status:e.approval_status||'',
+      version:e.version||'',
+      issue_date:e.issue_date||'',
+      review_date:e.review_date||'',
+      file_name:e.original_file||'',
+      stored_created:e.created_at?new Date(e.created_at).toLocaleString('en-GB'):''
+    }));
+  }
+
+  async function downloadSelectionZip54(type,scope){
+    if(!isManager54())return toast54('Manager or Admin access required.');
+    if(!window.JSZip)return toast54('ZIP library did not load. Refresh and try again.');
+    const entries=selectedFileEntries54(type,scope);
+    if(!entries.length)return toast54('No files match that download selection.');
+    const zip=new JSZip();
+    let ok=0,failed=0;
+    const seen=new Map();
+    toast54(`Building ZIP for ${entries.length} file${entries.length===1?'':'s'}…`);
+    for(const e of entries){
+      try{
+        const r=await sb.storage.from('safety-files').download(e.storage_path);
+        if(r.error||!r.data){failed++;continue}
+        const base=safe54(`${e.reference?e.reference+' - ':''}${e.title}${e.version?' - v'+e.version:''} - ${e.approval_status||e.record_status||''}`);
+        const n=(seen.get(base)||0)+1;seen.set(base,n);
+        zip.file(`${base}${n>1?' - '+n:''}.pdf`,r.data);
+        ok++;
+      }catch(_e){failed++}
+    }
+    if(!ok)return toast54('None of the selected files could be downloaded.');
+    const rows=entryIndexRows54(entries);
+    zip.file('INDEX.csv',csv54(rows));
+    zip.file('README.txt',
+      `Safety Tracker document export\nGenerated ${new Date().toLocaleString('en-GB')}\n`+
+      `Type: ${type==='ALL'?'All document types':docType54(type)}\n`+
+      `Scope: ${scopeLabel54(scope)}\n`+
+      `${ok} PDF file${ok===1?'':'s'} included.\n`+
+      `${failed?failed+' file(s) failed to download.\n':''}`+
+      `Approval status is shown in INDEX.csv. Files in this export may include pending/unapproved or archived records depending on the selected scope.\n`
+    );
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    saveBlob54(blob,`Safety-Tracker-Documents-${type}-${scope}-${today54()}.zip`);
+    toast54(`Document ZIP ready: ${ok} PDF${ok===1?'':'s'}${failed?`, ${failed} failed`:''}.`);
+  }
+
+  function downloadSelectionIndexPdf54(type,scope){
+    const rows=entryIndexRows54(selectedFileEntries54(type,scope));
+    if(!rows.length)return toast54('No records match that selection.');
+    if(typeof window.pdfTable!=='function')return toast54('PDF report helper is unavailable.');
+    window.pdfTable(`Safety Tracker - ${type==='ALL'?'Document':docType54(type)} Index - ${scopeLabel54(scope)}`,rows,`safety-document-index-${type}-${scope}-${today54()}.pdf`);
+  }
+  function downloadSelectionIndexCsv54(type,scope){
+    const rows=entryIndexRows54(selectedFileEntries54(type,scope));
+    if(!rows.length)return toast54('No records match that selection.');
+    saveBlob54(new Blob([csv54(rows)],{type:'text/csv;charset=utf-8'}),`safety-document-index-${type}-${scope}-${today54()}.csv`);
+  }
+
+  function allLinksRows54(){
+    const docs=new Map((st.documents||[]).map(d=>[d.id,d]));
+    const training=new Map((st.training||[]).map(t=>[t.id,t]));
+    const rows=[];
+
+    for(const l of (st.documentLinks||[])){
+      const a=docs.get(l.source_document_id),b=docs.get(l.target_document_id);
+      if(!a||!b)continue;
+      rows.push({
+        relationship_group:'Document to document',
+        source_reference:a.reference||'',
+        source_title:docTitle54(a),
+        source_type:docType54(a.doc_type),
+        relationship:String(l.link_type||'RELATED').replaceAll('_',' '),
+        linked_reference:b.reference||'',
+        linked_title:docTitle54(b),
+        linked_type:docType54(b.doc_type),
+        source_record_status:a.status||'',
+        linked_record_status:b.status||''
+      });
+    }
+
+    for(const l of (st.trainingDocumentLinks||[])){
+      const t=training.get(l.training_session_id),d=docs.get(l.document_id);
+      if(!t||!d)continue;
+      rows.push({
+        relationship_group:'Training / Toolbox Talk to document',
+        source_reference:trainingRef54(t),
+        source_title:t.name||'Training',
+        source_type:docType54(String(t.source_kind||t.session_type||'OTHER').toUpperCase()),
+        relationship:String(l.link_role||'RELATED').replaceAll('_',' '),
+        linked_reference:d.reference||'',
+        linked_title:docTitle54(d),
+        linked_type:docType54(d.doc_type),
+        source_record_status:`${t.status||''} / ${t.approval_status||''}`,
+        linked_record_status:d.status||''
+      });
+    }
+    return rows.sort((a,b)=>
+      String(a.relationship_group).localeCompare(String(b.relationship_group)) ||
+      String(a.source_reference||a.source_title).localeCompare(String(b.source_reference||b.source_title),undefined,{numeric:true})
+    );
+  }
+
+  function downloadAllLinksPdf54(){
+    const rows=allLinksRows54();
+    if(!rows.length)return toast54('No saved links are currently recorded.');
+    if(typeof window.pdfTable!=='function')return toast54('PDF report helper is unavailable.');
+    window.pdfTable('Safety Tracker - All Saved Links',rows,`safety-all-links-${today54()}.pdf`);
+  }
+  function downloadAllLinksCsv54(){
+    const rows=allLinksRows54();
+    if(!rows.length)return toast54('No saved links are currently recorded.');
+    saveBlob54(new Blob([csv54(rows)],{type:'text/csv;charset=utf-8'}),`safety-all-links-${today54()}.csv`);
+  }
+
+  function counts54(type,scope){
+    return selectedFileEntries54(type,scope).length;
+  }
+
+  function openDocumentDownloads54(typePreset='ALL',scopePreset='ACTIVE_LATEST'){
+    if(!isManager54())return toast54('Manager or Admin access required.');
+    const types=[
+      ['ALL','All document types'],
+      ['RISK_ASSESSMENT','Risk Assessments'],
+      ['COSHH','COSHH Risk Assessments'],
+      ['SSW','Safe Systems of Work'],
+      ['SDS','SDS / MSDS'],
+      ['TOOLBOX_TALK','Toolbox Talks'],
+      ['POLICY','Policies'],
+      ['PROCEDURE','Procedures'],
+      ['OTHER','Other']
+    ];
+    const scopes=[
+      ['APPROVED_CURRENT','Approved / current only'],
+      ['ACTIVE_LATEST','All active - latest file, approved or not'],
+      ['PENDING','Pending / unapproved only'],
+      ['ARCHIVED_LATEST','Archived - latest file'],
+      ['ALL_VERSIONS','Every stored version / full history']
+    ];
+    openModal('Document Downloads',`
+      <div class="hint-box"><strong>Nothing is hidden from Manager/Admin exports.</strong> Choose the document type and the status/history scope you want. Pending, unapproved and archived files can be downloaded deliberately and are labelled in the export index.</div>
+      <div class="form-grid">
+        <label>Document type
+          <select id="docDownloadTypeV21054">${types.map(([v,l])=>`<option value="${v}" ${v===typePreset?'selected':''}>${esc54(l)}</option>`).join('')}</select>
+        </label>
+        <label>Files to include
+          <select id="docDownloadScopeV21054">${scopes.map(([v,l])=>`<option value="${v}" ${v===scopePreset?'selected':''}>${esc54(l)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div id="docDownloadCountV21054" class="success-note" style="margin-top:10px"></div>
+      <div class="actions doc-download-actions-v21054">
+        <button type="button" class="primary" data-docdl54="zip">Download selected PDFs as ZIP</button>
+        <button type="button" class="secondary" data-docdl54="pdf">Download selected index PDF</button>
+        <button type="button" class="secondary" data-docdl54="csv">Download selected index CSV</button>
+      </div>
+      <div class="section-card">
+        <h4>Quick full-library exports</h4>
+        <p class="muted">These are shortcuts so you do not need to change the selectors.</p>
+        <div class="actions">
+          <button type="button" class="secondary" data-docdl54="all-active">All active documents - approved or not</button>
+          <button type="button" class="secondary" data-docdl54="all-history">Every stored PDF / full history</button>
+          <button type="button" class="secondary" data-docdl54="all-pending">All pending / unapproved PDFs</button>
+        </div>
+      </div>
+      <div class="section-card">
+        <h4>Links exports</h4>
+        <p class="muted">Includes document-to-document links and Training/Toolbox Talk-to-document links.</p>
+        <div class="actions">
+          <button type="button" class="secondary" data-docdl54="links-pdf">Download all links PDF</button>
+          <button type="button" class="secondary" data-docdl54="links-csv">Download all links CSV</button>
+          <button type="button" class="ghost" data-docdl54="linking">Open Linking</button>
+        </div>
+      </div>
+      <div class="hint-box"><strong>Difference between the two broad options:</strong> “All active” gives one latest PDF per active record, whatever its approval state. “Every stored version” includes old/superseded/archived history as well.</div>
+    `);
+    const typeEl=$54('docDownloadTypeV21054'),scopeEl=$54('docDownloadScopeV21054'),count=$54('docDownloadCountV21054');
+    const refresh=()=>{
+      const n=counts54(typeEl?.value||'ALL',scopeEl?.value||'ACTIVE_LATEST');
+      if(count)count.innerHTML=`<strong>${n} PDF file${n===1?'':'s'} match this selection.</strong>`;
+    };
+    typeEl?.addEventListener('change',refresh);scopeEl?.addEventListener('change',refresh);refresh();
+  }
+
+  function renderLinkingRows54(query='',type='ALL'){
+    const q=clean54(query).toLowerCase();
+    const docs=(st.documents||[]).filter(d=>String(d.status||'').toUpperCase()!=='ARCHIVED')
+      .filter(d=>type==='ALL'||String(d.doc_type||'OTHER').toUpperCase()===type)
+      .filter(d=>!q||`${d.reference||''} ${docTitle54(d)} ${docType54(d.doc_type)}`.toLowerCase().includes(q))
+      .sort((a,b)=>String(a.reference||docTitle54(a)).localeCompare(String(b.reference||docTitle54(b)),undefined,{numeric:true}));
+    const root=$54('allLinkingListV21054');if(!root)return;
+    root.innerHTML=docs.length?docs.map(d=>{
+      const direct=(st.documentLinks||[]).filter(l=>l.source_document_id===d.id||l.target_document_id===d.id);
+      const trainingLinks=(st.trainingDocumentLinks||[]).filter(l=>l.document_id===d.id);
+      return `<div class="item-card compact">
+        <div class="row-between">
+          <div><strong>${esc54(d.reference||docType54(d.doc_type))} - ${esc54(docTitle54(d))}</strong>
+            <div class="meta"><span class="badge">${esc54(docType54(d.doc_type))}</span><span>${direct.length} document link${direct.length===1?'':'s'}</span><span>${trainingLinks.length} training/TBT link${trainingLinks.length===1?'':'s'}</span></div>
+          </div>
+          <button type="button" class="primary" data-linkmanage54="${esc54(d.id)}">Manage links</button>
+        </div>
+      </div>`;
+    }).join(''):'<div class="empty">No documents match.</div>';
+  }
+
+  function openDocumentLinking54(){
+    if(!isManager54())return toast54('Manager or Admin access required.');
+    const dd=(st.documentLinks||[]).length,td=(st.trainingDocumentLinks||[]).length;
+    openModal('Document Linking',`
+      <div class="hint-box"><strong>All linking in one place.</strong> This page shows every active controlled document, its direct document relationships and any Training/Toolbox Talk links. Document links remain pairwise only.</div>
+      <div class="stats-grid">
+        <div class="stat traffic-neutral"><strong>${dd}</strong><span>Document links</span></div>
+        <div class="stat traffic-neutral"><strong>${td}</strong><span>Training / TBT links</span></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" data-linkcentre54="chemical">Chemical / COSHH completeness check</button>
+        <button type="button" class="secondary" data-linkcentre54="pdf">Download all links PDF</button>
+        <button type="button" class="secondary" data-linkcentre54="csv">Download all links CSV</button>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <label>Search<input id="allLinkingSearchV21054" placeholder="Reference, title or document type"></label>
+        <label>Document type
+          <select id="allLinkingTypeV21054">
+            <option value="ALL">All document types</option>
+            <option value="RISK_ASSESSMENT">Risk Assessments</option>
+            <option value="COSHH">COSHH Risk Assessments</option>
+            <option value="SSW">Safe Systems of Work</option>
+            <option value="SDS">SDS / MSDS</option>
+            <option value="POLICY">Policies</option>
+            <option value="PROCEDURE">Procedures</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </label>
+      </div>
+      <div id="allLinkingListV21054" class="card-list" style="margin-top:12px"></div>
+    `);
+    const search=$54('allLinkingSearchV21054'),type=$54('allLinkingTypeV21054');
+    const refresh=()=>renderLinkingRows54(search?.value||'',type?.value||'ALL');
+    search?.addEventListener('input',refresh);type?.addEventListener('change',refresh);refresh();
+  }
+
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-docdl54]');
+    if(b){
+      e.preventDefault();e.stopImmediatePropagation();
+      const type=$54('docDownloadTypeV21054')?.value||'ALL';
+      const scope=$54('docDownloadScopeV21054')?.value||'ACTIVE_LATEST';
+      const a=b.dataset.docdl54;
+      if(a==='zip')return downloadSelectionZip54(type,scope);
+      if(a==='pdf')return downloadSelectionIndexPdf54(type,scope);
+      if(a==='csv')return downloadSelectionIndexCsv54(type,scope);
+      if(a==='all-active')return downloadSelectionZip54('ALL','ACTIVE_LATEST');
+      if(a==='all-history')return downloadSelectionZip54('ALL','ALL_VERSIONS');
+      if(a==='all-pending')return downloadSelectionZip54('ALL','PENDING');
+      if(a==='links-pdf')return downloadAllLinksPdf54();
+      if(a==='links-csv')return downloadAllLinksCsv54();
+      if(a==='linking')return openDocumentLinking54();
+    }
+    const manage=e.target.closest?.('[data-linkmanage54]');
+    if(manage){
+      e.preventDefault();e.stopImmediatePropagation();
+      try{if(typeof showDocumentLinks==='function')return showDocumentLinks(manage.dataset.linkmanage54)}catch(err){return toast54(err?.message||'Could not open document links.')}
+    }
+    const centre=e.target.closest?.('[data-linkcentre54]');
+    if(centre){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(centre.dataset.linkcentre54==='pdf')return downloadAllLinksPdf54();
+      if(centre.dataset.linkcentre54==='csv')return downloadAllLinksCsv54();
+      if(centre.dataset.linkcentre54==='chemical'){
+        try{if(typeof showChemicalLinking==='function')return showChemicalLinking()}catch(err){return toast54(err?.message||'Could not open Chemical / COSHH linking.')}
+      }
+    }
+  },true);
+
+  // Make the v2.10.53 Register's extra actions comprehensive, not approval-only.
+  function enhanceRegister54(){
+    const toolbar=document.querySelector('#documentsList .register-toolbar');
+    if(!toolbar)return;
+    let btn=toolbar.querySelector('[data-reg54="downloads"]');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.type='button';btn.className='primary';btn.dataset.reg54='downloads';btn.textContent='All download options';
+      toolbar.appendChild(btn);
+    }
+    const linkBtn=toolbar.querySelector('[data-reg53="linking"]');
+    if(linkBtn)linkBtn.textContent='Open Linking';
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target.closest?.('[data-reg54="downloads"]');
+    if(b){e.preventDefault();e.stopImmediatePropagation();openDocumentDownloads54()}
+  },true);
+  [0,120,450,1000].forEach(ms=>setTimeout(enhanceRegister54,ms));
+
+  window.openDocumentDownloadsV21054=openDocumentDownloads54;
+  window.openDocumentLinkingV21054=openDocumentLinking54;
+  window.downloadAllLinksPdfV21054=downloadAllLinksPdf54;
+  window.downloadAllLinksCsvV21054=downloadAllLinksCsv54;
+  core.documentDownloadsV21054={
+    open:openDocumentDownloads54,
+    linking:openDocumentLinking54,
+    zip:downloadSelectionZip54,
+    indexPdf:downloadSelectionIndexPdf54,
+    indexCsv:downloadSelectionIndexCsv54,
+    linksPdf:downloadAllLinksPdf54,
+    linksCsv:downloadAllLinksCsv54
+  };
+
+  const style=document.createElement('style');
+  style.id='documentDownloadsStyleV21054';
+  style.textContent=`
+    .doc-download-actions-v21054{margin-top:12px}
+    @media(max-width:680px){
+      .doc-download-actions-v21054{display:grid;grid-template-columns:1fr}
+      .doc-download-actions-v21054 button{width:100%}
+    }
+  `;
+  document.head.appendChild(style);
 })();
