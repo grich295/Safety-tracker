@@ -62,3 +62,18 @@ window.SAFETY_TRACKER_CONFIG = {
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
 })();
+
+// v2.10.59 in-app TBT revision hotfix loader.
+(function(){
+  if(window.__SAFETY_V21059_SCRIPT_REQUESTED)return;
+  window.__SAFETY_V21059_SCRIPT_REQUESTED=true;
+  const load=()=>{
+    if(document.querySelector('script[data-safety-v21059]'))return;
+    const s=document.createElement('script');
+    s.src='hotfix-v21059-app-created-tbt-revision.js?v=v21059-tbt-revision-20260919';
+    s.async=false;s.dataset.safetyV21059='1';
+    s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
+    (document.body||document.head||document.documentElement).appendChild(s);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
+})();
