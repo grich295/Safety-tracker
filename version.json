@@ -1,6 +1,6 @@
 {
-  "version": "2.10.54",
-  "build_id": "v21054-all-document-downloads-20260919",
+  "version": "2.10.55",
+  "build_id": "v21055-training-packs-20260919",
   "clean": true,
-  "notes": "Expands Documents so Manager/Admin can deliberately export any controlled files, not only approved/current ones. Adds Documents > Downloads with type and scope selectors for approved/current, all active latest regardless of approval, pending/unapproved, archived latest, or every stored version/full history; supports all document types including RA, COSHH RA, SSW, SDS/MSDS, Toolbox Talks, Policies, Procedures and Other. Each selection can be downloaded as a ZIP of separate PDFs plus INDEX.csv, or as an index PDF/CSV. Adds quick full-library active, pending and full-history exports. All Links PDF/CSV now includes both document-to-document links and Training/Toolbox Talk-to-document links. Documents > Linking is now a general all-document linking centre with search/type filtering and access to the Chemical/COSHH completeness check. Includes all v2.10.53 fixes and earlier features. No database migration required."
+  "notes": "Adds linked training packs with completion evidence reused across packs while current; enforces per-user RA/COSHH -> SSW -> Toolbox Talk prerequisites; Toolbox Talks are always instructor-led; pack training requirements use the strictest applicable method for each person; adds RA/COSHH residual-risk training guidance (low self-training, high instructor-led, medium/unclear manager judgement) and requires a recorded reason when a Manager selects self-training against a high-risk instructor-led recommendation. Pack decisions are version/link aware and retained for audit. Supabase migration training_pack_decisions_v21055 applied. Includes v2.10.54 and earlier fixes."
 }
