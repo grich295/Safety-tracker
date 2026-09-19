@@ -1,6 +1,6 @@
 {
-  "version": "2.10.72",
-  "build_id": "v21072-calendar-label-dedupe-20260919",
+  "version": "2.10.74",
+  "build_id": "v21074-register-pdf-pages-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.72 CLEAN. Small display-only calendar correction: where a training record already contains its controlled reference in the training name, the Safety Calendar no longer prints the same reference twice (for example SSW-001 \u00b7 SSW-001 - ...). The underlying training record, assignment, evidence, due date and document linkage are unchanged. All v2.10.71 responsibility and document-scope rules remain unchanged."
+  "notes": "Safety Tracker v2.10.74 CLEAN. Improves the Approved / Current Document Register PDF so each controlled register section starts on a fresh page: Risk Assessments, COSHH Risk Assessments, Safe Systems of Work, MSDS / Safety Data Sheets and Toolbox Talks. Each section has its own heading, repeated column header and page numbering for a cleaner printable register. Includes the v2.10.72 calendar label de-duplication and v2.10.73 SSW/TBT Register download shortcuts. No database or controlled-record changes."
 }
