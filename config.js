@@ -11,13 +11,11 @@ window.SAFETY_TRACKER_CONFIG = {
     if(document.querySelector('script[data-safety-v21055]'))return;
     const s=document.createElement('script');
     s.src='hotfix-v21055-training-packs.js?v=v21055-training-packs-20260919';
-    s.async=false;
-    s.dataset.safetyV21055='1';
+    s.async=false;s.dataset.safetyV21055='1';
     s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
     (document.body||document.head||document.documentElement).appendChild(s);
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});
-  else load();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
 })();
 
 // v2.10.56 small review-audit hotfix loader.
@@ -28,11 +26,24 @@ window.SAFETY_TRACKER_CONFIG = {
     if(document.querySelector('script[data-safety-v21056]'))return;
     const s=document.createElement('script');
     s.src='hotfix-v21056-review-audit.js?v=v21056-review-audit-20260919';
-    s.async=false;
-    s.dataset.safetyV21056='1';
+    s.async=false;s.dataset.safetyV21056='1';
     s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
     (document.body||document.head||document.documentElement).appendChild(s);
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});
-  else load();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
+})();
+
+// v2.10.57 linked RA/COSHH impact-review hotfix loader.
+(function(){
+  if(window.__SAFETY_V21057_SCRIPT_REQUESTED)return;
+  window.__SAFETY_V21057_SCRIPT_REQUESTED=true;
+  const load=()=>{
+    if(document.querySelector('script[data-safety-v21057]'))return;
+    const s=document.createElement('script');
+    s.src='hotfix-v21057-linked-impact.js?v=v21057-linked-impact-20260919';
+    s.async=false;s.dataset.safetyV21057='1';
+    s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200);};
+    (document.body||document.head||document.documentElement).appendChild(s);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
 })();
