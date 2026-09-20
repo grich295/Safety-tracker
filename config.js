@@ -3,51 +3,123 @@ window.SAFETY_TRACKER_CONFIG = {
   supabaseKey: "sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_"
 };
 
-(function(){const f=(src,key)=>{if(window[key])return;window[key]=true;const load=()=>{if(document.querySelector(`script[data-${key}]`))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(`data-${key}`,'1');s.onerror=()=>{try{s.remove()}catch(_e){};setTimeout(load,1200)};(document.body||document.head||document.documentElement).appendChild(s)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();};
-f('hotfix-v21055-training-packs.js?v=v21055-training-packs-20260919','safety-v21055');
-f('hotfix-v21056-review-audit.js?v=v21056-review-audit-20260919','safety-v21056');
-f('hotfix-v21057-linked-impact.js?v=v21057-linked-impact-20260919','safety-v21057');
-f('hotfix-v21058-app-created-ssw-revision.js?v=v21058-ssw-revision-20260919','safety-v21058');
-f('hotfix-v21059-app-created-tbt-revision.js?v=v21059-tbt-revision-20260919','safety-v21059');
-f('hotfix-v21060-refresher-method.js?v=v21060-refresher-method-20260919','safety-v21060');
-f('hotfix-v21061-retrain-now.js?v=v21061-retrain-now-20260919','safety-v21061');
-f('hotfix-v21062-revision-training-impact.js?v=v21062-revision-training-impact-20260919','safety-v21062');
-f('hotfix-v21063-pack-version-awareness.js?v=v21063-pack-version-awareness-20260919','safety-v21063');
-f('hotfix-v21064-source-training-guard.js?v=v21064-source-training-guard-20260919','safety-v21064');
-f('hotfix-v21065-strictest-method-wins.js?v=v21065-strictest-method-wins-20260919','safety-v21065');
-f('hotfix-v21066-temporary-unsuitable.js?v=v21066-temporary-unsuitable-20260919','safety-v21066');
-f('hotfix-v21067-change-control-workflow.js?v=v21067-change-control-workflow-20260919','safety-v21067');
-f('hotfix-v21068-regression-hardening.js?v=v21068-regression-hardening-20260919','safety-v21068');
-f('hotfix-v21069-positions-responsibilities.js?v=v21071-hs-officer-notice-20260919','safety-v21069');
-f('hotfix-v21072-calendar-label-dedupe.js?v=v21072-calendar-label-dedupe-20260919','safety-v21072');
-f('hotfix-v21073-register-downloads.js?v=v21073-register-downloads-20260919','safety-v21073');
-f('hotfix-v21074-register-pdf-pages.js?v=v21074-register-pdf-pages-20260919','safety-v21074');
-f('hotfix-v21075-document-creation-toggle.js?v=v21075-document-creation-toggle-20260919','safety-v21075');
-f('hotfix-v21076-help-document-links.js?v=v21076-help-document-links-20260919','safety-v21076');
-f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safety-v21077');
-f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
-f('hotfix-v21086-asbestos-catalogue.js?v=v21086-asbestos-catalogue-20260920','safety-v21086');
-f('hotfix-v21080-asbestos.js?v=v21081-asbestos-parser-20260920','safety-v21080');
-f('hotfix-v21082-asbestos-modal.js?v=v21082-asbestos-modal-20260920','safety-v21082');
-f('hotfix-v21083-admin-sections.js?v=v21103-admin-sections-location-fix-20260920','safety-v21083');
-f('hotfix-v21084-tile-routes.js?v=v21084-tile-routes-20260920','safety-v21084');
-f('hotfix-v21085-admin-grouping.js?v=v21103-admin-grouping-location-fix-20260920','safety-v21085');
-f('hotfix-v21088-asbestos-full-analysis.js?v=v21088-asbestos-full-analysis-20260920','safety-v21088');
-f('hotfix-v21087-asbestos-source-tools.js?v=v21088-asbestos-source-tools-20260920','safety-v21087');
-f('hotfix-v21089-site-location-tile.js?v=v21089-site-location-tile-20260920','safety-v21089');
-f('hotfix-v21090-responsibility-location-tree.js?v=v21090-responsibility-location-tree-20260920','safety-v21090');
-f('hotfix-v21091-report-evidence-retention.js?v=v21091-report-evidence-retention-20260920','safety-v21091');
-f('hotfix-v21092-incident-review.js?v=v21092-incident-review-20260920','safety-v21092');
-f('hotfix-v21093-asbestos-location-cleanup.js?v=v21093-asbestos-location-cleanup-20260920','safety-v21093');
-f('hotfix-v21094-report-scope.js?v=v21094-report-scope-20260920','safety-v21094');
-f('hotfix-v21095-repair-bundle.js?v=v21095-repair-bundle-20260920','safety-v21095');
-f('hotfix-v21096-site-location-test-cleanup.js?v=v21096-site-location-test-cleanup-20260920','safety-v21096');
-f('hotfix-v21102-site-location-search.js?v=v21103-authoritative-search-20260920','safety-v21102');
-f('hotfix-v21105-asbestos-evidence-audit.js?v=v21105-asbestos-evidence-audit-20260920','safety-v21105');
-f('hotfix-v21106-asbestos-workflow.js?v=v21106-asbestos-workflow-20260920','safety-v21106');
-f('hotfix-v21107-asbestos-history-library.js?v=v21107-asbestos-history-library-20260920','safety-v21107');
-f('hotfix-v21108-asbestos-intelligence.js?v=v21108-asbestos-intelligence-20260920','safety-v21108');
-f('hotfix-v21110-user-access-save-repair.js?v=v21110-user-access-save-repair-20260920','safety-v21110');
-f('hotfix-v21111-management-stability.js?v=v21111-management-stability-20260920','safety-v21111');
-f('hotfix-v21112-management-scroll-guard.js?v=v21112-management-scroll-guard-20260920','safety-v21112');
+/* v2.11.13 stable hotfix loader.
+   One lightweight waiter replaces dozens of simultaneous boot-poll timers.
+   Hotfixes are loaded sequentially only after the core app + baseline are ready. */
+(function(){
+  if(window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED)return;
+  window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED=true;
+
+  const scripts=[
+      ['hotfix-v21113-runtime-stability.js','v21113-runtime-stability'],
+      ['hotfix-v21055-training-packs.js','v21055-training-packs'],
+      ['hotfix-v21056-review-audit.js','v21056-review-audit'],
+      ['hotfix-v21057-linked-impact.js','v21057-linked-impact'],
+      ['hotfix-v21058-app-created-ssw-revision.js','v21058-ssw-revision'],
+      ['hotfix-v21059-app-created-tbt-revision.js','v21059-tbt-revision'],
+      ['hotfix-v21060-refresher-method.js','v21060-refresher-method'],
+      ['hotfix-v21061-retrain-now.js','v21061-retrain-now'],
+      ['hotfix-v21062-revision-training-impact.js','v21062-revision-training-impact'],
+      ['hotfix-v21063-pack-version-awareness.js','v21063-pack-version-awareness'],
+      ['hotfix-v21064-source-training-guard.js','v21064-source-training-guard'],
+      ['hotfix-v21065-strictest-method-wins.js','v21065-strictest-method-wins'],
+      ['hotfix-v21066-temporary-unsuitable.js','v21066-temporary-unsuitable'],
+      ['hotfix-v21067-change-control-workflow.js','v21067-change-control-workflow'],
+      ['hotfix-v21068-regression-hardening.js','v21068-regression-hardening'],
+      ['hotfix-v21069-positions-responsibilities.js','v21071-hs-officer-notice'],
+      ['hotfix-v21072-calendar-label-dedupe.js','v21072-calendar-label-dedupe'],
+      ['hotfix-v21073-register-downloads.js','v21073-register-downloads'],
+      ['hotfix-v21074-register-pdf-pages.js','v21074-register-pdf-pages'],
+      ['hotfix-v21075-document-creation-toggle.js','v21075-document-creation-toggle'],
+      ['hotfix-v21076-help-document-links.js','v21076-help-document-links'],
+      ['hotfix-v21077-creator-employees.js','v21077-creator-employees'],
+      ['hotfix-v21078-ssw-ppe-tools.js','v21078-ssw-ppe-tools'],
+      ['hotfix-v21086-asbestos-catalogue.js','v21086-asbestos-catalogue'],
+      ['hotfix-v21080-asbestos.js','v21081-asbestos-parser'],
+      ['hotfix-v21082-asbestos-modal.js','v21082-asbestos-modal'],
+      ['hotfix-v21083-admin-sections.js','v21103-admin-sections-location-fix'],
+      ['hotfix-v21084-tile-routes.js','v21084-tile-routes'],
+      ['hotfix-v21085-admin-grouping.js','v21103-admin-grouping-location-fix'],
+      ['hotfix-v21088-asbestos-full-analysis.js','v21088-asbestos-full-analysis'],
+      ['hotfix-v21087-asbestos-source-tools.js','v21088-asbestos-source-tools'],
+      ['hotfix-v21089-site-location-tile.js','v21089-site-location-tile'],
+      ['hotfix-v21090-responsibility-location-tree.js','v21090-responsibility-location-tree'],
+      ['hotfix-v21091-report-evidence-retention.js','v21091-report-evidence-retention'],
+      ['hotfix-v21092-incident-review.js','v21092-incident-review'],
+      ['hotfix-v21093-asbestos-location-cleanup.js','v21093-asbestos-location-cleanup'],
+      ['hotfix-v21094-report-scope.js','v21094-report-scope'],
+      ['hotfix-v21095-repair-bundle.js','v21095-repair-bundle'],
+      ['hotfix-v21096-site-location-test-cleanup.js','v21096-site-location-test-cleanup'],
+      ['hotfix-v21102-site-location-search.js','v21103-authoritative-search'],
+      ['hotfix-v21105-asbestos-evidence-audit.js','v21105-asbestos-evidence-audit'],
+      ['hotfix-v21106-asbestos-workflow.js','v21106-asbestos-workflow'],
+      ['hotfix-v21107-asbestos-history-library.js','v21107-asbestos-history-library'],
+      ['hotfix-v21108-asbestos-intelligence.js','v21108-asbestos-intelligence'],
+      ['hotfix-v21110-user-access-save-repair.js','v21110-user-access-save-repair'],
+      ['hotfix-v21111-management-stability.js','v21111-management-stability']
+  ];
+  const loaded=new Set();
+  let started=false;
+  let waiter=0;
+
+  function record(type,msg,extra){
+    try{window.SafetyRuntimeStabilityV21113?.record?.(type,msg,extra)}catch(_e){}
+  }
+
+  function loadOne(src,token,attempt=0){
+    return new Promise(resolve=>{
+      if(loaded.has(src))return resolve(true);
+      const existing=document.querySelector(`script[data-safety-loader-v21113="${src}"]`);
+      if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
+
+      const s=existing||document.createElement('script');
+      if(!existing){
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21113';
+        s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
+        s.async=false;
+        s.dataset.safetyLoaderV21113=src;
+        (document.body||document.head||document.documentElement).appendChild(s);
+      }
+
+      s.onload=()=>{
+        s.dataset.loaded='1';
+        loaded.add(src);
+        resolve(true);
+      };
+      s.onerror=()=>{
+        try{s.remove()}catch(_e){}
+        if(attempt<1){
+          setTimeout(()=>loadOne(src,token,attempt+1).then(resolve),500);
+        }else{
+          record('hotfix-load-failed',src,'Loader continued after two attempts.');
+          resolve(false);
+        }
+      };
+    });
+  }
+
+  async function start(){
+    if(started)return;
+    const core=window.SafetyTrackerV2;
+    if(!core||!core.navigationTidyV21044){
+      clearTimeout(waiter);
+      waiter=setTimeout(start,120);
+      return;
+    }
+
+    started=true;
+    window.__SAFETY_HOTFIX_LOADER_V21113_STARTED=true;
+
+    for(const [src,token] of scripts){
+      await loadOne(src,token);
+    }
+
+    window.__SAFETY_HOTFIX_LOADER_V21113_COMPLETE=true;
+    try{window.applySafetyBuildLabel?.()}catch(_e){}
+  }
+
+  /* config.js is intentionally also present in <head>. Do not start the additive
+     chain there. Wait for the actual app/baseline boot instead. */
+  setTimeout(start,0);
+  window.addEventListener('pageshow',()=>{if(!started)setTimeout(start,0)},{once:true});
 })();
