@@ -1,4 +1,4 @@
-/* Safety Tracker v2.10.97 - definitive Site Locations display + live verification */
+/* Safety Tracker v2.10.99 patch of v2.10.97 - Site Locations display without search-tree rebuilds */
 'use strict';
 (function(){
   if(window.__SAFETY_SITE_LOCATIONS_V21097)return;
@@ -17,15 +17,30 @@
     const st=core.state,sb=core.sb;
     const $=id=>document.getElementById(id);
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    let active=false,refreshing=false,timer=0;
+    let active=false,refreshing=false;
+    let cardObserver=null;
 
     function card(){
       const c=Array.from(view.children).find(el=>{
         if(!el.classList?.contains('section-card'))return false;
         return String(el.querySelector('h3')?.textContent||'').trim().toLowerCase()==='site locations';
       })||null;
-      if(c)c.classList.add('site-locations-card-v21097');
+      if(c){
+        c.classList.add('site-locations-card-v21097');
+        watchCard(c);
+      }
       return c;
+    }
+
+    function watchCard(c){
+      if(cardObserver||!c)return;
+      cardObserver=new MutationObserver(()=>{
+        if(active && c.hidden){
+          c.hidden=false;
+          c.removeAttribute('hidden');
+        }
+      });
+      cardObserver.observe(c,{attributes:true,attributeFilter:['hidden']});
     }
 
     function statusBox(){
@@ -70,13 +85,14 @@
       view.classList.add('force-locations-v21097');
       c.hidden=false;
       c.removeAttribute('hidden');
-      try{window.SafetyResponsibilityLocationV21090?.renderLocationTree?.()}catch(_e){}
-      showStatus();
-    }
 
-    function scheduleForce(){
-      clearTimeout(timer);
-      timer=setTimeout(forceVisible,20);
+      // IMPORTANT v2.10.99: do not rebuild an existing tree.
+      // Rebuilding here destroys the mobile search input and closes the keyboard.
+      const list=$('siteLocationList');
+      if(list && !list.querySelector('.site-location-tree-v21090')){
+        try{window.SafetyResponsibilityLocationV21090?.renderLocationTree?.()}catch(_e){}
+      }
+      showStatus();
     }
 
     async function refreshLocations(showToast=false){
@@ -89,14 +105,17 @@
         const r=await sb.from('site_locations_v280').select('*').order('sort_order',{ascending:true});
         if(r.error)throw r.error;
         st.siteLocations=r.data||[];
+
+        // A manual/live data refresh is one of the few times a full tree rebuild is wanted.
         try{window.SafetyResponsibilityLocationV21090?.renderLocationTree?.()}catch(_e){}
         forceVisible();
+
         const n=counts();
         showStatus();
         if(showToast)core.toast?.(`Site Locations: ${n.active} active, ${n.rooms} rooms${n.room214?', Room 214 found':''}.`);
         return true;
       }catch(e){
-        console.error('v2.10.97 Site Locations refresh',e);
+        console.error('v2.10.99 Site Locations refresh',e);
         showStatus(`<strong>Could not load live Site Locations.</strong><br>${esc(e?.message||'Unknown error')}`,'red');
         if(showToast)core.toast?.(e?.message||'Could not refresh Site Locations.');
         return false;
@@ -108,7 +127,7 @@
     function activate(){
       active=true;
       view.classList.add('force-locations-v21097');
-      [0,40,120,300,700].forEach(ms=>setTimeout(forceVisible,ms));
+      [0,40,120,300].forEach(ms=>setTimeout(forceVisible,ms));
       setTimeout(()=>refreshLocations(false),80);
     }
 
@@ -121,7 +140,7 @@
       const locationTile=e.target.closest?.('[data-admin-tile-v21083="locations"]');
       if(locationTile){
         activate();
-        return; // allow original Admin routing to continue; CSS/display override wins afterwards
+        return;
       }
 
       const refresh=e.target.closest?.('[data-v21097-refresh-locations]');
@@ -137,13 +156,13 @@
       if(back||otherTile||leave)deactivate();
     },true);
 
-    // Re-assert visibility after older Admin renderers toggle the hidden attribute.
+    // Only watch direct Admin-card changes. Do not watch subtree mutations from
+    // search results, otherwise typing causes repeated tree redraws.
     new MutationObserver(()=>{
       card();
-      if(active)scheduleForce();
-    }).observe(view,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','data-admin-section-v21083']});
+      if(active)forceVisible();
+    }).observe(view,{childList:true,subtree:false});
 
-    // Ensure the dedicated location tile/card exists and keep the tree current.
     [100,350,900,1800].forEach(ms=>setTimeout(()=>{
       try{window.SafetySiteLocationTileV21089?.refresh?.()}catch(_e){}
       card();

@@ -1,6 +1,6 @@
 {
-  "version": "2.10.98",
-  "build_id": "v21098-site-location-search-20260920",
+  "version": "2.10.99",
+  "build_id": "v21099-mobile-site-location-search-stability-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.98 CLEAN small mobile usability repair. Replaces the Site Locations search input with a stable search field that does not rebuild the full 261-location tree on every keystroke. Prevents Android keyboard focus loss/flicker and reduces typing lag. Search shows matching live location paths in a lightweight result list. No SQL required."
+  "notes": "Safety Tracker v2.10.99 CLEAN fixes the remaining Android Site Locations keyboard closure. The v2.10.97 visibility watcher no longer rebuilds an existing location tree when search results change, and the v2.10.98 search watcher now observes only whole-tree replacement rather than its own result mutations. Search therefore keeps the same input element and keyboard focus while typing. No SQL required."
 }

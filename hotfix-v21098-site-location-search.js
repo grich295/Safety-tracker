@@ -1,4 +1,4 @@
-/* Safety Tracker v2.10.98 - stable Site Locations search for mobile */
+/* Safety Tracker v2.10.99 patch of v2.10.98 - stable Site Locations search for mobile */
 'use strict';
 (function(){
   if(window.__SAFETY_SITE_LOCATION_SEARCH_V21098)return;
@@ -90,8 +90,6 @@
       const toolbar=tree.querySelector('.site-tree-toolbar-v21090');
       if(!toolbar)return;
 
-      // Rename/hide the old input so the v2.10.90 document-level input listener
-      // no longer sees it and cannot rebuild the full tree on every character.
       const legacy=toolbar.querySelector('#siteLocationTreeSearchV21090');
       if(legacy){
         legacy.id='siteLocationTreeSearchV21090Legacy';
@@ -135,7 +133,10 @@
 
     const list=document.getElementById('siteLocationList');
     if(list){
-      new MutationObserver(scheduleInstall).observe(list,{childList:true,subtree:true});
+      // IMPORTANT v2.10.99: only react when the whole tree is replaced.
+      // Search-result mutations happen inside the tree and must not trigger
+      // another search installation/render cycle.
+      new MutationObserver(scheduleInstall).observe(list,{childList:true,subtree:false});
     }
 
     document.addEventListener('click',e=>{
