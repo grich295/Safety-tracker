@@ -1,6 +1,6 @@
 {
-  "version": "2.10.83",
-  "build_id": "v21083-admin-section-tiles-20260920",
+  "version": "2.10.84",
+  "build_id": "v21084-tile-route-hardening-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.83 CLEAN. Replaces the long Admin page with compact section tiles and shows modal toast/status messages inside open dialogs. Also backed by the v2.10.83 server-side asbestos document-type/lifecycle guard so survey recommendation wording cannot misclassify a survey as removal evidence."
+  "notes": "Safety Tracker v2.10.84 CLEAN. Hardens Management tile navigation with explicit routes so Safety Actions, Compliance, People, Calendar, Reports, Knowledge and Admin cannot fall through to the wrong section. Keeps v2.10.83 compact Admin sections and all asbestos fixes."
 }
