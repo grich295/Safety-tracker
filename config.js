@@ -44,4 +44,5 @@ f('hotfix-v21094-report-scope.js?v=v21094-report-scope-20260920','safety-v21094'
 f('hotfix-v21095-repair-bundle.js?v=v21095-repair-bundle-20260920','safety-v21095');
 f('hotfix-v21096-site-location-test-cleanup.js?v=v21096-site-location-test-cleanup-20260920','safety-v21096');
 f('hotfix-v21100-site-locations-root-fix.js?v=v21100-site-locations-root-fix-20260920','safety-v21100');
+f('hotfix-v21101-site-location-search-dedupe.js?v=v21101-site-location-search-dedupe-20260920','safety-v21101');
 })();

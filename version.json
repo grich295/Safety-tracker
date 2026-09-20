@@ -1,6 +1,6 @@
 {
-  "version": "2.11.0",
-  "build_id": "v21100-site-locations-root-fix-20260920",
+  "version": "2.11.1",
+  "build_id": "v21101-site-location-search-dedupe-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.11.0 CLEAN removes the conflicting v2.10.97/v2.10.98 Site Locations workaround scripts from the loader and fixes the underlying Admin classification conflict. Site Locations remains its own Admin section instead of being reclassified as Asbestos whenever search results mutate. The replacement stable search disables the legacy full-tree-redraw input and updates only the result area, preventing Android focus/keyboard resets. No SQL required."
+  "notes": "Safety Tracker v2.11.1 CLEAN is a tiny Site Locations UI cleanup. The working v2.11.0 stable search remains unchanged, while all legacy v2.10.90/v2.10.98 search inputs are forcibly hidden if recreated by older render code. This removes the duplicate second search bar without changing search behaviour or database data. No SQL required."
 }
