@@ -1,6 +1,6 @@
 {
-  "version": "2.10.93",
-  "build_id": "v21093-asbestos-location-cleanup-20260920",
+  "version": "2.10.94",
+  "build_id": "v21094-whole-report-scope-20260920",
   "clean": true,
-  "notes": "Cumulative build. Includes v2.10.90 responsibility/location tree, v2.10.91 reporting/evidence/retention, v2.10.92 non-personal incident review trigger, and fixes asbestos location parsing so room-range headings do not become fake locations, explanatory prose is ignored, and deleted TEST asbestos cards disappear after the database deletion succeeds."
+  "notes": "Safety Tracker v2.10.94 CLEAN. Adds one scope filter for the whole Reports section: Whole hotel, My positions, Department or Person. Screen totals and all report exports use the same scope. Fixes blank Excel Department values by resolving the existing user_departments membership model rather than profile.department_id, supports multiple departments, adds Scope to PDF/Excel outputs, adds Department to training/report rows, scopes Evidence Pack person choices, and carries forward v2.10.92 incident review plus v2.10.93 asbestos location/delete fixes."
 }
