@@ -1,6 +1,6 @@
 {
-  "version": "2.10.88",
-  "build_id": "v21088-full-asbestos-reanalysis-20260920",
+  "version": "2.10.89",
+  "build_id": "v21089-dedicated-site-locations-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.88 CLEAN. Re-analyse now performs full existing-source analysis for both asbestos Management Surveys and AMPs. Surveys re-extract metadata, all structured ACM findings, pages and the full location catalogue, then compare against the live register as unchanged/changed/new/missing. AMPs extract document control fields, responsibilities, source survey, objectives, work controls, monitoring, emergency procedure, review/closure, location hierarchy and register-reference cross-check. Re-analysis approval reconciles existing ACMs without creating duplicates or pretending a physical reinspection occurred."
+  "notes": "Safety Tracker v2.10.89 CLEAN. Splits Admin Asbestos & Locations into separate Asbestos Sources and Site Locations tiles so floors, rooms and work-area hierarchy can be reached directly without scrolling through asbestos document controls. Keeps all v2.10.88 full asbestos re-analysis features."
 }
