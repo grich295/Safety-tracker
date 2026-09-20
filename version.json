@@ -1,6 +1,6 @@
 {
-  "version": "2.10.99",
-  "build_id": "v21099-mobile-site-location-search-stability-20260920",
+  "version": "2.11.0",
+  "build_id": "v21100-site-locations-root-fix-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.99 CLEAN fixes the remaining Android Site Locations keyboard closure. The v2.10.97 visibility watcher no longer rebuilds an existing location tree when search results change, and the v2.10.98 search watcher now observes only whole-tree replacement rather than its own result mutations. Search therefore keeps the same input element and keyboard focus while typing. No SQL required."
+  "notes": "Safety Tracker v2.11.0 CLEAN removes the conflicting v2.10.97/v2.10.98 Site Locations workaround scripts from the loader and fixes the underlying Admin classification conflict. Site Locations remains its own Admin section instead of being reclassified as Asbestos whenever search results mutate. The replacement stable search disables the legacy full-tree-redraw input and updates only the result area, preventing Android focus/keyboard resets. No SQL required."
 }
