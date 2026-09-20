@@ -1,6 +1,6 @@
 {
-  "version": "2.10.82",
-  "build_id": "v21082-asbestos-mobile-modal-20260920",
+  "version": "2.10.83",
+  "build_id": "v21083-admin-section-tiles-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.82 CLEAN. Improves asbestos review/evidence dialogs on mobile with a solid full-screen review sheet and stronger backdrop so the underlying page does not bleed through. Built on v2.10.81 parser hardening; no database or asbestos extraction logic changes."
+  "notes": "Safety Tracker v2.10.83 CLEAN. Replaces the long Admin page with compact section tiles and shows modal toast/status messages inside open dialogs. Also backed by the v2.10.83 server-side asbestos document-type/lifecycle guard so survey recommendation wording cannot misclassify a survey as removal evidence."
 }
