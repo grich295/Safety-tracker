@@ -1,6 +1,6 @@
 {
-  "version": "2.11.8",
-  "build_id": "v21108-asbestos-intelligence-20260920",
+  "version": "2.11.9",
+  "build_id": "v21109-user-access-preferences-20260920",
   "clean": true,
-  "notes": "HSE-informed asbestos phrase intelligence and chronology-safe historical review. Recognises confirmed/presumed ACM wording, no-access/inaccessible areas, covered/overlaid/encapsulated ACMs that remain in situ, removal-complete vs recommended-removal wording, four-stage clearance/reoccupation wording and failures, negative/no-asbestos findings, damage/friability terms, six asbestos fibre names and common HSE building ACM groups. Review now prominently highlights known historical ACM locations, requires acknowledgement of critical findings, blocks unresolved wording conflicts, protects newer live state when older dated reports are approved later, requires a source date for chronological evidence, and defaults the asbestos Source Library to newest-first. Covered/encapsulated ACMs receive a persistent no-drill/cut/screw/lift/disturb warning. Database migration safety_v2118_asbestos_intelligence_chronology already applied."
+  "notes": "Adds per-user access preferences layered on the normal User/Manager role defaults. Admin can open Edit user, keep the role baseline, then enable or hide individual app areas for that named person. Core My Safety, Training, H&S Training and Help remain mandatory. User accounts may receive Documents and Asbestos Lookup as explicit extras; the asbestos exception grants lookup/evidence access only and does not grant Manager/Admin powers. Managers may have individual manager screens hidden without changing role. Reset to role defaults is provided. The missing set_user_view_preferences_v21022 RPC is repaired, checklists are included in the preference model, and explicit asbestos-user access is enforced in the backend maintenance-access helper. Database migration safety_v2119_user_access_preferences already applied."
 }
