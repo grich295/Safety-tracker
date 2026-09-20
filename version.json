@@ -1,6 +1,6 @@
 {
-  "version": "2.10.84",
-  "build_id": "v21084-tile-route-hardening-20260920",
+  "version": "2.10.85",
+  "build_id": "v21085-admin-dynamic-card-grouping-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.84 CLEAN. Hardens Management tile navigation with explicit routes so Safety Actions, Compliance, People, Calendar, Reports, Knowledge and Admin cannot fall through to the wrong section. Keeps v2.10.83 compact Admin sections and all asbestos fixes."
+  "notes": "Safety Tracker v2.10.85 CLEAN. Fixes new Admin section tiles appearing to open Knowledge Check by assigning older/dynamic Admin cards to the tile system. Only the selected Admin group is now visible. Adds Knowledge Check Setup / People & Responsibilities / Additional Admin tiles only when those dynamic cards exist. Keeps v2.10.84 route hardening and all asbestos fixes."
 }
