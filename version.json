@@ -1,6 +1,6 @@
 {
-  "version": "2.10.96",
-  "build_id": "v21096-site-location-test-cleanup-20260920",
+  "version": "2.10.97",
+  "build_id": "v21097-site-locations-display-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.96 CLEAN repair-only update. Fixes the blank Admin > Site Locations detail and completes safe TEST/DEMO location cleanup. The live database now tracks which Site Locations were created by each asbestos source; deleting a TEST source removes only its unused TEST-created locations and retains any location used by genuine asbestos evidence, contractor permits, aliases or incident reviews. Carries forward v2.10.95 repair bundle and v2.10.94 report scope."
+  "notes": "Safety Tracker v2.10.97 CLEAN repair-only update. Definitively fixes Admin > Site Locations being hidden by the older Admin section renderer. Adds a live database verification banner showing active location count, room count and whether Room 214 is present, plus manual Refresh. Carries forward the v2.10.96 TEST-created-location cleanup database migration and all v2.10.95 repairs. No new SQL required."
 }
