@@ -1,6 +1,6 @@
 {
-  "version": "2.10.86",
-  "build_id": "v21086-asbestos-location-catalogue-20260920",
+  "version": "2.10.87",
+  "build_id": "v21087-asbestos-source-tools-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.86 CLEAN. Adds full asbestos location-catalogue extraction independent of ACM findings, supports large room schedules, deduplicates repeated mentions, preserves file/page coverage, blocks approval on declared-count mismatch, requires reviewer confirmation when the source has no declared total, gives AMP its own structured review, improves source status cards, and ensures the visible Asbestos tab opens in Admin User Mode."
+  "notes": "Safety Tracker v2.10.87 CLEAN. Adds Re-analyse to existing asbestos source PDFs without uploading a duplicate, rebuilding the v2.10.86 full location catalogue / AMP structured data from the existing controlled copy. Adds guarded Admin-only Delete TEST for explicit standalone TEST/DEMO asbestos sources and their linked test register/evidence/history data. Legitimate words such as 'Testing' do not qualify for delete."
 }

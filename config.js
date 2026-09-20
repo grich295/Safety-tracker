@@ -27,11 +27,11 @@ f('hotfix-v21076-help-document-links.js?v=v21076-help-document-links-20260919','
 f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safety-v21077');
 f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
 f('hotfix-v21079-management-tiles.js?v=v21079-management-tiles-20260919','safety-v21079');
-/* Must load before v2.10.80 so it can observe the selected PDF before the older importer handles it. */
 f('hotfix-v21086-asbestos-catalogue.js?v=v21086-asbestos-catalogue-20260920','safety-v21086');
 f('hotfix-v21080-asbestos.js?v=v21081-asbestos-parser-20260920','safety-v21080');
 f('hotfix-v21082-asbestos-modal.js?v=v21082-asbestos-modal-20260920','safety-v21082');
 f('hotfix-v21083-admin-sections.js?v=v21083-admin-sections-20260920','safety-v21083');
 f('hotfix-v21084-tile-routes.js?v=v21084-tile-routes-20260920','safety-v21084');
 f('hotfix-v21085-admin-grouping.js?v=v21085-admin-grouping-20260920','safety-v21085');
+f('hotfix-v21087-asbestos-source-tools.js?v=v21087-asbestos-source-tools-20260920','safety-v21087');
 })();
