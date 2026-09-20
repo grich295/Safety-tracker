@@ -1,6 +1,6 @@
 {
-  "version": "2.11.7",
-  "build_id": "v21107-asbestos-history-library-20260920",
+  "version": "2.11.8",
+  "build_id": "v21108-asbestos-intelligence-20260920",
   "clean": true,
-  "notes": "Adds open-ended asbestos historical bulk import and a searchable Source Library. Any number of PDFs can be selected; files are processed sequentially to protect browser memory, with 50 MB per-file validation, duplicate skipping, automatic type/date/version pre-detection, progress, failure isolation and no automatic publication. The Source Library supports search/type/year/status filters, oldest/newest sorting, 20-per-page pagination, Review, Open full report, Download PDF, re-analysis/TEST cleanup, and filtered multi-part ZIP export. No database migration required."
+  "notes": "HSE-informed asbestos phrase intelligence and chronology-safe historical review. Recognises confirmed/presumed ACM wording, no-access/inaccessible areas, covered/overlaid/encapsulated ACMs that remain in situ, removal-complete vs recommended-removal wording, four-stage clearance/reoccupation wording and failures, negative/no-asbestos findings, damage/friability terms, six asbestos fibre names and common HSE building ACM groups. Review now prominently highlights known historical ACM locations, requires acknowledgement of critical findings, blocks unresolved wording conflicts, protects newer live state when older dated reports are approved later, requires a source date for chronological evidence, and defaults the asbestos Source Library to newest-first. Covered/encapsulated ACMs receive a persistent no-drill/cut/screw/lift/disturb warning. Database migration safety_v2118_asbestos_intelligence_chronology already applied."
 }
