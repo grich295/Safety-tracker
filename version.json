@@ -1,6 +1,6 @@
 {
-  "version": "2.11.1",
-  "build_id": "v21101-site-location-search-dedupe-20260920",
+  "version": "2.11.2",
+  "build_id": "v21102-authoritative-site-location-search-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.11.1 CLEAN is a tiny Site Locations UI cleanup. The working v2.11.0 stable search remains unchanged, while all legacy v2.10.90/v2.10.98 search inputs are forcibly hidden if recreated by older render code. This removes the duplicate second search bar without changing search behaviour or database data. No SQL required."
+  "notes": "Safety Tracker v2.11.2 CLEAN replaces the Site Locations search workaround chain with one authoritative mobile search. It removes legacy search inputs, intercepts Site Locations input at window-capture level before the old v2.10.90 document listener can redraw the tree, and updates only a lightweight results area. Also preserves Site Locations as its own Admin section. No SQL required."
 }
