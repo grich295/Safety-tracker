@@ -1,6 +1,6 @@
 {
-  "version": "2.10.79",
-  "build_id": "v21079-management-tiles-20260919",
+  "version": "2.10.80",
+  "build_id": "v21080-asbestos-import-history-20260919",
   "clean": true,
-  "notes": "Safety Tracker v2.10.79 CLEAN. Replaces the oversized Management landing experience with a clean large-tile home. Opening Management now shows large tiles for Safety Actions, Compliance, People & Positions, Calendar, Reports & Evidence, Knowledge Checks and, for Admin, Admin & Setup. The old horizontal Management pill-scroll is hidden. Detailed information stays inside the selected section, and each Management detail screen has a clear Back to Management button. No database change. Built on the verified v2.10.78 SSW PPE/tools update."
+  "notes": "Safety Tracker v2.10.80 CLEAN. Adds asbestos source import/review, history and lifecycle tracking, automatic approved location hierarchy creation, whole-floor and multi-area lookup, source file/page evidence, compressed evidence previews, and single-copy controlled-document storage. Contractor permit service v7 includes descendant locations, current-lifecycle filtering and evidence preview support."
 }
