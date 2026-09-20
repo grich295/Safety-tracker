@@ -1,6 +1,6 @@
 {
-  "version": "2.11.10",
-  "build_id": "v21110-user-access-save-repair-20260920",
+  "version": "2.11.11",
+  "build_id": "v21111-management-stability-20260920",
   "clean": true,
-  "notes": "Repairs People > Edit user access preferences on mobile. Removes the v2.11.9 whole-app MutationObserver loader, uses direct event handlers instead, fixes Save changes with visible Saving/error feedback, retries access-editor decoration after the base modal opens, adds Checklists and clear User/Manager role-default labels, preserves per-user Documents/Asbestos extras, and enforces selected navigation without continuous DOM watching. No new SQL migration is required; the v2.11.9 access RPC/database changes remain active."
+  "notes": "Replaces the old Management landing implementation with a stable event-driven version. Removes the v2.10.79 whole-main DOM MutationObserver and smooth scroll-to-top, and removes the v2.11.4 repeated 0/40/120/300 ms home-reset calls and reports-view observer. Management tiles are prepared before the normal Reports/Management navigation renders, preventing the old long management page flashing first. No database change."
 }
