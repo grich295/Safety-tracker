@@ -47,4 +47,5 @@ f('hotfix-v21102-site-location-search.js?v=v21103-authoritative-search-20260920'
 f('hotfix-v21104-management-home-reset.js?v=v21104-management-home-reset-20260920','safety-v21104');
 f('hotfix-v21105-asbestos-evidence-audit.js?v=v21105-asbestos-evidence-audit-20260920','safety-v21105');
 f('hotfix-v21106-asbestos-workflow.js?v=v21106-asbestos-workflow-20260920','safety-v21106');
+f('hotfix-v21107-asbestos-history-library.js?v=v21107-asbestos-history-library-20260920','safety-v21107');
 })();

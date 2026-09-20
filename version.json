@@ -1,6 +1,6 @@
 {
-  "version": "2.11.6",
-  "build_id": "v21106-asbestos-workflow-20260920",
+  "version": "2.11.7",
+  "build_id": "v21107-asbestos-history-library-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.11.6 CLEAN simplifies and corrects the asbestos workflow. Initial survey negative/no-asbestos findings no longer require an existing ACM match. AMP imports are management/control sources only and cannot create operational locations or coverage; old AMP-created location artefacts were safely removed. Admin now gets a simple 3-step Plan -> Survey -> Live register workflow with extracted counts and a friendly Review & Publish confirmation. Asbestos Lookup clearly explains pending-vs-live status and collapses whole-floor/multiple-area lookup under an Advanced button. The v2.11.6 database migration is already applied."
+  "notes": "Adds open-ended asbestos historical bulk import and a searchable Source Library. Any number of PDFs can be selected; files are processed sequentially to protect browser memory, with 50 MB per-file validation, duplicate skipping, automatic type/date/version pre-detection, progress, failure isolation and no automatic publication. The Source Library supports search/type/year/status filters, oldest/newest sorting, 20-per-page pagination, Review, Open full report, Download PDF, re-analysis/TEST cleanup, and filtered multi-part ZIP export. No database migration required."
 }
