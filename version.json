@@ -1,6 +1,6 @@
 {
-  "version": "2.10.85",
-  "build_id": "v21085-admin-dynamic-card-grouping-20260920",
+  "version": "2.10.86",
+  "build_id": "v21086-asbestos-location-catalogue-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.85 CLEAN. Fixes new Admin section tiles appearing to open Knowledge Check by assigning older/dynamic Admin cards to the tile system. Only the selected Admin group is now visible. Adds Knowledge Check Setup / People & Responsibilities / Additional Admin tiles only when those dynamic cards exist. Keeps v2.10.84 route hardening and all asbestos fixes."
+  "notes": "Safety Tracker v2.10.86 CLEAN. Adds full asbestos location-catalogue extraction independent of ACM findings, supports large room schedules, deduplicates repeated mentions, preserves file/page coverage, blocks approval on declared-count mismatch, requires reviewer confirmation when the source has no declared total, gives AMP its own structured review, improves source status cards, and ensures the visible Asbestos tab opens in Admin User Mode."
 }
