@@ -1,6 +1,6 @@
 {
-  "version": "2.10.97",
-  "build_id": "v21097-site-locations-display-20260920",
+  "version": "2.10.98",
+  "build_id": "v21098-site-location-search-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.97 CLEAN repair-only update. Definitively fixes Admin > Site Locations being hidden by the older Admin section renderer. Adds a live database verification banner showing active location count, room count and whether Room 214 is present, plus manual Refresh. Carries forward the v2.10.96 TEST-created-location cleanup database migration and all v2.10.95 repairs. No new SQL required."
+  "notes": "Safety Tracker v2.10.98 CLEAN small mobile usability repair. Replaces the Site Locations search input with a stable search field that does not rebuild the full 261-location tree on every keystroke. Prevents Android keyboard focus loss/flicker and reduces typing lag. Search shows matching live location paths in a lightweight result list. No SQL required."
 }
