@@ -38,4 +38,6 @@ f('hotfix-v21087-asbestos-source-tools.js?v=v21088-asbestos-source-tools-2026092
 f('hotfix-v21089-site-location-tile.js?v=v21089-site-location-tile-20260920','safety-v21089');
 f('hotfix-v21090-responsibility-location-tree.js?v=v21090-responsibility-location-tree-20260920','safety-v21090');
 f('hotfix-v21091-report-evidence-retention.js?v=v21091-report-evidence-retention-20260920','safety-v21091');
+f('hotfix-v21092-incident-review.js?v=v21092-incident-review-20260920','safety-v21092');
+f('hotfix-v21093-asbestos-location-cleanup.js?v=v21093-asbestos-location-cleanup-20260920','safety-v21093');
 })();

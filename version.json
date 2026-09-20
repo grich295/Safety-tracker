@@ -1,6 +1,6 @@
 {
-  "version": "2.10.91",
-  "build_id": "v21091-report-evidence-retention-20260920",
+  "version": "2.10.93",
+  "build_id": "v21093-asbestos-location-cleanup-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.91 CLEAN. Reporting defaults from active position(s)/managed departments with My positions, individual department and All site filters; scoped report exports use the same filter. Evidence Pack is person-first and shows only documents/training assigned directly, by department or Everyone, plus linked supporting controlled documents. People defaults to Active with Disabled, Recommended delete/anonymise and All filters. Disabled-user retention review uses a configurable 6-year general Safety Tracker evidence policy from the later of disable date/latest personal evidence, supports explicit retention holds, and never auto-deletes."
+  "notes": "Cumulative build. Includes v2.10.90 responsibility/location tree, v2.10.91 reporting/evidence/retention, v2.10.92 non-personal incident review trigger, and fixes asbestos location parsing so room-range headings do not become fake locations, explanatory prose is ignored, and deleted TEST asbestos cards disappear after the database deletion succeeds."
 }
