@@ -1,6 +1,6 @@
 {
-  "version": "2.10.80",
-  "build_id": "v21080-asbestos-import-history-20260919",
+  "version": "2.10.81",
+  "build_id": "v21081-asbestos-parser-hardening-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.80 CLEAN. Adds asbestos source import/review, history and lifecycle tracking, automatic approved location hierarchy creation, whole-floor and multi-area lookup, source file/page evidence, compressed evidence previews, and single-copy controlled-document storage. Contractor permit service v7 includes descendant locations, current-lifecycle filtering and evidence preview support."
+  "notes": "Safety Tracker v2.10.81 CLEAN. Hardens asbestos PDF extraction for wrapped table/form fields, longest-label matching, sample/evidence capture and source-page accuracy; preserves conditional action-due wording as well as dates. Built on v2.10.80 asbestos history/location/evidence upgrade. Contractor permit service v8 includes descendant locations, lifecycle filtering, evidence previews and action due/trigger wording."
 }

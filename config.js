@@ -27,5 +27,5 @@ f('hotfix-v21076-help-document-links.js?v=v21076-help-document-links-20260919','
 f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safety-v21077');
 f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
 f('hotfix-v21079-management-tiles.js?v=v21079-management-tiles-20260919','safety-v21079');
-f('hotfix-v21080-asbestos.js?v=v21080-asbestos-20260919','safety-v21080');
+f('hotfix-v21080-asbestos.js?v=v21081-asbestos-parser-20260920','safety-v21080');
 })();
