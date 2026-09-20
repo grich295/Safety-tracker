@@ -19,7 +19,8 @@
       'guest / viewer access':'viewer',
       'departments':'departments',
       'asbestos source documents':'asbestos',
-      'site locations':'asbestos',
+      'site locations':'locations',
+      'site locations & rooms':'locations',
       'force sync & review':'sync',
       'repair sds/msds titles':'sync',
       'repair risk assessment titles':'sync',
@@ -165,7 +166,6 @@
     });
     viewObserver.observe(view,{attributes:true,attributeFilter:['class']});
 
-    /* Keep dynamically refreshed Admin content inside the selected section. */
     var contentTimer=0;
     var contentObserver=new MutationObserver(function(){
       if(!view.classList.contains('active')||!isAdmin())return;
@@ -174,9 +174,6 @@
     });
     contentObserver.observe(view,{childList:true,subtree:true});
 
-    /* A <dialog>.showModal() lives in the browser top layer. Normal page
-       toasts can sit behind it, making an error look like "OK did nothing".
-       Mirror toast text inside the open modal so failures/success are visible. */
     function installModalToastMirror(){
       var dialog=document.getElementById('modal');
       var toast=document.getElementById('toast');
@@ -226,102 +223,25 @@
       .admin-home-v21083[hidden]{display:none!important}
       .admin-home-head-v21083{margin:4px 0 14px}
       .admin-home-head-v21083 h3{margin:0 0 5px;font-size:1.3rem}
-      .admin-home-head-v21083 p{
-        margin:0;
-        color:var(--muted,#a6b1c2);
-        line-height:1.4
-      }
-
-      .admin-tile-grid-v21083{
-        display:grid;
-        grid-template-columns:repeat(3,minmax(0,1fr));
-        gap:12px
-      }
-      .admin-tile-v21083{
-        min-width:0;
-        min-height:118px;
-        border:1px solid var(--border,#475569);
-        border-radius:16px;
-        background:var(--card,#1f1f1f);
-        color:inherit;
-        padding:14px;
-        text-align:left;
-        display:flex;
-        align-items:flex-start;
-        gap:11px;
-        cursor:pointer
-      }
-      .admin-tile-v21083:hover,
-      .admin-tile-v21083:focus-visible{
-        border-color:#6f9bc5;
-        box-shadow:0 0 0 2px rgba(74,124,170,.18)
-      }
-      .admin-tile-icon-v21083{
-        flex:0 0 40px;
-        width:40px;
-        height:40px;
-        border-radius:12px;
-        display:grid;
-        place-items:center;
-        background:#243b53;
-        color:#fff;
-        font-size:1.2rem;
-        font-weight:900
-      }
-      .admin-tile-copy-v21083{
-        min-width:0;
-        display:flex;
-        flex-direction:column;
-        gap:5px
-      }
-      .admin-tile-copy-v21083 strong{
-        font-size:1rem;
-        line-height:1.18
-      }
-      .admin-tile-copy-v21083 small{
-        color:var(--muted,#a6b1c2);
-        font-size:.82rem;
-        line-height:1.3
-      }
+      .admin-home-head-v21083 p{margin:0;color:var(--muted,#a6b1c2);line-height:1.4}
+      .admin-tile-grid-v21083{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+      .admin-tile-v21083{min-width:0;min-height:118px;border:1px solid var(--border,#475569);border-radius:16px;background:var(--card,#1f1f1f);color:inherit;padding:14px;text-align:left;display:flex;align-items:flex-start;gap:11px;cursor:pointer}
+      .admin-tile-v21083:hover,.admin-tile-v21083:focus-visible{border-color:#6f9bc5;box-shadow:0 0 0 2px rgba(74,124,170,.18)}
+      .admin-tile-icon-v21083{flex:0 0 40px;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#243b53;color:#fff;font-size:1.2rem;font-weight:900}
+      .admin-tile-copy-v21083{min-width:0;display:flex;flex-direction:column;gap:5px}
+      .admin-tile-copy-v21083 strong{font-size:1rem;line-height:1.18}
+      .admin-tile-copy-v21083 small{color:var(--muted,#a6b1c2);font-size:.82rem;line-height:1.3}
       .admin-section-back-v21083{margin:0 0 14px}
-      .modal-toast-v21083{
-        margin:0 0 12px;
-        padding:11px 12px;
-        border:1px solid #b97920;
-        border-radius:10px;
-        background:#3b2a13;
-        color:#ffe0a6;
-        font-weight:700;
-        line-height:1.35
-      }
-
+      .modal-toast-v21083{margin:0 0 12px;padding:11px 12px;border:1px solid #b97920;border-radius:10px;background:#3b2a13;color:#ffe0a6;font-weight:700;line-height:1.35}
       @media(max-width:760px){
-        .admin-tile-grid-v21083{
-          grid-template-columns:repeat(2,minmax(0,1fr));
-          gap:10px
-        }
-        .admin-tile-v21083{
-          min-height:108px;
-          padding:12px 10px;
-          gap:8px;
-          border-radius:14px
-        }
-        .admin-tile-icon-v21083{
-          flex-basis:34px;
-          width:34px;
-          height:34px;
-          border-radius:10px;
-          font-size:1rem
-        }
+        .admin-tile-grid-v21083{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+        .admin-tile-v21083{min-height:108px;padding:12px 10px;gap:8px;border-radius:14px}
+        .admin-tile-icon-v21083{flex-basis:34px;width:34px;height:34px;border-radius:10px;font-size:1rem}
         .admin-tile-copy-v21083 strong{font-size:.93rem}
         .admin-tile-copy-v21083 small{font-size:.75rem}
       }
-
       @media(max-width:390px){
-        .admin-tile-v21083{
-          min-height:104px;
-          padding:10px 8px
-        }
+        .admin-tile-v21083{min-height:104px;padding:10px 8px}
         .admin-tile-copy-v21083 small{font-size:.71rem}
       }
     `;

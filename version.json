@@ -1,6 +1,6 @@
 {
-  "version": "2.11.2",
-  "build_id": "v21102-authoritative-site-location-search-20260920",
+  "version": "2.11.3",
+  "build_id": "v21103-site-locations-admin-root-fix-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.11.2 CLEAN replaces the Site Locations search workaround chain with one authoritative mobile search. It removes legacy search inputs, intercepts Site Locations input at window-capture level before the old v2.10.90 document listener can redraw the tree, and updates only a lightweight results area. Also preserves Site Locations as its own Admin section. No SQL required."
+  "notes": "Safety Tracker v2.11.3 CLEAN fixes the underlying Admin classification conflict that blanked Site Locations. v2.10.83 now maps Site Locations to the dedicated locations section, and v2.10.85 no longer groups any 'site location' heading under Asbestos. The v2.11.2 authoritative search is also tightened to observe only whole-tree replacement, avoiding self-trigger loops. No SQL required."
 }

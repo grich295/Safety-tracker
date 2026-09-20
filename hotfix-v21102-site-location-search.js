@@ -1,4 +1,4 @@
-/* Safety Tracker v2.11.2 - authoritative Site Locations mobile search */
+/* Safety Tracker v2.11.3 patch of v2.11.2 - authoritative Site Locations mobile search */
 'use strict';
 (function(){
   if(window.__SAFETY_SITE_LOCATION_SEARCH_V2112)return;
@@ -34,12 +34,7 @@
 
     function classify(){
       const card=locationCard();
-      if(!card)return;
-      card.dataset.adminSectionV21083='locations';
-      const h=card.querySelector('h3');
-      if(h && String(h.textContent||'').trim().toLowerCase()==='site locations'){
-        h.textContent='Site Locations & Rooms';
-      }
+      if(card)card.dataset.adminSectionV21083='locations';
     }
 
     const locById=id=>(st.siteLocations||[]).find(x=>x.id===id)||null;
@@ -123,8 +118,6 @@
       const toolbar=tree.querySelector('.site-tree-toolbar-v21090');
       if(!toolbar)return;
 
-      /* Delete every legacy location-tree search input.
-         The old v2.10.90 document listener therefore has nothing to own. */
       toolbar.querySelectorAll('input[type="search"]').forEach(input=>{
         if(input.id!=='siteLocationTreeSearchV2112')input.remove();
       });
@@ -144,9 +137,7 @@
         input.value=query;
       }
 
-      /* Remove stale result containers from older compatibility patches. */
       tree.querySelectorAll('.site-search-results-v21098,.site-search-results-v2110').forEach(el=>el.remove());
-
       renderResults();
     }
 
@@ -155,10 +146,6 @@
       ensureTimer=setTimeout(ensureSearch,20);
     }
 
-    /* Critical fix:
-       Window capture runs BEFORE the legacy v2.10.90 document-capture input
-       listener. Stop the event there so the old code cannot rebuild the whole
-       tree/input after every character. */
     window.addEventListener('input',e=>{
       const input=e.target;
       if(!(input instanceof HTMLInputElement))return;
@@ -179,11 +166,10 @@
       scheduleResults();
     },true);
 
-    /* When the old tree renderer intentionally replaces the whole tree
-       (refresh, expand/collapse, archive etc), put our stable field back. */
-    new MutationObserver(scheduleEnsure).observe(list,{childList:true,subtree:true});
+    /* Only watch replacement of the whole tree. Search-result changes happen
+       inside the tree and must not retrigger installation. */
+    new MutationObserver(scheduleEnsure).observe(list,{childList:true,subtree:false});
 
-    /* Preserve Site Locations as its own Admin section. */
     new MutationObserver(classify).observe(view,{childList:true,subtree:false});
 
     document.addEventListener('click',e=>{
@@ -199,15 +185,8 @@
     const style=document.createElement('style');
     style.id='siteLocationSearchStylesV2112';
     style.textContent=`
-      #siteLocationTreeSearchV2112{
-        width:100%;
-        min-width:0;
-      }
-      .site-search-results-v2112{
-        display:grid;
-        gap:7px;
-        margin-top:10px;
-      }
+      #siteLocationTreeSearchV2112{width:100%;min-width:0}
+      .site-search-results-v2112{display:grid;gap:7px;margin-top:10px}
       .site-search-summary-v2112{margin-bottom:2px}
       .site-search-row-v2112{margin:0}
       .site-search-copy-v2112{min-width:0}

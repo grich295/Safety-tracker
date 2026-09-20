@@ -43,7 +43,11 @@
       if(h.includes('guest')||h.includes('viewer access'))return 'viewer';
       if(h.includes('department'))return 'departments';
 
-      if(h.includes('asbestos source')||h.includes('site location'))return 'asbestos';
+      /* v2.11.3 root fix:
+         Asbestos source documents and Site Locations are separate Admin sections.
+         Do not group Site Locations back under asbestos. */
+      if(h.includes('asbestos source'))return 'asbestos';
+      if(h.includes('site location'))return 'locations';
 
       if(
         h.includes('force sync')||
@@ -111,11 +115,6 @@
         if(groups.has(key))ensureTile(key);
       });
 
-      /*
-       * v2.10.83 hides every tagged card on the Admin landing page and,
-       * in detail mode, displays only the selected tag. Before this fix,
-       * older dynamic cards had no tag and therefore remained visible.
-       */
       try{api.render();}catch(e){console.warn('Admin grouping render',e);}
     }
 
@@ -130,10 +129,6 @@
     });
     observer.observe(view,{childList:true,subtree:false});
 
-    /*
-     * Some older modules add their Admin cards shortly after navigation,
-     * so rescan at a few safe points as well.
-     */
     [0,100,350,900,1800,3200].forEach(function(ms){setTimeout(scan,ms);});
     window.addEventListener('pageshow',function(){setTimeout(scan,100);});
     document.addEventListener('visibilitychange',function(){
