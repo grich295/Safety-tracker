@@ -1,6 +1,6 @@
 {
-  "version": "2.11.4",
-  "build_id": "v21104-management-home-reset-20260920",
+  "version": "2.11.5",
+  "build_id": "v21105-asbestos-evidence-audit-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.11.4 CLEAN fixes sticky Management navigation. Tapping the top-level Management tab or any \u2190 Management button always resets to the Management tile landing page. Deliberate Reports, Calendar and Knowledge tiles still open their detail sections. Browser/system Back also restores the Management tile home when returning without an explicit detail route. No SQL required."
+  "notes": "Safety Tracker v2.11.5 CLEAN completes the asbestos lookup evidence/audit workflow. Maintenance users, including Admin switched to User mode, always receive Asbestos Lookup access. Every asbestos register location lookup is written to a permanent audit table with user, time, location, result, entry IDs, source documents and source pages. Source-page evidence snapshots are automatically generated from approved survey PDFs by Admin/Manager, stored once per source page, shown as tap-to-enlarge thumbnails in Asbestos Lookup, and shown in contractor asbestos checks. Source-page opens and evidence opens are also logged. Admin/Manager full mode includes a recent access-log card. The database migration has already been applied."
 }
