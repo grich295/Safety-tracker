@@ -1,6 +1,6 @@
 {
-  "version": "2.11.9",
-  "build_id": "v21109-user-access-preferences-20260920",
+  "version": "2.11.10",
+  "build_id": "v21110-user-access-save-repair-20260920",
   "clean": true,
-  "notes": "Adds per-user access preferences layered on the normal User/Manager role defaults. Admin can open Edit user, keep the role baseline, then enable or hide individual app areas for that named person. Core My Safety, Training, H&S Training and Help remain mandatory. User accounts may receive Documents and Asbestos Lookup as explicit extras; the asbestos exception grants lookup/evidence access only and does not grant Manager/Admin powers. Managers may have individual manager screens hidden without changing role. Reset to role defaults is provided. The missing set_user_view_preferences_v21022 RPC is repaired, checklists are included in the preference model, and explicit asbestos-user access is enforced in the backend maintenance-access helper. Database migration safety_v2119_user_access_preferences already applied."
+  "notes": "Repairs People > Edit user access preferences on mobile. Removes the v2.11.9 whole-app MutationObserver loader, uses direct event handlers instead, fixes Save changes with visible Saving/error feedback, retries access-editor decoration after the base modal opens, adds Checklists and clear User/Manager role-default labels, preserves per-user Documents/Asbestos extras, and enforces selected navigation without continuous DOM watching. No new SQL migration is required; the v2.11.9 access RPC/database changes remain active."
 }
