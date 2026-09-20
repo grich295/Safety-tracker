@@ -28,4 +28,5 @@ f('hotfix-v21077-creator-employees.js?v=v21077-creator-employees-20260919','safe
 f('hotfix-v21078-ssw-ppe-tools.js?v=v21078-ssw-ppe-tools-20260919','safety-v21078');
 f('hotfix-v21079-management-tiles.js?v=v21079-management-tiles-20260919','safety-v21079');
 f('hotfix-v21080-asbestos.js?v=v21081-asbestos-parser-20260920','safety-v21080');
+f('hotfix-v21082-asbestos-modal.js?v=v21082-asbestos-modal-20260920','safety-v21082');
 })();
