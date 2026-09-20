@@ -1,6 +1,6 @@
 {
-  "version": "2.10.89",
-  "build_id": "v21089-dedicated-site-locations-20260920",
+  "version": "2.10.90",
+  "build_id": "v21090-responsibility-location-tree-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.89 CLEAN. Splits Admin Asbestos & Locations into separate Asbestos Sources and Site Locations tiles so floors, rooms and work-area hierarchy can be reached directly without scrolling through asbestos document controls. Keeps all v2.10.88 full asbestos re-analysis features."
+  "notes": "Safety Tracker v2.10.90 CLEAN. Site Locations now renders as an expandable searchable hierarchy suitable for 250+ rooms. H&S responsibility is enforced: site-wide/multi-department RA, COSHH RA, SSW and Toolbox Talks require the assigned H&S Manager; single-department items require that Department Manager. Department Manager setup shows review/approval due items and department training overdue/action counts. Unscoped controlled H&S items are flagged and cannot be silently treated as site-wide."
 }
