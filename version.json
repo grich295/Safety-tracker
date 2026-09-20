@@ -1,6 +1,6 @@
 {
-  "version": "2.10.95",
-  "build_id": "v21095-repair-bundle-20260920",
+  "version": "2.10.96",
+  "build_id": "v21096-site-location-test-cleanup-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.95 CLEAN repair-only update. Refreshes Site Locations directly from Supabase when opened and after asbestos catalogue approval so newly approved floors/rooms such as Room 214 appear without a stale in-memory view; hardens Reports/Management back routing; resets and scopes the contractor asbestos acknowledgement to the newly selected work location and shows relevant source/page evidence; and ensures Delete TEST is attached by source ID to every explicit TEST/DEMO asbestos source/re-analysis view. Carries forward v2.10.94 whole Reports scope. No SQL required."
+  "notes": "Safety Tracker v2.10.96 CLEAN repair-only update. Fixes the blank Admin > Site Locations detail and completes safe TEST/DEMO location cleanup. The live database now tracks which Site Locations were created by each asbestos source; deleting a TEST source removes only its unused TEST-created locations and retains any location used by genuine asbestos evidence, contractor permits, aliases or incident reviews. Carries forward v2.10.95 repair bundle and v2.10.94 report scope."
 }
