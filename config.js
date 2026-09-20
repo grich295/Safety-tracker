@@ -33,5 +33,6 @@ f('hotfix-v21082-asbestos-modal.js?v=v21082-asbestos-modal-20260920','safety-v21
 f('hotfix-v21083-admin-sections.js?v=v21083-admin-sections-20260920','safety-v21083');
 f('hotfix-v21084-tile-routes.js?v=v21084-tile-routes-20260920','safety-v21084');
 f('hotfix-v21085-admin-grouping.js?v=v21085-admin-grouping-20260920','safety-v21085');
-f('hotfix-v21087-asbestos-source-tools.js?v=v21087-asbestos-source-tools-20260920','safety-v21087');
+f('hotfix-v21088-asbestos-full-analysis.js?v=v21088-asbestos-full-analysis-20260920','safety-v21088');
+f('hotfix-v21087-asbestos-source-tools.js?v=v21088-asbestos-source-tools-20260920','safety-v21087');
 })();

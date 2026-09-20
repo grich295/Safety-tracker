@@ -1,6 +1,6 @@
 {
-  "version": "2.10.87",
-  "build_id": "v21087-asbestos-source-tools-20260920",
+  "version": "2.10.88",
+  "build_id": "v21088-full-asbestos-reanalysis-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.87 CLEAN. Adds Re-analyse to existing asbestos source PDFs without uploading a duplicate, rebuilding the v2.10.86 full location catalogue / AMP structured data from the existing controlled copy. Adds guarded Admin-only Delete TEST for explicit standalone TEST/DEMO asbestos sources and their linked test register/evidence/history data. Legitimate words such as 'Testing' do not qualify for delete."
+  "notes": "Safety Tracker v2.10.88 CLEAN. Re-analyse now performs full existing-source analysis for both asbestos Management Surveys and AMPs. Surveys re-extract metadata, all structured ACM findings, pages and the full location catalogue, then compare against the live register as unchanged/changed/new/missing. AMPs extract document control fields, responsibilities, source survey, objectives, work controls, monitoring, emergency procedure, review/closure, location hierarchy and register-reference cross-check. Re-analysis approval reconciles existing ACMs without creating duplicates or pretending a physical reinspection occurred."
 }
