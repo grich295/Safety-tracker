@@ -1,6 +1,6 @@
 {
-  "version": "2.10.90",
-  "build_id": "v21090-responsibility-location-tree-20260920",
+  "version": "2.10.91",
+  "build_id": "v21091-report-evidence-retention-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.90 CLEAN. Site Locations now renders as an expandable searchable hierarchy suitable for 250+ rooms. H&S responsibility is enforced: site-wide/multi-department RA, COSHH RA, SSW and Toolbox Talks require the assigned H&S Manager; single-department items require that Department Manager. Department Manager setup shows review/approval due items and department training overdue/action counts. Unscoped controlled H&S items are flagged and cannot be silently treated as site-wide."
+  "notes": "Safety Tracker v2.10.91 CLEAN. Reporting defaults from active position(s)/managed departments with My positions, individual department and All site filters; scoped report exports use the same filter. Evidence Pack is person-first and shows only documents/training assigned directly, by department or Everyone, plus linked supporting controlled documents. People defaults to Active with Disabled, Recommended delete/anonymise and All filters. Disabled-user retention review uses a configurable 6-year general Safety Tracker evidence policy from the later of disable date/latest personal evidence, supports explicit retention holds, and never auto-deletes."
 }
