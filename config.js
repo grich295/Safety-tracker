@@ -41,4 +41,5 @@ f('hotfix-v21091-report-evidence-retention.js?v=v21091-report-evidence-retention
 f('hotfix-v21092-incident-review.js?v=v21092-incident-review-20260920','safety-v21092');
 f('hotfix-v21093-asbestos-location-cleanup.js?v=v21093-asbestos-location-cleanup-20260920','safety-v21093');
 f('hotfix-v21094-report-scope.js?v=v21094-report-scope-20260920','safety-v21094');
+f('hotfix-v21095-repair-bundle.js?v=v21095-repair-bundle-20260920','safety-v21095');
 })();

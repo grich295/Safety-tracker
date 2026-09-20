@@ -1,6 +1,6 @@
 {
-  "version": "2.10.94",
-  "build_id": "v21094-whole-report-scope-20260920",
+  "version": "2.10.95",
+  "build_id": "v21095-repair-bundle-20260920",
   "clean": true,
-  "notes": "Safety Tracker v2.10.94 CLEAN. Adds one scope filter for the whole Reports section: Whole hotel, My positions, Department or Person. Screen totals and all report exports use the same scope. Fixes blank Excel Department values by resolving the existing user_departments membership model rather than profile.department_id, supports multiple departments, adds Scope to PDF/Excel outputs, adds Department to training/report rows, scopes Evidence Pack person choices, and carries forward v2.10.92 incident review plus v2.10.93 asbestos location/delete fixes."
+  "notes": "Safety Tracker v2.10.95 CLEAN repair-only update. Refreshes Site Locations directly from Supabase when opened and after asbestos catalogue approval so newly approved floors/rooms such as Room 214 appear without a stale in-memory view; hardens Reports/Management back routing; resets and scopes the contractor asbestos acknowledgement to the newly selected work location and shows relevant source/page evidence; and ensures Delete TEST is attached by source ID to every explicit TEST/DEMO asbestos source/re-analysis view. Carries forward v2.10.94 whole Reports scope. No SQL required."
 }
