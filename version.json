@@ -1,6 +1,6 @@
 {
-  "version": "2.11.11",
-  "build_id": "v21111-management-stability-20260920",
+  "version": "2.11.12",
+  "build_id": "v21112-management-scroll-guard-20260920",
   "clean": true,
-  "notes": "Replaces the old Management landing implementation with a stable event-driven version. Removes the v2.10.79 whole-main DOM MutationObserver and smooth scroll-to-top, and removes the v2.11.4 repeated 0/40/120/300 ms home-reset calls and reports-view observer. Management tiles are prepared before the normal Reports/Management navigation renders, preventing the old long management page flashing first. No database change."
+  "notes": "Stops the Management tile landing being pulled back to the top on Android/mobile. The top-level Management tab no longer runs the underlying full Reports render; the tile landing is activated directly. While that landing is visible, legacy programmatic scrollTo/scroll/scrollIntoView calls are ignored and unexpected non-user upward layout jumps are restored to the user's last position. Manual touch/wheel/key scrolling remains normal. Adds overflow-anchor protection. Detail Reports/Calendar/Knowledge screens retain their normal scrolling. No database change."
 }

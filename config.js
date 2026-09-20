@@ -49,4 +49,5 @@ f('hotfix-v21107-asbestos-history-library.js?v=v21107-asbestos-history-library-2
 f('hotfix-v21108-asbestos-intelligence.js?v=v21108-asbestos-intelligence-20260920','safety-v21108');
 f('hotfix-v21110-user-access-save-repair.js?v=v21110-user-access-save-repair-20260920','safety-v21110');
 f('hotfix-v21111-management-stability.js?v=v21111-management-stability-20260920','safety-v21111');
+f('hotfix-v21112-management-scroll-guard.js?v=v21112-management-scroll-guard-20260920','safety-v21112');
 })();
