@@ -3,9 +3,6 @@ window.SAFETY_TRACKER_CONFIG = {
   supabaseKey: "sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_"
 };
 
-/* v2.11.13 stable hotfix loader.
-   One lightweight waiter replaces dozens of simultaneous boot-poll timers.
-   Hotfixes are loaded sequentially only after the core app + baseline are ready. */
 (function(){
   if(window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED)return;
   window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED=true;
@@ -56,7 +53,8 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21107-asbestos-history-library.js','v21107-asbestos-history-library'],
       ['hotfix-v21108-asbestos-intelligence.js','v21108-asbestos-intelligence'],
       ['hotfix-v21110-user-access-save-repair.js','v21110-user-access-save-repair'],
-      ['hotfix-v21111-management-stability.js','v21111-management-stability']
+      ['hotfix-v21111-management-stability.js','v21111-management-stability'],
+      ['hotfix-v21114-contractor-multi-area.js','v21114-contractor-multi-area']
   ];
   const loaded=new Set();
   let started=false;
@@ -74,7 +72,7 @@ window.SAFETY_TRACKER_CONFIG = {
 
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21113';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21114';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
@@ -118,8 +116,6 @@ window.SAFETY_TRACKER_CONFIG = {
     try{window.applySafetyBuildLabel?.()}catch(_e){}
   }
 
-  /* config.js is intentionally also present in <head>. Do not start the additive
-     chain there. Wait for the actual app/baseline boot instead. */
   setTimeout(start,0);
   window.addEventListener('pageshow',()=>{if(!started)setTimeout(start,0)},{once:true});
 })();

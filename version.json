@@ -1,6 +1,6 @@
 {
-  "version": "2.11.13",
-  "build_id": "v21113-runtime-stability-audit-20260920",
+  "version": "2.11.14",
+  "build_id": "v21114-contractor-multi-area-20260920",
   "clean": true,
-  "notes": "Crash-stability audit repair. Replaces the parallel DOMContentLoaded hotfix injection with one sequential loader that waits for the core app/baseline, eliminating dozens of simultaneous boot poll timers. Adds a runtime MutationObserver governor for broad BODY/appView/reportsView child-list observers, preventing self-generated DOM feedback loops found in v2.10.91 report/evidence retention, v2.10.94 report scope and v2.11.8 asbestos lookup while retaining their features. Retires v2.11.12's global scrollTo/scrollIntoView monkeypatch; v2.11.11 Management landing remains. Adds local JavaScript error/rejection diagnostics. No database change."
+  "notes": "Contractor/PTW work scope now supports multiple selected rooms/areas using the existing contractor_permits_v280 location_ids array and MULTIPLE work-scope type. Work-area picker is searchable and highlights known/presumed ACM, no-access/incomplete asbestos information, and parent areas containing known ACM in red before selection. Selected areas are checked together through the contractor-permit asbestos_preview service and the returned scope fingerprint is submitted, preventing stale asbestos acknowledgements. Permit review already shows the combined location_text/location_ids. No SQL or Edge Function change required."
 }
