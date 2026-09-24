@@ -54,7 +54,8 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21108-asbestos-intelligence.js','v21108-asbestos-intelligence'],
       ['hotfix-v21110-user-access-save-repair.js','v21110-user-access-save-repair'],
       ['hotfix-v21111-management-stability.js','v21111-management-stability'],
-      ['hotfix-v21114-contractor-multi-area.js','v21114-contractor-multi-area']
+      ['hotfix-v21114-contractor-multi-area.js','v21114-contractor-multi-area'],
+      ['hotfix-v21115-auto-link-repair.js','v21115-auto-link-repair']
   ];
   const loaded=new Set();
   let started=false;
@@ -69,29 +70,19 @@ window.SAFETY_TRACKER_CONFIG = {
       if(loaded.has(src))return resolve(true);
       const existing=document.querySelector(`script[data-safety-loader-v21113="${src}"]`);
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
-
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21114';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21115';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
         (document.body||document.head||document.documentElement).appendChild(s);
       }
-
-      s.onload=()=>{
-        s.dataset.loaded='1';
-        loaded.add(src);
-        resolve(true);
-      };
+      s.onload=()=>{s.dataset.loaded='1';loaded.add(src);resolve(true)};
       s.onerror=()=>{
         try{s.remove()}catch(_e){}
-        if(attempt<1){
-          setTimeout(()=>loadOne(src,token,attempt+1).then(resolve),500);
-        }else{
-          record('hotfix-load-failed',src,'Loader continued after two attempts.');
-          resolve(false);
-        }
+        if(attempt<1)setTimeout(()=>loadOne(src,token,attempt+1).then(resolve),500);
+        else{record('hotfix-load-failed',src,'Loader continued after two attempts.');resolve(false)}
       };
     });
   }
@@ -104,14 +95,9 @@ window.SAFETY_TRACKER_CONFIG = {
       waiter=setTimeout(start,120);
       return;
     }
-
     started=true;
     window.__SAFETY_HOTFIX_LOADER_V21113_STARTED=true;
-
-    for(const [src,token] of scripts){
-      await loadOne(src,token);
-    }
-
+    for(const [src,token] of scripts)await loadOne(src,token);
     window.__SAFETY_HOTFIX_LOADER_V21113_COMPLETE=true;
     try{window.applySafetyBuildLabel?.()}catch(_e){}
   }

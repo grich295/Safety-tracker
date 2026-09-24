@@ -1,6 +1,6 @@
 {
-  "version": "2.11.14",
-  "build_id": "v21114-contractor-multi-area-20260920",
+  "version": "2.11.15",
+  "build_id": "v21115-auto-link-repair-clean-doc-reset-20260924",
   "clean": true,
-  "notes": "Contractor/PTW work scope now supports multiple selected rooms/areas using the existing contractor_permits_v280 location_ids array and MULTIPLE work-scope type. Work-area picker is searchable and highlights known/presumed ACM, no-access/incomplete asbestos information, and parent areas containing known ACM in red before selection. Selected areas are checked together through the contractor-permit asbestos_preview service and the returned scope fingerprint is submitted, preventing stale asbestos acknowledgements. Permit review already shows the combined location_text/location_ids. No SQL or Edge Function change required."
+  "notes": "Repairs controlled-document auto-linking. Force Sync again reads declared links inside PDFs, creates direct pairwise document links, links TBT/training references, flags missing referenced documents and automatically clears LINK_SYNC warnings when the missing reference later appears. Bulk import uses the repaired full scan; individual document/replacement/training/creator uploads trigger an automatic full link reconciliation after upload. Asbestos controlled source PDFs are excluded from generic document-link scanning. The controlled-document/training workspace was reset on 24 Sep 2026: all non-asbestos Documents, versions, links, document history/activity, drafts, Training sessions/files/assignments/sign-offs/approvals and quiz data were removed. The 29 asbestos source documents and their controlled PDF copies were deliberately preserved."
 }
