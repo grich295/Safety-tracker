@@ -56,7 +56,8 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21111-management-stability.js','v21111-management-stability'],
       ['hotfix-v21114-contractor-multi-area.js','v21114-contractor-multi-area'],
       ['hotfix-v21115-auto-link-repair.js','v21115-auto-link-repair'],
-      ['hotfix-v21116-bulk-metadata.js','v21116-bulk-metadata']
+      ['hotfix-v21116-bulk-metadata.js','v21116-bulk-metadata'],
+      ['hotfix-v21117-training-excel-rolling.js','v21117-training-excel-rolling']
   ];
   const loaded=new Set();
   let started=false;
@@ -73,7 +74,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21116';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21117';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

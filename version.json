@@ -1,6 +1,6 @@
 {
-  "version": "2.11.16",
-  "build_id": "v21116-bulk-metadata-repair-20260924",
+  "version": "2.11.17",
+  "build_id": "v21117-training-excel-rolling-history-20260924",
   "clean": true,
-  "notes": "Repairs bulk-import metadata validation after live testing found COSHH titles being read from the field-label row and document versions being read from unrelated Version text inside the assessment/SDS. New CREATE imports are forced to v1 unless a later controlled-version workflow applies. COSHH preview metadata is re-read geometrically from the PDF table around Name of Substance/Substance Details. Suspicious COSHH titles, RA records detected as COSHH, and RA/SDS records detected as OTHER are blocked before import. Adds Admin 'Repair pending import metadata' for already-uploaded pending COSHH records. Existing pending first-version labels were normalised to v1 in the database on 24 Sep 2026."
+  "notes": "Changes the existing Reports > Training Excel Report into one rolling Training Excel Tracker rather than adding another report. The same button now downloads a workbook with Current Status and Training History sheets. Current Status keeps the existing filterable compliance view. Training History contains every stored training sign-off as a separate permanent row, including completion date/month/year, person, department, reference, title, type, method, document version, acknowledgement, instructor, delivered date, renewal period and next due date. Historical rows include inactive assignments and are never replaced by a later refresher completion. No database change."
 }
