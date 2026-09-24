@@ -1,6 +1,6 @@
 {
-  "version": "2.11.17",
-  "build_id": "v21117-training-excel-rolling-history-20260924",
+  "version": "2.11.18",
+  "build_id": "v21118-training-history-excel-name-20260924",
   "clean": true,
-  "notes": "Changes the existing Reports > Training Excel Report into one rolling Training Excel Tracker rather than adding another report. The same button now downloads a workbook with Current Status and Training History sheets. Current Status keeps the existing filterable compliance view. Training History contains every stored training sign-off as a separate permanent row, including completion date/month/year, person, department, reference, title, type, method, document version, acknowledgement, instructor, delivered date, renewal period and next due date. Historical rows include inactive assignments and are never replaced by a later refresher completion. No database change."
+  "notes": "Renames the existing rolling training workbook to 'Training History (Excel)'. No duplicate report is added. The same report contains Current Status and Training History sheets; Training History keeps every completion/sign-off as a permanent row. Download filename is Safety-Tracker-Training-History-YYYY-MM-DD.xlsx. No database change."
 }
