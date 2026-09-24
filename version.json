@@ -1,6 +1,6 @@
 {
-  "version": "2.11.15",
-  "build_id": "v21115-auto-link-repair-clean-doc-reset-20260924",
+  "version": "2.11.16",
+  "build_id": "v21116-bulk-metadata-repair-20260924",
   "clean": true,
-  "notes": "Repairs controlled-document auto-linking. Force Sync again reads declared links inside PDFs, creates direct pairwise document links, links TBT/training references, flags missing referenced documents and automatically clears LINK_SYNC warnings when the missing reference later appears. Bulk import uses the repaired full scan; individual document/replacement/training/creator uploads trigger an automatic full link reconciliation after upload. Asbestos controlled source PDFs are excluded from generic document-link scanning. The controlled-document/training workspace was reset on 24 Sep 2026: all non-asbestos Documents, versions, links, document history/activity, drafts, Training sessions/files/assignments/sign-offs/approvals and quiz data were removed. The 29 asbestos source documents and their controlled PDF copies were deliberately preserved."
+  "notes": "Repairs bulk-import metadata validation after live testing found COSHH titles being read from the field-label row and document versions being read from unrelated Version text inside the assessment/SDS. New CREATE imports are forced to v1 unless a later controlled-version workflow applies. COSHH preview metadata is re-read geometrically from the PDF table around Name of Substance/Substance Details. Suspicious COSHH titles, RA records detected as COSHH, and RA/SDS records detected as OTHER are blocked before import. Adds Admin 'Repair pending import metadata' for already-uploaded pending COSHH records. Existing pending first-version labels were normalised to v1 in the database on 24 Sep 2026."
 }
