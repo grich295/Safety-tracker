@@ -70,7 +70,8 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21128-generic-audience-layout.js','v21128-generic-audience-layout'],
       ['hotfix-v21130-people-filter-stability.js','v21130-people-filter-stability'],
       ['hotfix-v21131-approval-move-repair.js','v21131-approval-move-repair'],
-      ['hotfix-v21132-assignment-audit.js','v21132-assignment-audit']
+      ['hotfix-v21132-assignment-audit.js','v21132-assignment-audit'],
+      ['hotfix-v21133-owner-department-functions.js','v21133-owner-department-functions']
   ];
   const loaded=new Set();
   let started=false;

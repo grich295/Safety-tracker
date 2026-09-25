@@ -1,0 +1,23 @@
+Safety Tracker v2.11.33 database status
+
+The database migration was applied directly to Supabase by ChatGPT on 25 September 2026.
+No manual SQL action is required.
+
+Project: Safety tracker
+Project ID: qvgcralroduuoptbnctt
+
+Applied migration names:
+- safety_v21133_owner_department_functions
+- safety_v21133_rpc_permissions
+- safety_v21133_owner_department_tbt_generic
+
+Post-migration checks confirmed:
+- documents.owner_department_id exists
+- training_sessions.owner_department_id exists
+- Department PPE / First Aid configuration fields exist
+- Department responsibility RPC exists
+- Document owner RPC exists
+- Toolbox Talk owner RPC exists
+- New security-definer RPCs are NOT executable by anon and ARE executable by authenticated users, with internal role/responsibility checks.
+
+This file is a deployment record only.
