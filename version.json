@@ -1,6 +1,6 @@
 {
-  "version": "2.11.35",
-  "build_id": "v21135-first-aid-equipment-eyewash-20260925",
+  "version": "2.11.37",
+  "build_id": "v21137-people-access-20260925",
   "clean": true,
-  "notes": "Keeps the simplified v2.11.34 Site-wide/H&S-or-real-Department ownership model and expands Monthly First Aid into First Aid Equipment. Adds Eye Wash Station as a separate equipment/check type within First Aid, requires Department plus exact physical location, uses the Department First Aid responsible person by default with an optional equipment-specific member override, and provides editable HSE-based starter templates. New First Aid Boxes can load the HSE L74 low-hazard suggested contents; new Eye Wash Stations default to 2 x 500 ml sterile water or sterile 0.9% saline bottles (1 litre total) where mains tap water is not readily available. All checklist items/quantities remain editable to the site first-aid needs assessment. Supabase migrations through v2.11.35 are already applied."
+  "notes": "Adds the People & Access foundation. Safety access is separate from role and responsibilities, Admin/Manager can switch to a simple day-to-day User view without changing real permissions, username-only accounts are supported with one-time temporary passwords and forced password change, email users keep email recovery, and Admin can reset username-only passwords without ever retrieving the old password. Adds Home Site/additional-site access ready for multi-site use and optional app capabilities while retaining existing Department, Position, H&S Manager, Department Manager, PPE and First Aid responsibility controls. Includes v2.11.36 Eye Wash default buttons. Database migrations and the manage-user-access-v21137 Edge Function are already applied to the live Safety Supabase project."
 }

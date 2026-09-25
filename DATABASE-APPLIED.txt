@@ -1,0 +1,1 @@
+Safety Supabase v2.11.37 People & Access database foundation and manage-user-access-v21137 Edge Function are already applied to project qvgcralroduuoptbnctt. No SQL upload is required for this patch.
