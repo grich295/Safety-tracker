@@ -1,12 +1,18 @@
-Safety Tracker v2.11.39 CLEAN
+SAFETY TRACKER v2.11.40 SCREEN FLICKER FIX
 
-Upload these 3 files to the repository root:
+Upload these 3 files to the Safety Tracker repository root:
 - config.js
+- hotfix-v21140-flicker-guard.js
 - version.json
-- hotfix-v21139-management-stability.js
 
-Important:
-- config.js no longer loads hotfix-v21138-multisite-clean-backup.js.
-- The old v2.11.38 JS file can remain in GitHub; it is simply not loaded.
-- No Supabase/database changes are required for this fix.
-- v2.11.38 clean-site database protection remains in place.
+No Supabase/database update is needed.
+
+Cause fixed:
+The late People & Access and Management patches each created a body-wide
+MutationObserver. Their callbacks changed UI/navigation DOM, which could
+immediately trigger the same observer again. On Android this shows as the
+whole Admin/Management screen flickering and can make a native select/dropdown
+flash closed.
+
+v2.11.40 blocks only those known late broad observers. Scoped observers used
+for modals, People filters and Admin section content are left alone.

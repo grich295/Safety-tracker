@@ -1,6 +1,6 @@
 {
-  "version": "2.11.39",
-  "build_id": "v21139-management-navigation-dropdown-fix-20260925",
+  "version": "2.11.40",
+  "build_id": "v21140-mobile-screen-flicker-guard-20260925",
   "clean": true,
-  "notes": "Fixes Safety Management/Admin navigation state and flashing dropdowns. Re-entering Admin now returns to the Admin section tiles instead of staying trapped in the last sub-section. Returning to Management restores the main Management tiles. Replaces the v2.11.38 site decorator that repeatedly rebuilt the site select; the site dropdown is now stable while open and DOM updates are idempotent. Clean-site creation/protection and all v2.11.38 database work are retained. No SQL/database update required."
+  "notes": "Fixes mobile Safety Management/Admin screen flicker and native dropdown instability by preventing the known late People & Access and Management body-wide MutationObserver feedback loops. Existing management tiles, People & Access, clean-site controls, First Aid/Eye Wash changes and all database work remain in place. No SQL/database update required."
 }
