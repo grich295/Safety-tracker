@@ -1,6 +1,6 @@
 {
-  "version": "2.11.47",
-  "build_id": "v21147-shared-users-targeted-incident-review-20260925",
+  "version": "2.11.48",
+  "build_id": "v21148-edit-shared-user-safety-access-20260925",
   "clean": true,
-  "notes": "Fixes the shared Inventory/Energy user directory visibility in Safety by using the corrected authenticated table permission. Redirects People entry points to the consolidated People & Access screen. Changes incident/policy review from department-wide scope to targeted controlled-document selection: choose the relevant RA/COSHH RA/SSW/etc, then only directly linked documents and linked TBT/training are included automatically. No whole department is flagged. New-site creator-only access from v2.11.46 remains in force."
+  "notes": "Adds editable Safety access to the shared Inventory/Energy People directory. Admin can choose Give Safety access for a shared user with Safety OFF, select Safety role/working view and explicitly tick only the Safety site(s) required. No site is assigned automatically. Existing Safety accounts have Edit access for role, enable/disable, home site and site assignments. Username-only accounts support Admin temporary-password reset. New-site creator-only access and v2.11.47 targeted incident/document review remain in force. Backend shared-to-Safety account link table is already applied."
 }

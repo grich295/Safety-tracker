@@ -1,30 +1,29 @@
-SAFETY TRACKER v2.11.47
+SAFETY TRACKER v2.11.48
 
 Upload these 3 files to the Safety Tracker repository root:
 - config.js
-- hotfix-v21147-users-targeted-incident-review.js
+- hotfix-v21148-edit-shared-user-access.js
 - version.json
 
-BACKEND/DATABASE:
+DATABASE:
 Already updated. Do not run SQL manually.
+A shared-to-Safety account link table has been added so Inventory/Energy people
+can be reliably connected to their Safety account even if they later use a
+username-only login.
 
-USERS:
-The shared Inventory/Energy directory already contains 5 current active users.
-The missing SELECT permission has now been fixed, so Safety Admin/Manager can
-actually read those rows in People & Access.
-These users remain GLOBAL directory entries only. They are NOT automatically
-assigned to a new site.
+PEOPLE & ACCESS:
+- Shared Inventory/Energy users now have a button:
+  * GIVE SAFETY ACCESS if no Safety account exists
+  * EDIT ACCESS once Safety exists
+- Role can be User / Manager / Admin / Viewer.
+- Working view can be User / Full / Viewer.
+- Safety sites are explicit checkboxes.
+- NO site is automatically ticked when giving access.
+- A Home Site can be selected deliberately.
+- New sites still start with only the Admin who created them.
+- Existing site creator/Admin access is protected from accidental removal.
+- Email users receive an invitation.
+- Username-only users can be created with a temporary password.
+- Username-only passwords can be reset by an Admin later.
 
-NEW SITE RULE:
-A new Safety site still starts with ONLY the Admin who creates it.
-
-INCIDENT / POLICY REVIEW:
-The department-wide review selector is replaced by targeted document selection.
-Choose only the relevant RA / COSHH RA / SSW / controlled document.
-The backend then adds ONLY:
-- those selected documents,
-- documents directly linked to the selected documents,
-- TBT/training directly linked to the selected/related documents.
-It does NOT flag every document for a department.
-SDS links are treated as suggested/reference review rather than mandatory
-controlled-document review.
+The v2.11.47 targeted incident/document review is retained.
