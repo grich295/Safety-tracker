@@ -65,7 +65,12 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21121-generic-doc-controls.js','v21121-generic-doc-controls'],
       ['hotfix-v21122-approval-training-restore.js','v21122-approval-training-restore'],
       ['hotfix-v21124-freeze-guard.js','v21124-freeze-guard'],
-      ['hotfix-v21125-admin-approval.js','v21125-admin-approval']
+      ['hotfix-v21125-admin-approval.js','v21125-admin-approval'],
+      ['hotfix-v21126-scroll-isolation.js','v21126-scroll-isolation'],
+      ['hotfix-v21128-generic-audience-layout.js','v21128-generic-audience-layout'],
+      ['hotfix-v21130-people-filter-stability.js','v21130-people-filter-stability'],
+      ['hotfix-v21131-approval-move-repair.js','v21131-approval-move-repair'],
+      ['hotfix-v21132-assignment-audit.js','v21132-assignment-audit']
   ];
   const loaded=new Set();
   let started=false;
