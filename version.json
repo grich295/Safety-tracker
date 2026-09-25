@@ -1,6 +1,6 @@
 {
-  "version": "2.11.28",
-  "build_id": "v21128-generic-audience-layout-20260925",
+  "version": "2.11.29",
+  "build_id": "v21129-approval-modal-final-repair-20260925",
   "clean": true,
-  "notes": "Carries forward v2.11.27 Policy/Procedure approval scope and v2.11.26 stability fixes. Corrects generic controlled-document audience layout in both approval and Folder/readers/responsibility screens: one full-width section per audience type in the modal, left-aligned checkbox/text rows, stable checkbox column, readable position-holder text, no horizontal overflow, and tighter mobile layout. No SQL required."
+  "notes": "Replaces the v2.11.27 Policy/Procedure approval scope handler with a robust native checkbox selector for Everyone, Departments, Positions and specific people. Reader scope is saved before approval. Restores document review frequency and Next review date directly in every non-SDS approval modal and persists both on approval. RA/COSHH/SSW formal training audience remains unchanged. Carries forward v2.11.26 scroll/freeze protection and v2.11.28 generic reader layout fixes. No SQL required."
 }
