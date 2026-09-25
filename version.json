@@ -1,6 +1,6 @@
 {
-  "version": "2.11.45",
-  "build_id": "v21145-stable-admin-sites-people-20260925",
+  "version": "2.11.46",
+  "build_id": "v21146-global-people-site-specific-access-20260925",
   "clean": true,
-  "notes": "Consolidates the stacked People/Management/Sites hotfixes into one stable layer. Removes the Admin Viewer Access setup tile. Blocks legacy whole-app/Admin child-list observer feedback loops that were causing mobile flicker. Sites and People & Access are standalone screens intercepted before legacy Admin routing, so they cannot open as blank Admin sections. People & Access shows the 5 shared Inventory/Energy users plus local Safety accounts. Existing database/site/shared-user backend remains unchanged."
+  "notes": "Clarifies and enforces People vs Site access. The global People & Access directory shows the shared Inventory/Energy users, but they are not automatically assigned to a Safety site. New Safety sites now start with only the Admin who creates the site. Sites has explicit Manage people controls for active Safety accounts. Viewer Access setup remains removed from Admin. Supabase create-site RPC has already been updated to creator-only initial access."
 }
