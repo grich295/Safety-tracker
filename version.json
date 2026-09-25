@@ -1,6 +1,6 @@
 {
-  "version": "2.11.26",
-  "build_id": "v21126-scroll-runtime-stability-20260925",
+  "version": "2.11.28",
+  "build_id": "v21128-generic-audience-layout-20260925",
   "clean": true,
-  "notes": "Loads the v2.11 stability and additive hotfix chain in the correct order. Runtime and modal MutationObserver governors load before legacy/additive application code. Adds nested scroll isolation so modal/list scroll areas do not move the parent page at the same time. Carries forward Admin approval, training schedule restore, generic document controls, management scroll guard, asbestos workflow/history/intelligence, site/location, contractor multi-area and auto-link repairs. No SQL required."
+  "notes": "Carries forward v2.11.27 Policy/Procedure approval scope and v2.11.26 stability fixes. Corrects generic controlled-document audience layout in both approval and Folder/readers/responsibility screens: one full-width section per audience type in the modal, left-aligned checkbox/text rows, stable checkbox column, readable position-holder text, no horizontal overflow, and tighter mobile layout. No SQL required."
 }
