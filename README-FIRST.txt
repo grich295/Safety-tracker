@@ -1,31 +1,24 @@
-SAFETY TRACKER v2.11.49
+SAFETY TRACKER v2.11.51 - ONE LOGIN + ORIGINAL SITE
 
-Upload these 3 files to the Safety Tracker repository root:
-- config.js
-- hotfix-v21149-access-click-fix.js
-- version.json
+Upload ALL files in this ZIP to the Safety Tracker repository root.
 
-NO DATABASE CHANGE IS REQUIRED.
+BACKEND IS ALREADY APPLIED:
+- Shared Inventory/Energy master-login endpoint deployed.
+- Safety master-session exchange deployed.
+- Safety shared-user provisioning/access endpoint deployed.
+- Main Hotel adopted as the Original Site and mapped to the shared master site.
+- No SQL needs to be run manually.
 
-ROOT CAUSE:
-The shared users were loading correctly, but the Give Safety access / Edit access
-buttons were being swallowed by older document-level People/Admin click handlers
-before the v2.11.48 access handler could run.
+LOGIN:
+Safety now uses the SAME master email/username + password as Inventory/Energy.
+No separate Safety password is created when Safety access is switched on.
 
-FIX:
-v2.11.49 handles the access actions at WINDOW CAPTURE level. That runs before
-all of the older document click handlers, so the buttons open and save reliably.
+PEOPLE & ACCESS:
+Use Give Safety access / Edit access.
+Choose Safety role, working view, Home Site and exact Safety sites.
+No site is assigned automatically.
 
-EXPECTED:
-- Safety > People & Access
-- Every shared Inventory/Energy user has either:
-    GIVE SAFETY ACCESS
-  or
-    EDIT ACCESS
-- Tap it and choose:
-    Safety ON/OFF
-    Role
-    Working view
-    Home site
-    Explicit Safety site checkboxes
-- Existing Inventory users are never assigned to a new site automatically.
+ORIGINAL SITE:
+Main Hotel is the original live Safety site.
+Its existing records stay there.
+New sites start clean.

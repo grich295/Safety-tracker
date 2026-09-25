@@ -1,6 +1,6 @@
 {
-  "version": "2.11.49",
-  "build_id": "v21149-people-access-click-fix-20260925",
+  "version": "2.11.51",
+  "build_id": "v21151-master-login-original-site-20260925",
   "clean": true,
-  "notes": "Fixes shared-user Safety access buttons being swallowed by older People/Admin click handlers. Give Safety access, Edit access, Save access, password reset and Refresh users now use a window-level capture handler that runs before legacy document handlers. Access buttons are full-width/easier to tap on mobile. v2.11.48 shared-to-Safety account linking, creator-only new-site access and v2.11.47 targeted incident review remain unchanged. No database migration required."
+  "notes": "Moves Safety sign-in to the shared Inventory/Energy master account: same email/username and same password, while Safety keeps a hidden internal session for its existing database/RLS. Giving a shared user Safety access no longer creates a second credential; it provisions/links an internal Safety identity and applies only the selected Safety role/sites. Main Hotel is explicitly adopted and labelled as the Original Site. Existing records remain on Main Hotel and new sites remain clean. Includes the v2.11.50 Help/PPE setup layer."
 }
