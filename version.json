@@ -1,6 +1,6 @@
 {
-  "version": "2.11.25",
-  "build_id": "v21125-admin-approval-modal-stability-20260925",
+  "version": "2.11.26",
+  "build_id": "v21126-scroll-runtime-stability-20260925",
   "clean": true,
-  "notes": "Carries forward v2.11.24 freeze/stability repairs and fixes approval permissions. Any full Admin can approve/review any scoped controlled document or Toolbox Talk even when the H&S Manager/Department Manager responsibility is vacant or assigned to someone else. Responsibility assignments remain for ownership, reminders and follow-up rather than acting as an Admin permission gate. Document scope/audience is still required before approval. Adds an early scoped modal observer governor to suppress the legacy v2.10.90 approval decorator feedback loop without adding polling. No SQL required."
+  "notes": "Loads the v2.11 stability and additive hotfix chain in the correct order. Runtime and modal MutationObserver governors load before legacy/additive application code. Adds nested scroll isolation so modal/list scroll areas do not move the parent page at the same time. Carries forward Admin approval, training schedule restore, generic document controls, management scroll guard, asbestos workflow/history/intelligence, site/location, contractor multi-area and auto-link repairs. No SQL required."
 }
