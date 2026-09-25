@@ -1,6 +1,6 @@
 {
-  "version": "2.11.48",
-  "build_id": "v21148-edit-shared-user-safety-access-20260925",
+  "version": "2.11.49",
+  "build_id": "v21149-people-access-click-fix-20260925",
   "clean": true,
-  "notes": "Adds editable Safety access to the shared Inventory/Energy People directory. Admin can choose Give Safety access for a shared user with Safety OFF, select Safety role/working view and explicitly tick only the Safety site(s) required. No site is assigned automatically. Existing Safety accounts have Edit access for role, enable/disable, home site and site assignments. Username-only accounts support Admin temporary-password reset. New-site creator-only access and v2.11.47 targeted incident/document review remain in force. Backend shared-to-Safety account link table is already applied."
+  "notes": "Fixes shared-user Safety access buttons being swallowed by older People/Admin click handlers. Give Safety access, Edit access, Save access, password reset and Refresh users now use a window-level capture handler that runs before legacy document handlers. Access buttons are full-width/easier to tap on mobile. v2.11.48 shared-to-Safety account linking, creator-only new-site access and v2.11.47 targeted incident review remain unchanged. No database migration required."
 }

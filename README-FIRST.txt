@@ -1,29 +1,31 @@
-SAFETY TRACKER v2.11.48
+SAFETY TRACKER v2.11.49
 
 Upload these 3 files to the Safety Tracker repository root:
 - config.js
-- hotfix-v21148-edit-shared-user-access.js
+- hotfix-v21149-access-click-fix.js
 - version.json
 
-DATABASE:
-Already updated. Do not run SQL manually.
-A shared-to-Safety account link table has been added so Inventory/Energy people
-can be reliably connected to their Safety account even if they later use a
-username-only login.
+NO DATABASE CHANGE IS REQUIRED.
 
-PEOPLE & ACCESS:
-- Shared Inventory/Energy users now have a button:
-  * GIVE SAFETY ACCESS if no Safety account exists
-  * EDIT ACCESS once Safety exists
-- Role can be User / Manager / Admin / Viewer.
-- Working view can be User / Full / Viewer.
-- Safety sites are explicit checkboxes.
-- NO site is automatically ticked when giving access.
-- A Home Site can be selected deliberately.
-- New sites still start with only the Admin who created them.
-- Existing site creator/Admin access is protected from accidental removal.
-- Email users receive an invitation.
-- Username-only users can be created with a temporary password.
-- Username-only passwords can be reset by an Admin later.
+ROOT CAUSE:
+The shared users were loading correctly, but the Give Safety access / Edit access
+buttons were being swallowed by older document-level People/Admin click handlers
+before the v2.11.48 access handler could run.
 
-The v2.11.47 targeted incident/document review is retained.
+FIX:
+v2.11.49 handles the access actions at WINDOW CAPTURE level. That runs before
+all of the older document click handlers, so the buttons open and save reliably.
+
+EXPECTED:
+- Safety > People & Access
+- Every shared Inventory/Energy user has either:
+    GIVE SAFETY ACCESS
+  or
+    EDIT ACCESS
+- Tap it and choose:
+    Safety ON/OFF
+    Role
+    Working view
+    Home site
+    Explicit Safety site checkboxes
+- Existing Inventory users are never assigned to a new site automatically.
