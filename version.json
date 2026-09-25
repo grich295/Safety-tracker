@@ -1,6 +1,6 @@
 {
-  "version": "2.11.18",
-  "build_id": "v21118-training-history-excel-name-20260924",
+  "version": "2.11.19",
+  "build_id": "v21119-generic-document-folders-20260925",
   "clean": true,
-  "notes": "Renames the existing rolling training workbook to 'Training History (Excel)'. No duplicate report is added. The same report contains Current Status and Training History sheets; Training History keeps every completion/sign-off as a permanent row. Download filename is Safety-Tracker-Training-History-YYYY-MM-DD.xlsx. No database change."
+  "notes": "Adds Manager/Admin-created custom folders inside Documents for generic controlled information, policies, procedures and reusable plain-text templates. Plain documents are authored directly in Safety Tracker, rendered to a controlled PDF, versioned and sent through the existing pending approval/review workflow. Each document can have a review responsibility and approval responsibility recorded as a person name or job title, plus required readers set to Everyone, Departments and/or specific people. Assigned generic documents appear in My Safety as Documents to read and require the exact approved version to be opened before Read is recorded. Templates can be reused to start new documents. The v2.11.19 database migration was applied directly on 25 Sep 2026."
 }

@@ -1,0 +1,16 @@
+-- Safety Tracker v2.11.19 migration record
+-- Applied directly to Supabase project qvgcralroduuoptbnctt on 25 Sep 2026.
+-- Adds:
+--   document_folders_v21119
+--   document_read_audiences_v21119
+--   documents.folder_id
+--   documents.is_template
+--   documents.content_mode
+--   documents.review_responsibility
+--   documents.approval_responsibility
+--   documents.created_from_document_id
+--   document_versions.editable_content
+--   document_versions.content_format
+-- Extends user_can_access_document_v237 for explicitly assigned generic-document readers.
+-- Adds my_document_reads_v21119() for the signed-in user's current read requirements.
+-- No action is required: the migration has already been applied.
