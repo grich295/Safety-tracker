@@ -71,7 +71,7 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21130-people-filter-stability.js','v21130-people-filter-stability'],
       ['hotfix-v21131-approval-move-repair.js','v21131-approval-move-repair'],
       ['hotfix-v21132-assignment-audit.js','v21132-assignment-audit'],
-      ['hotfix-v21133-owner-department-functions.js','v21133-owner-department-functions']
+      ['hotfix-v21134-simple-owner.js','v21134-simple-owner']
   ];
   const loaded=new Set();
   let started=false;
@@ -88,7 +88,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21125';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21134';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

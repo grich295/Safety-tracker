@@ -1,6 +1,6 @@
 {
-  "version": "2.11.33",
-  "build_id": "v21133-owner-department-ppe-first-aid-20260925",
+  "version": "2.11.34",
+  "build_id": "v21134-simple-owner-responsibility-20260925",
   "clean": true,
-  "notes": "Adds explicit Owner Department control for RA, COSHH RA, SSW, Policy, Procedure, Information and controlled Toolbox Talks. Owner Department controls review/follow-up responsibility and is automatically included in the relevant Training/read audience unless Everyone is selected; additional departments and people remain independently assignable. Admin can enable PPE and First Aid functions per Department. Department Manager/H&S Manager can assign the responsible person from current Department members. Department First Aid responsibility becomes the monthly default checker unless a First Aid box has its own override. Department PPE responsible people can see and action PPE issues for their Department. Existing document/version/training history is retained. Required Supabase migrations have already been applied to the live Safety Tracker project."
+  "notes": "Simplifies ownership: Owner is Site-wide / H&S Manager or one real Department. H&S Manager is a responsibility and is never created as a Department. Owner no longer changes or auto-adds the Training/read audience; audience remains a separate Everyone/Department/person choice. Keeps PPE and First Aid enabled per real Department with responsible people chosen from Department members. First Aid responsible person remains the monthly default unless a box has its own override; PPE responsible people can action Department PPE issues. Supabase v2.11.34 owner-scope migration already applied."
 }
