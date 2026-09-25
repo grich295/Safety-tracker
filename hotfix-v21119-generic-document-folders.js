@@ -335,7 +335,7 @@
   function currentAudienceRows(docId){return audiences.filter(x=>x.document_id===docId)}
 
   async function showCreatePlain(templateId=''){
-    await loadManagerData();
+    if(!folders.length||!positions.length)await loadManagerData();
     if(!folders.length)return toast('Create a document folder first.');
     const t=templateId?state.documents.find(x=>x.id===templateId):null;
     const tv=t?(currentApproved(t)||api.currentVersion(t.id)):null;
@@ -367,7 +367,10 @@
     };
     $('v21123CreateReviewResponsible')?.addEventListener('change',e=>e.target.dataset.manual='1');
     $('v21123CreateApprovalResponsible')?.addEventListener('change',e=>e.target.dataset.manual='1');
-    $('modalBody')?.addEventListener('change',e=>{if(e.target.matches('#v21119CreateEveryone,[data-v21119Create-dep],[data-v21119Create-position]'))apply()});
+    const createRoot=$('v21123CreateReviewResponsible')?.closest('[data-v21123-native-controls]');
+    createRoot?.addEventListener('change',e=>{
+      if(e.target.matches('#v21119CreateEveryone,[data-v21119Create-dep],[data-v21119Create-position]'))apply();
+    });
     if(!t)apply();
   }
 
@@ -440,7 +443,7 @@
   }
 
   async function showGenericControls(docId){
-    await loadManagerData();
+    if(!folders.length||!positions.length)await loadManagerData();
     const d=state.documents.find(x=>x.id===docId);if(!d)return;
     const rows=currentAudienceRows(docId),due=rows[0]?.due_days||14,v=pending(d)||currentApproved(d)||api.currentVersion(d.id),f=reviewFreq(d);
     openModal('Folder, readers & responsibility',`<div class="v21123-native-controls" data-v21123-native-controls="1"><p><strong>${esc(d.reference?d.reference+' - ':'')}${esc(d.title)}</strong></p><div class="form-grid">

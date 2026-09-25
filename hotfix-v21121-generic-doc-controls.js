@@ -628,40 +628,27 @@
     addStyles();
     patchApprovalAndReview();
 
-    const body=$('modalBody');
-    if(body){
-      let timer=0;
-      new MutationObserver(()=>{
-        clearTimeout(timer);
-        timer=setTimeout(decorateModal,20);
-      }).observe(body,{childList:true,subtree:true});
-    }
-
+    // v2.11.23 renders generic-document controls directly.
+    // Do not watch modalBody or redecorate generic-document modals.
     document.addEventListener('click',e=>{
-      const create=e.target.closest?.('[data-v21121-save-plain]');
-      if(create){e.preventDefault();e.stopImmediatePropagation();savePlain(create);return}
-      const controls=e.target.closest?.('[data-v21121-save-controls]');
-      if(controls){e.preventDefault();e.stopImmediatePropagation();saveControls(controls);return}
-
-      // Backup decoration after the base v2.11.19 modal is opened.
-      if(e.target.closest?.('[data-v21119-new-plain],[data-v21119-use-template],[data-v21119-controls],[data-approve-version],[data-review-doc]')){
-        setTimeout(decorateModal,40);
-        setTimeout(decorateModal,300);
+      const approve=e.target.closest?.('[data-approve-version]');
+      if(approve){
+        const versionId=approve.dataset.approveVersion;
+        setTimeout(()=>decorateApprovalFrequency(versionId),40);
+      }
+      const review=e.target.closest?.('[data-review-doc]');
+      if(review){
+        const documentId=review.dataset.reviewDoc;
+        setTimeout(()=>decorateControlledReviewFrequency(documentId),40);
       }
     },false);
 
-    loadReferenceData(true)
-      .then(()=>decorateModal())
-      .catch(console.warn);
-
-    // If the user opened the modal while the long hotfix chain was still loading,
-    // decorate the already-open modal immediately rather than waiting for a new mutation.
-    setTimeout(decorateModal,0);
-    setTimeout(decorateModal,250);
-
-    window.SafetyGenericDocControlsV21121={loadReferenceData,decorateModal,audienceState};
+    window.SafetyGenericDocControlsV21121={
+      loadReferenceData,
+      decorateModal:()=>{},
+      audienceState
+    };
   }
-
   function boot(){
     api=window.SafetyTrackerV2;
     if(!api?.state||!api?.sb||!window.SafetyGenericDocumentsV21119){setTimeout(boot,120);return}

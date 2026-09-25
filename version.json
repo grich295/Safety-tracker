@@ -1,6 +1,6 @@
 {
-  "version": "2.11.23",
-  "build_id": "v21123-native-generic-doc-controls-20260925",
+  "version": "2.11.25",
+  "build_id": "v21125-admin-approval-modal-stability-20260925",
   "clean": true,
-  "notes": "Rebuilds the generic-document controls natively inside the folder feature rather than relying on a later modal decorator. Folder/readers/responsibility now opens directly with Position/People dropdowns, review frequency, next review date, and a tidied collapsible reader selector for Departments, Positions and Specific people. Position responsibility and position read audiences use the configured Safety Tracker position data/current holders. Carries forward the v2.11.22 training-schedule visibility repair. No new SQL required; v2.11.21 database changes are already live."
+  "notes": "Carries forward v2.11.24 freeze/stability repairs and fixes approval permissions. Any full Admin can approve/review any scoped controlled document or Toolbox Talk even when the H&S Manager/Department Manager responsibility is vacant or assigned to someone else. Responsibility assignments remain for ownership, reminders and follow-up rather than acting as an Admin permission gate. Document scope/audience is still required before approval. Adds an early scoped modal observer governor to suppress the legacy v2.10.90 approval decorator feedback loop without adding polling. No SQL required."
 }

@@ -1,4 +1,4 @@
-/* Safety Tracker v2.11.22 - approval training controls recovery */
+/* Safety Tracker v2.11.24 - lean approval training recovery */
 'use strict';
 (function(){
   if(window.__SAFETY_APPROVAL_TRAINING_RESTORE_V21122)return;
@@ -20,7 +20,6 @@
       if(grid)grid.hidden=false;
     }
 
-    // Never hide containers because they may contain live controls.
     [...section.querySelectorAll('span,p')].forEach(el=>{
       if(el.id==='approvalTrainingScheduleCurrentV21120'||el.children.length)return;
       const txt=(el.textContent||'').trim();
@@ -34,24 +33,21 @@
     if(note)note.hidden=false;
   }
 
-  const body=document.getElementById('modalBody');
-  if(body){
-    let timer=0;
-    new MutationObserver(()=>{
-      clearTimeout(timer);
-      timer=setTimeout(restore,20);
-    }).observe(body,{childList:true,subtree:true});
+  const original=window.showVersionApproval;
+  if(typeof original==='function'){
+    window.showVersionApproval=function(versionId){
+      const out=original(versionId);
+      setTimeout(restore,0);
+      setTimeout(restore,80);
+      return out;
+    };
   }
 
   document.addEventListener('click',e=>{
     if(e.target.closest?.('[data-approve-version]')){
-      setTimeout(restore,30);
-      setTimeout(restore,250);
+      setTimeout(restore,40);
     }
   },false);
-
-  setTimeout(restore,0);
-  setTimeout(restore,300);
 
   window.SafetyApprovalTrainingRestoreV21122={restore};
 })();
