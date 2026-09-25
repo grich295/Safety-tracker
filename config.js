@@ -75,7 +75,7 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21135-first-aid-equipment.js','v21135-first-aid-equipment'],
       ['hotfix-v21136-first-aid-default-types.js','v21136-first-aid-default-types'],
       ['hotfix-v21137-people-access.js','v21137-people-access'],
-      ['hotfix-v21138-multisite-clean-backup.js','v21138-multisite-clean-backup']
+      ['hotfix-v21139-management-stability.js','v21139-management-stability']
   ];
   const loaded=new Set();
   let started=false;
@@ -92,7 +92,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21138';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21139';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

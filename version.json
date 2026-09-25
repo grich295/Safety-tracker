@@ -1,6 +1,6 @@
 {
-  "version": "2.11.38",
-  "build_id": "v21138-clean-site-foundation-20260925",
+  "version": "2.11.39",
+  "build_id": "v21139-management-navigation-dropdown-fix-20260925",
   "clean": true,
-  "notes": "Adds the protected Safety multi-site clean-start foundation. Admin can create new site shells, but no departments, documents, training, PPE, First Aid, asbestos, contractor, report or other operational history is copied. New Safety sites remain SETUP_REQUIRED and cannot be opened operationally until full Safety row-level site isolation is completed, preventing Main Hotel records appearing at another site. Existing Main Hotel remains unchanged. Existing JSON and Full Backup ZIP remain available, with v2.11.38 site metadata included in state backups. Supabase migration is already applied."
+  "notes": "Fixes Safety Management/Admin navigation state and flashing dropdowns. Re-entering Admin now returns to the Admin section tiles instead of staying trapped in the last sub-section. Returning to Management restores the main Management tiles. Replaces the v2.11.38 site decorator that repeatedly rebuilt the site select; the site dropdown is now stable while open and DOM updates are idempotent. Clean-site creation/protection and all v2.11.38 database work are retained. No SQL/database update required."
 }
