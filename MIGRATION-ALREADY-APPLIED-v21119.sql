@@ -1,16 +1,17 @@
 -- Safety Tracker v2.11.19 migration record
--- Applied directly to Supabase project qvgcralroduuoptbnctt on 25 Sep 2026.
--- Adds:
---   document_folders_v21119
---   document_read_audiences_v21119
---   documents.folder_id
---   documents.is_template
---   documents.content_mode
---   documents.review_responsibility
---   documents.approval_responsibility
---   documents.created_from_document_id
---   document_versions.editable_content
---   document_versions.content_format
--- Extends user_can_access_document_v237 for explicitly assigned generic-document readers.
--- Adds my_document_reads_v21119() for the signed-in user's current read requirements.
--- No action is required: the migration has already been applied.
+-- BOTH required v2.11.19 migrations have already been applied directly to Supabase.
+-- No SQL action is required.
+
+-- Generic document folders:
+-- document_folders_v21119
+-- document_read_audiences_v21119
+-- generic document columns on documents/document_versions
+-- my_document_reads_v21119()
+-- updated user_can_access_document_v237()
+
+-- Department Leads:
+-- department_leads_v21119
+-- set_user_department_leads_v21119(uuid, uuid[])
+--
+-- Department Lead is deliberately separate from app Role/access.
+-- The person must belong to every department they are marked as leading.

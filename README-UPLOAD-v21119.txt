@@ -1,48 +1,48 @@
-Safety Tracker v2.11.19 CLEAN — CUSTOM DOCUMENT FOLDERS + PLAIN CONTROLLED DOCUMENTS
+Safety Tracker v2.11.19 CLEAN — CUSTOM DOCUMENT FOLDERS + DEPARTMENT LEADS
+
+THIS REPLACES THE EARLIER v2.11.19 ZIP.
+If you have not uploaded v2.11.19 yet, use only this amended package.
 
 DATABASE
-The required Supabase migration has ALREADY been applied directly.
+Both required Supabase migrations have ALREADY been applied directly.
 Do not run SQL manually.
 
 UPLOAD TO REPOSITORY ROOT
 1. hotfix-v21119-generic-document-folders.js
-2. config.js (replace)
-3. version.json (replace)
+2. hotfix-v21119-department-leads.js
+3. config.js (replace)
+4. version.json (replace)
 
-WHAT CHANGES
+DEPARTMENT LEAD
+People > Invite user:
+- choose Role / access as normal;
+- choose Department as normal;
+- tick "Department lead for the selected department" when appropriate.
 
-DOCUMENTS > DOCUMENT FOLDERS
-Managers/Admins can:
-- create their own folders;
-- add plain controlled Information, Policy or Procedure documents;
-- mark a document as a reusable Template;
-- paste/type plain text directly into Safety Tracker;
-- create a new document from an approved template;
-- edit a plain document by creating a controlled replacement version;
-- choose the folder;
-- record Responsible for review as a name or job title;
-- record Responsible for approval as a name or job title;
-- select required readers as Everyone, Departments and/or specific people;
-- set how many days readers have to acknowledge it.
+People > Edit user:
+- keep Primary/Additional departments;
+- a separate Department Lead section lets Admin mark which of those departments the person leads.
 
-CONTROLLED WORKFLOW
-A newly created plain document is v1 Pending approval.
-It uses the existing Safety Tracker controlled-document approval and controlled-review workflow.
-The pending PDF must be opened before approval.
-A replacement plain-text version remains pending while the approved/current version stays in use.
+IMPORTANT
+Department Lead is NOT the same as the app Manager role.
+Examples:
+- User + Front desk + Department Lead = Front Desk lead, normal User app permissions.
+- Manager + Front desk + Department Lead = Front Desk lead plus Manager app permissions.
+- Manager + Front desk without Department Lead = Manager app permissions, but not recorded as Front Desk lead.
 
-MY SAFETY > DOCUMENTS TO READ
-Assigned generic controlled documents appear automatically.
-The user must open the exact approved/current version first.
-Mark as read then writes the existing Document Activity REVIEWED audit event.
-A later approved version becomes a new read requirement because acknowledgements are version-specific.
+A Department Lead must belong to the department they lead.
 
-TEMPLATES
-Templates are still controlled documents.
-An approved template can be used as the starting text for a new document.
+Department cards show the assigned lead name(s), and People cards show any Department Lead responsibilities.
 
-RESPONSIBILITY
-The app displays the expected review/approval responsibility (free text name or role/title).
-The actual reviewer/approver is still captured from the authenticated Manager/Admin account when the action is completed.
+GENERIC DOCUMENT FOLDERS
+The same package also includes:
+- custom folders inside Documents;
+- plain Information / Policy / Procedure documents;
+- reusable controlled templates;
+- review date and normal controlled approval/review;
+- review responsibility and approval responsibility fields;
+- required readers by Everyone / Department / specific people;
+- My Safety > Documents to read;
+- exact-version open/read audit history.
 
-Existing RA/COSHH/SSW/SDS/TBT behaviour is unchanged.
+No duplicate report or separate app is added.

@@ -58,7 +58,9 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21115-auto-link-repair.js','v21115-auto-link-repair'],
       ['hotfix-v21116-bulk-metadata.js','v21116-bulk-metadata'],
       ['hotfix-v21118-training-history-excel.js','v21118-training-history-excel'],
-      ['hotfix-v21119-generic-document-folders.js','v21119-generic-document-folders']
+      ['hotfix-v21119-generic-document-folders.js','v21119-generic-document-folders'],
+      ['hotfix-v21119-department-leads.js','v21119-department-leads'],
+      ['hotfix-v21120-approval-review-date.js','v21120-approval-review-date']
   ];
   const loaded=new Set();
   let started=false;
@@ -75,7 +77,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21119';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21120';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
