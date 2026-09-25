@@ -1,6 +1,6 @@
 {
-  "version": "2.11.34",
-  "build_id": "v21134-simple-owner-responsibility-20260925",
+  "version": "2.11.35",
+  "build_id": "v21135-first-aid-equipment-eyewash-20260925",
   "clean": true,
-  "notes": "Simplifies ownership: Owner is Site-wide / H&S Manager or one real Department. H&S Manager is a responsibility and is never created as a Department. Owner no longer changes or auto-adds the Training/read audience; audience remains a separate Everyone/Department/person choice. Keeps PPE and First Aid enabled per real Department with responsible people chosen from Department members. First Aid responsible person remains the monthly default unless a box has its own override; PPE responsible people can action Department PPE issues. Supabase v2.11.34 owner-scope migration already applied."
+  "notes": "Keeps the simplified v2.11.34 Site-wide/H&S-or-real-Department ownership model and expands Monthly First Aid into First Aid Equipment. Adds Eye Wash Station as a separate equipment/check type within First Aid, requires Department plus exact physical location, uses the Department First Aid responsible person by default with an optional equipment-specific member override, and provides editable HSE-based starter templates. New First Aid Boxes can load the HSE L74 low-hazard suggested contents; new Eye Wash Stations default to 2 x 500 ml sterile water or sterile 0.9% saline bottles (1 litre total) where mains tap water is not readily available. All checklist items/quantities remain editable to the site first-aid needs assessment. Supabase migrations through v2.11.35 are already applied."
 }
