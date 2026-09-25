@@ -1,1 +1,3 @@
-Safety Supabase v2.11.37 People & Access database foundation and manage-user-access-v21137 Edge Function are already applied to project qvgcralroduuoptbnctt. No SQL upload is required for this patch.
+Safety Supabase v2.11.38 clean-site foundation is already applied to project qvgcralroduuoptbnctt.
+New Safety sites are created empty and protected as SETUP_REQUIRED. Main Hotel remains the only operational READY Safety site until full Safety row isolation is completed.
+Do not run SQL manually.

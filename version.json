@@ -1,6 +1,6 @@
 {
-  "version": "2.11.37",
-  "build_id": "v21137-people-access-20260925",
+  "version": "2.11.38",
+  "build_id": "v21138-clean-site-foundation-20260925",
   "clean": true,
-  "notes": "Adds the People & Access foundation. Safety access is separate from role and responsibilities, Admin/Manager can switch to a simple day-to-day User view without changing real permissions, username-only accounts are supported with one-time temporary passwords and forced password change, email users keep email recovery, and Admin can reset username-only passwords without ever retrieving the old password. Adds Home Site/additional-site access ready for multi-site use and optional app capabilities while retaining existing Department, Position, H&S Manager, Department Manager, PPE and First Aid responsibility controls. Includes v2.11.36 Eye Wash default buttons. Database migrations and the manage-user-access-v21137 Edge Function are already applied to the live Safety Supabase project."
+  "notes": "Adds the protected Safety multi-site clean-start foundation. Admin can create new site shells, but no departments, documents, training, PPE, First Aid, asbestos, contractor, report or other operational history is copied. New Safety sites remain SETUP_REQUIRED and cannot be opened operationally until full Safety row-level site isolation is completed, preventing Main Hotel records appearing at another site. Existing Main Hotel remains unchanged. Existing JSON and Full Backup ZIP remain available, with v2.11.38 site metadata included in state backups. Supabase migration is already applied."
 }
