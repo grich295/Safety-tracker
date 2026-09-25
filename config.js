@@ -60,7 +60,8 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21118-training-history-excel.js','v21118-training-history-excel'],
       ['hotfix-v21119-generic-document-folders.js','v21119-generic-document-folders'],
       ['hotfix-v21119-department-leads.js','v21119-department-leads'],
-      ['hotfix-v21120-approval-review-date.js','v21120-approval-review-date']
+      ['hotfix-v21120-approval-review-date.js','v21120-approval-review-date'],
+      ['hotfix-v21121-generic-doc-controls.js','v21121-generic-doc-controls']
   ];
   const loaded=new Set();
   let started=false;
@@ -77,7 +78,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21120';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21121';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

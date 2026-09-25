@@ -1,6 +1,6 @@
 {
-  "version": "2.11.20",
-  "build_id": "v21120-department-leads-approval-review-date-20260925",
+  "version": "2.11.21",
+  "build_id": "v21121-generic-doc-people-positions-review-frequency-20260925",
   "clean": true,
-  "notes": "Carries forward v2.11.19 generic document folders/templates and Department Lead assignment. Fixes the document approval screen so the training repeat schedule helper always reflects the actual selected schedule instead of showing an obsolete six-month default. Adds an editable Next document review date directly to non-SDS approval, defaulting to 12 months from the issue date when missing. The selected review date is saved before approval. Department Lead remains separate from app Role/access. Required database migrations were already applied directly."
+  "notes": "Carries forward v2.11.20. Tidies the generic controlled-document editor. Responsible for review and Responsible for approval are now dropdowns populated from active Safety Tracker Positions and People rather than free text. Position responsibility follows the current holder. Reader assignment is condensed into Everyone/whole hotel plus collapsible Departments, Positions and Specific people sections; position audiences automatically apply to current holders. Scope suggests the H&S Manager for whole-hotel documents, the department manager/lead for a single department, and otherwise the uploader, while remaining editable. Adds editable controlled-document review frequency, default 12 months, to generic document creation/controls, initial approval and controlled review. The chosen frequency recalculates the next review date but the date can still be overridden. Required v2.11.21 Supabase migration was applied directly."
 }

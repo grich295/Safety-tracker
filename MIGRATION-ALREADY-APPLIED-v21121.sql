@@ -1,0 +1,18 @@
+-- Safety Tracker v2.11.21 migration record
+-- ALREADY APPLIED directly to the live Supabase project on 25 Sep 2026.
+-- No SQL action is required.
+
+-- documents:
+--   review_responsible_user_id
+--   approval_responsible_user_id
+--   review_responsible_position_id
+--   approval_responsible_position_id
+--   review_frequency_value
+--   review_frequency_unit
+--
+-- document_read_audiences_v21119:
+--   position_id
+--   target_type now supports POSITION
+--
+-- user_can_access_document_v237() and my_document_reads_v21119()
+-- now recognise current holders of selected positions.
