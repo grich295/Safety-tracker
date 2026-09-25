@@ -10,9 +10,7 @@ window.SAFETY_TRACKER_CONFIG = {
   const scripts=[
       ['hotfix-v21113-runtime-stability.js','v21113-runtime-stability'],
       ['hotfix-v21125-modal-observer-governor.js','v21125-modal-observer-governor'],
-      ['hotfix-v21144-sites-people-stable.js','v21144-sites-people-stable'],
-      ['hotfix-v21140-flicker-guard.js','v21140-flicker-guard'],
-      ['hotfix-v21141-people-flicker-root.js','v21141-people-flicker-root'],
+      ['hotfix-v21145-stable-admin-sites-people.js','v21145-stable-admin-sites-people'],
       ['hotfix-v21055-training-packs.js','v21055-training-packs'],
       ['hotfix-v21056-review-audit.js','v21056-review-audit'],
       ['hotfix-v21057-linked-impact.js','v21057-linked-impact'],
@@ -77,8 +75,6 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21134-simple-owner.js','v21134-simple-owner'],
       ['hotfix-v21135-first-aid-equipment.js','v21135-first-aid-equipment'],
       ['hotfix-v21136-first-aid-default-types.js','v21136-first-aid-default-types'],
-      ['hotfix-v21137-people-access.js','v21137-people-access'],
-      ['hotfix-v21139-management-stability.js','v21139-management-stability'],
   ];
   const loaded=new Set();
   let started=false;
@@ -95,7 +91,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21144';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21145';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

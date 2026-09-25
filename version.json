@@ -1,6 +1,6 @@
 {
-  "version": "2.11.44",
-  "build_id": "v21144-sites-standalone-shared-people-20260925",
+  "version": "2.11.45",
+  "build_id": "v21145-stable-admin-sites-people-20260925",
   "clean": true,
-  "notes": "Fixes the blank Sites/Admin section and missing shared users. Sites is now a standalone stable view rather than a legacy Admin grouping, with Main Hotel/site status, Create site and clean-start information. Safety People now shows All app users at the top from the shared Inventory/Energy directory, followed separately by Safety accounts. The shared mirror is already populated with the 5 current shared users. Also blocks known legacy Admin whole-subtree observer feedback loops before those modules initialise. No new SQL required for this frontend patch."
+  "notes": "Consolidates the stacked People/Management/Sites hotfixes into one stable layer. Removes the Admin Viewer Access setup tile. Blocks legacy whole-app/Admin child-list observer feedback loops that were causing mobile flicker. Sites and People & Access are standalone screens intercepted before legacy Admin routing, so they cannot open as blank Admin sections. People & Access shows the 5 shared Inventory/Energy users plus local Safety accounts. Existing database/site/shared-user backend remains unchanged."
 }

@@ -1,22 +1,28 @@
-SAFETY TRACKER v2.11.44
+SAFETY TRACKER v2.11.45 CLEAN
 
 Upload these 3 files to the Safety Tracker repository root:
 - config.js
-- hotfix-v21144-sites-people-stable.js
+- hotfix-v21145-stable-admin-sites-people.js
 - version.json
 
-BACKEND:
-Already updated. The Safety shared user mirror now contains the 5 current
-Inventory/Energy users. No SQL needs to be run manually.
+NO DATABASE CHANGE IS REQUIRED.
 
-FIXES:
-1. Sites no longer uses the legacy Admin-section grouping that was opening an
-   empty Admin page. The Sites tile opens its own standalone view.
-2. Sites shows Main Hotel immediately and has a proper Create site button.
-3. Safety > People now shows "All app users" at the TOP, before the local
-   Safety account statistics, so Inventory users are immediately visible.
-4. Existing Safety accounts remain a separate section underneath.
-5. v2.11.44 installs its stability boundary before the legacy Admin decorators,
-   blocking the known admin-subtree observer feedback loops.
-6. v2.11.42 and v2.11.43 frontend UI scripts are no longer loaded. Their
-   backend/database work remains intact.
+This build deliberately removes these superseded frontend layers from the loader:
+- v2.11.37 People & Access
+- v2.11.39 Management stability
+- v2.11.40 flicker guard
+- v2.11.41 People flicker guard
+- v2.11.42 Sites UI
+- v2.11.43 shared-users UI
+- v2.11.44 Sites/People UI
+
+Their backend/database work is retained.
+
+v2.11.45 now owns this area:
+- Stops the legacy Admin/body child-list observer repaint loops.
+- Adds stable standalone SITES and PEOPLE & ACCESS screens.
+- Puts Sites and People & Access first on Admin sections.
+- Removes VIEWER ACCESS setup from Admin.
+- Sites must show Main Hotel immediately.
+- People & Access must show the 5 shared Inventory/Energy users plus Safety accounts.
+- Create Safety user reuses the existing secure Safety create-user flow.
