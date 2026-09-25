@@ -641,9 +641,23 @@
       if(create){e.preventDefault();e.stopImmediatePropagation();savePlain(create);return}
       const controls=e.target.closest?.('[data-v21121-save-controls]');
       if(controls){e.preventDefault();e.stopImmediatePropagation();saveControls(controls);return}
-    },true);
 
-    loadReferenceData(true).catch(console.warn);
+      // Backup decoration after the base v2.11.19 modal is opened.
+      if(e.target.closest?.('[data-v21119-new-plain],[data-v21119-use-template],[data-v21119-controls],[data-approve-version],[data-review-doc]')){
+        setTimeout(decorateModal,40);
+        setTimeout(decorateModal,300);
+      }
+    },false);
+
+    loadReferenceData(true)
+      .then(()=>decorateModal())
+      .catch(console.warn);
+
+    // If the user opened the modal while the long hotfix chain was still loading,
+    // decorate the already-open modal immediately rather than waiting for a new mutation.
+    setTimeout(decorateModal,0);
+    setTimeout(decorateModal,250);
+
     window.SafetyGenericDocControlsV21121={loadReferenceData,decorateModal,audienceState};
   }
 

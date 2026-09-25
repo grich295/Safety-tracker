@@ -33,12 +33,26 @@
     if(!section)return;
     let note=$('approvalTrainingScheduleCurrentV21120');
 
-    // Remove/neutralise any older hard-coded "Default: every 6 months..." helper.
-    [...section.querySelectorAll('span,p,div')].forEach(el=>{
-      if(el.id==='approvalTrainingScheduleCurrentV21120')return;
+    // Remove only the obsolete helper leaf text. Never hide a parent div/form-grid:
+    // doing so also hides the live training controls.
+    [...section.querySelectorAll('span,p')].forEach(el=>{
+      if(el.id==='approvalTrainingScheduleCurrentV21120'||el.children.length)return;
       const txt=(el.textContent||'').trim();
-      if(/^Default:\s*every\s+6\s+months/i.test(txt) || /Manager\/Admin can change this/i.test(txt)){
+      if(/^Default:\s*every\s+6\s+months/i.test(txt) || /^Manager\/Admin can change this/i.test(txt)){
         el.hidden=true;
+      }
+    });
+
+    // Recovery guard if an older cached build already hid the controls.
+    section.querySelectorAll('.form-grid').forEach(el=>{
+      if(el.querySelector('#approvalTrainingRenewalPreset')||el.querySelector('#approvalTrainingDelivery'))el.hidden=false;
+    });
+    ['approvalTrainingDelivery','approvalTrainingRenewalPreset'].forEach(id=>{
+      const field=$(id);
+      if(field){
+        field.hidden=false;
+        const label=field.closest('label');
+        if(label)label.hidden=false;
       }
     });
 

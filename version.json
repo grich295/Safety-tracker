@@ -1,6 +1,6 @@
 {
-  "version": "2.11.21",
-  "build_id": "v21121-generic-doc-people-positions-review-frequency-20260925",
+  "version": "2.11.22",
+  "build_id": "v21122-training-restore-generic-controls-live-20260925",
   "clean": true,
-  "notes": "Carries forward v2.11.20. Tidies the generic controlled-document editor. Responsible for review and Responsible for approval are now dropdowns populated from active Safety Tracker Positions and People rather than free text. Position responsibility follows the current holder. Reader assignment is condensed into Everyone/whole hotel plus collapsible Departments, Positions and Specific people sections; position audiences automatically apply to current holders. Scope suggests the H&S Manager for whole-hotel documents, the department manager/lead for a single department, and otherwise the uploader, while remaining editable. Adds editable controlled-document review frequency, default 12 months, to generic document creation/controls, initial approval and controlled review. The chosen frequency recalculates the next review date but the date can still be overridden. Required v2.11.21 Supabase migration was applied directly."
+  "notes": "Fixes the approval Training schedule regression and makes the v2.11.21 generic-document controls apply reliably even when a modal is opened before the long hotfix chain has finished loading. Training method/repeat/refresher controls remain visible. Generic documents now reliably replace free-text review/approval responsibility with Position/People dropdowns, use the tidied collapsible reader selector with Departments/Positions/Specific people, and expose editable review frequency/next review date. No database change beyond migrations already applied for v2.11.21."
 }
