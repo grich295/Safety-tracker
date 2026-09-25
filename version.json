@@ -1,6 +1,6 @@
 {
-  "version": "2.11.43",
-  "build_id": "v21143-global-flicker-shared-users-20260925",
+  "version": "2.11.44",
+  "build_id": "v21144-sites-standalone-shared-people-20260925",
   "clean": true,
-  "notes": "Fixes remaining mobile flicker by suppressing legacy whole-body/#appView MutationObserver feedback loops while leaving scoped modal/list observers active. Adds an All app users section to Safety People showing the shared Inventory/Energy directory, including Inventory/Energy roles and whether a matching Safety account exists. Admin opening Safety automatically syncs the shared directory. App access remains separate; listing a user does not grant Safety access. Supabase table and sync edge functions are already applied/deployed."
+  "notes": "Fixes the blank Sites/Admin section and missing shared users. Sites is now a standalone stable view rather than a legacy Admin grouping, with Main Hotel/site status, Create site and clean-start information. Safety People now shows All app users at the top from the shared Inventory/Energy directory, followed separately by Safety accounts. The shared mirror is already populated with the 5 current shared users. Also blocks known legacy Admin whole-subtree observer feedback loops before those modules initialise. No new SQL required for this frontend patch."
 }

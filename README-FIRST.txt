@@ -1,30 +1,22 @@
-SAFETY TRACKER v2.11.43
+SAFETY TRACKER v2.11.44
 
 Upload these 3 files to the Safety Tracker repository root:
 - config.js
-- hotfix-v21143-stability-shared-users.js
+- hotfix-v21144-sites-people-stable.js
 - version.json
 
-DATABASE/BACKEND:
-Already applied. Do not run SQL manually.
-- Safety shared_app_users_v21143 mirror table created.
-- Shared Inventory/Energy export edge function deployed.
-- Safety admin-only sync edge function deployed.
+BACKEND:
+Already updated. The Safety shared user mirror now contains the 5 current
+Inventory/Energy users. No SQL needs to be run manually.
 
-WHAT THIS FIXES:
-1. Remaining mobile flicker:
-   Legacy hotfixes were still watching the entire BODY or #appView and changing
-   the DOM they were observing. v2.11.43 blocks those whole-app observers.
-   Scoped observers for modals and specific lists remain available.
-
-2. Inventory users in Safety:
-   Safety > People now has an "All app users" section.
-   It lists the shared Inventory/Energy directory and badges each user's
-   Inventory, Energy and Safety status.
-   Admin opening Safety triggers a directory sync automatically.
-   "Sync users" is also available manually.
-
-IMPORTANT:
-Seeing a user in All app users does NOT grant them Safety access. Safety auth
-is still a separate Supabase project, so Safety access remains independently
-controlled until authentication is consolidated across the apps.
+FIXES:
+1. Sites no longer uses the legacy Admin-section grouping that was opening an
+   empty Admin page. The Sites tile opens its own standalone view.
+2. Sites shows Main Hotel immediately and has a proper Create site button.
+3. Safety > People now shows "All app users" at the TOP, before the local
+   Safety account statistics, so Inventory users are immediately visible.
+4. Existing Safety accounts remain a separate section underneath.
+5. v2.11.44 installs its stability boundary before the legacy Admin decorators,
+   blocking the known admin-subtree observer feedback loops.
+6. v2.11.42 and v2.11.43 frontend UI scripts are no longer loaded. Their
+   backend/database work remains intact.
