@@ -4,9 +4,10 @@
   if(window.__SAFETY_GENERIC_DOCUMENTS_V21119)return;
   window.__SAFETY_GENERIC_DOCUMENTS_V21119=true;
 
-  const VERSION='2.11.19';
+  const VERSION='2.11.23';
   let api,state,sb;
   let folders=[],audiences=[],selectedFolderId=null,myReads=[];
+  let positions=[],positionDepartments=[],userPositions=[],responsibilities=[],departmentLeads=[];
   const $=id=>document.getElementById(id);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const clean=s=>String(s??'').replace(/\r/g,'').trim();
@@ -42,19 +43,146 @@
       .generic-responsibility-v21119{margin-top:10px}
       .generic-read-card-v21119 .meta{margin-top:5px}
       .generic-folder-contents-v21119{margin-top:14px}
-      @media(max-width:720px){.doc-folder-grid-v21119{grid-template-columns:1fr 1fr}.generic-audience-v21119{max-height:180px}}
+      .v21123-reader-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+      .v21123-reader-box{border:1px solid var(--border,#d8dee6);border-radius:10px;background:var(--card,#fff)}
+      .v21123-reader-box summary{cursor:pointer;font-weight:700;padding:10px 12px}
+      .v21123-reader-box .generic-audience-v21119{border:0;border-top:1px solid var(--border,#d8dee6);border-radius:0;max-height:180px}
+      .v21123-read-days{max-width:180px}
+      .v21123-native-controls select{min-height:44px}
+      @media(max-width:720px){.doc-folder-grid-v21119{grid-template-columns:1fr 1fr}.generic-audience-v21119{max-height:180px}.v21123-reader-grid{grid-template-columns:1fr}}
     `;
     document.head.appendChild(s);
   }
 
   async function loadManagerData(){
     if(!isManager())return;
-    const [f,a]=await Promise.all([
+    const [f,a,p,pd,up,resp,dl]=await Promise.all([
       sb.from('document_folders_v21119').select('*').eq('active',true).order('sort_order').order('name'),
-      sb.from('document_read_audiences_v21119').select('*')
+      sb.from('document_read_audiences_v21119').select('*'),
+      sb.from('safety_positions_v21069').select('*').eq('active',true).order('name'),
+      sb.from('safety_position_departments_v21069').select('*'),
+      sb.from('safety_user_positions_v21069').select('*').eq('active',true),
+      sb.from('safety_responsibilities_v21069').select('*').eq('active',true),
+      sb.from('department_leads_v21119').select('*')
     ]);
     if(!f.error)folders=f.data||[];
     if(!a.error)audiences=a.data||[];
+    if(!p.error)positions=p.data||[];
+    if(!pd.error)positionDepartments=pd.data||[];
+    if(!up.error)userPositions=up.data||[];
+    if(!resp.error)responsibilities=resp.data||[];
+    if(!dl.error)departmentLeads=dl.data||[];
+  }
+
+  const positionName=id=>positions.find(x=>x.id===id)?.name||'';
+  const personNameV21123=id=>{const p=(state.people||[]).find(x=>x.id===id);return p?.display_name||p?.email||'Unknown user'};
+  function positionDepartmentIds(id){
+    const ids=positionDepartments.filter(x=>x.position_id===id).map(x=>x.department_id);
+    const p=positions.find(x=>x.id===id);
+    if(p?.primary_department_id&&!ids.includes(p.primary_department_id))ids.push(p.primary_department_id);
+    return ids;
+  }
+  function currentHolders(id){return userPositions.filter(x=>x.position_id===id&&x.active!==false).map(x=>x.user_id)}
+  function primaryPosition(uid){
+    const rows=userPositions.filter(x=>x.user_id===uid&&x.active!==false);
+    return rows.find(x=>x.is_primary)||rows[0]||null;
+  }
+  function personOptionLabel(uid){
+    const p=(state.people||[]).find(x=>x.id===uid),up=primaryPosition(uid),pos=up?positionName(up.position_id):'';
+    return `${p?.display_name||p?.email||'User'}${pos?` — ${pos}`:''}`;
+  }
+  function responsibilityValue(d,kind){
+    if(!d)return '';
+    const posId=kind==='review'?d.review_responsible_position_id:d.approval_responsible_position_id;
+    const userId=kind==='review'?d.review_responsible_user_id:d.approval_responsible_user_id;
+    if(posId)return `POSITION:${posId}`;
+    if(userId)return `USER:${userId}`;
+    const legacy=clean(kind==='review'?d.review_responsibility:d.approval_responsibility).toLowerCase();
+    if(legacy){
+      const pos=positions.find(x=>clean(x.name).toLowerCase()===legacy);
+      if(pos)return `POSITION:${pos.id}`;
+      const user=(state.people||[]).find(x=>clean(x.display_name||x.email).toLowerCase()===legacy);
+      if(user)return `USER:${user.id}`;
+    }
+    return '';
+  }
+  function responsibilityOptions(selected=''){
+    const pos=positions.filter(x=>x.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(x=>{
+      const holders=currentHolders(x.id).map(personNameV21123).filter(Boolean);
+      return `<option value="POSITION:${x.id}" ${selected===`POSITION:${x.id}`?'selected':''}>${esc(x.name)}${holders.length?` — ${esc(holders.join(', '))}`:' — vacant'}</option>`;
+    }).join('');
+    const people=(state.people||[]).filter(x=>x.active!==false&&x.report_only!==true).sort((a,b)=>String(a.display_name||a.email||'').localeCompare(String(b.display_name||b.email||''))).map(x=>
+      `<option value="USER:${x.id}" ${selected===`USER:${x.id}`?'selected':''}>${esc(personOptionLabel(x.id))}</option>`
+    ).join('');
+    return `<option value="">Not assigned</option><optgroup label="Positions">${pos}</optgroup><optgroup label="People">${people}</optgroup>`;
+  }
+  function responsibilityPayload(value,kind){
+    const out={[`${kind}_responsibility`]:null,[`${kind}_responsible_user_id`]:null,[`${kind}_responsible_position_id`]:null};
+    if(!value)return out;
+    const [type,id]=String(value).split(':');
+    if(type==='POSITION'){out[`${kind}_responsible_position_id`]=id;out[`${kind}_responsibility`]=positionName(id)||null}
+    if(type==='USER'){out[`${kind}_responsible_user_id`]=id;out[`${kind}_responsibility`]=personNameV21123(id)||null}
+    return out;
+  }
+  function suggestedResponsible(sel){
+    if(sel.everyone){
+      const hs=responsibilities.find(x=>x.responsibility_type==='HS_MANAGER'&&!x.department_id);
+      if(hs?.user_id){
+        const up=primaryPosition(hs.user_id);
+        return up?`POSITION:${up.position_id}`:`USER:${hs.user_id}`;
+      }
+      const hp=positions.find(x=>/\b(h\s*&\s*s|health\s*(and|&)\s*safety|safety\s+manager)\b/i.test(x.name||''));
+      if(hp)return `POSITION:${hp.id}`;
+    }
+    if(sel.departments.length===1){
+      const dep=sel.departments[0];
+      const resp=responsibilities.find(x=>x.responsibility_type==='DEPARTMENT_MANAGER'&&x.department_id===dep);
+      const lead=departmentLeads.find(x=>x.department_id===dep);
+      const uid=resp?.user_id||lead?.user_id;
+      if(uid){
+        const matching=userPositions.find(x=>x.user_id===uid&&x.active!==false&&positionDepartmentIds(x.position_id).includes(dep));
+        const up=matching||primaryPosition(uid);
+        return up?`POSITION:${up.position_id}`:`USER:${uid}`;
+      }
+      const managerPos=positions.find(x=>positionDepartmentIds(x.id).includes(dep)&&/\b(manager|head|lead)\b/i.test(x.name||''));
+      if(managerPos)return `POSITION:${managerPos.id}`;
+    }
+    return state.user?.id?`USER:${state.user.id}`:'';
+  }
+  function addReviewInterval(base,value,unit){
+    const d=new Date((base||today())+'T12:00:00'),n=Math.max(1,Number(value)||12);
+    if(unit==='DAYS')d.setDate(d.getDate()+n);
+    else if(unit==='YEARS')d.setFullYear(d.getFullYear()+n);
+    else d.setMonth(d.getMonth()+n);
+    return d.toISOString().slice(0,10);
+  }
+  function reviewFreq(d){return {value:Number(d?.review_frequency_value)||12,unit:d?.review_frequency_unit||'MONTHS'}}
+  function reviewFrequencyHtml(prefix,d){
+    const f=reviewFreq(d),key=`${f.value}|${f.unit}`,known=['3|MONTHS','6|MONTHS','12|MONTHS','24|MONTHS','36|MONTHS'],preset=known.includes(key)?key:'CUSTOM';
+    return `<label>Review frequency<select id="${prefix}ReviewFreq">
+      <option value="3|MONTHS" ${preset==='3|MONTHS'?'selected':''}>Every 3 months</option>
+      <option value="6|MONTHS" ${preset==='6|MONTHS'?'selected':''}>Every 6 months</option>
+      <option value="12|MONTHS" ${preset==='12|MONTHS'?'selected':''}>Every 12 months</option>
+      <option value="24|MONTHS" ${preset==='24|MONTHS'?'selected':''}>Every 24 months</option>
+      <option value="36|MONTHS" ${preset==='36|MONTHS'?'selected':''}>Every 36 months</option>
+      <option value="CUSTOM" ${preset==='CUSTOM'?'selected':''}>Custom…</option></select>
+      <span class="muted">Default 12 months; can be overridden.</span></label>
+      <div id="${prefix}ReviewFreqCustom" class="form-grid full" ${preset==='CUSTOM'?'':'hidden'}>
+        <label>Every<input id="${prefix}ReviewFreqValue" type="number" min="1" value="${f.value}"></label>
+        <label>Unit<select id="${prefix}ReviewFreqUnit"><option value="DAYS" ${f.unit==='DAYS'?'selected':''}>Days</option><option value="MONTHS" ${f.unit==='MONTHS'?'selected':''}>Months</option><option value="YEARS" ${f.unit==='YEARS'?'selected':''}>Years</option></select></label>
+      </div>`;
+  }
+  function getReviewFreq(prefix){
+    const p=$(`${prefix}ReviewFreq`)?.value||'12|MONTHS';
+    if(p==='CUSTOM')return {value:Math.max(1,Number($(`${prefix}ReviewFreqValue`)?.value)||12),unit:$(`${prefix}ReviewFreqUnit`)?.value||'MONTHS'};
+    const [v,u]=p.split('|');return {value:Number(v)||12,unit:u||'MONTHS'};
+  }
+  function wireReviewFreq(prefix,baseId,nextId){
+    const recalc=()=>{const f=getReviewFreq(prefix),next=$(nextId);if(next)next.value=addReviewInterval($(baseId)?.value||today(),f.value,f.unit)};
+    $(`${prefix}ReviewFreq`)?.addEventListener('change',()=>{const custom=$(`${prefix}ReviewFreqCustom`);if(custom)custom.hidden=$(`${prefix}ReviewFreq`).value!=='CUSTOM';recalc()});
+    $(`${prefix}ReviewFreqValue`)?.addEventListener('input',recalc);
+    $(`${prefix}ReviewFreqUnit`)?.addEventListener('change',recalc);
+    $(baseId)?.addEventListener('change',recalc);
   }
 
   function folderControlsHtml(){
@@ -134,18 +262,23 @@
   function audienceEditorHtml(prefix,selectedRows=[],dueDays=14){
     const every=selectedRows.some(x=>x.target_type==='EVERYONE');
     const deps=new Set(selectedRows.filter(x=>x.target_type==='DEPARTMENT').map(x=>x.department_id));
+    const poss=new Set(selectedRows.filter(x=>x.target_type==='POSITION').map(x=>x.position_id));
     const users=new Set(selectedRows.filter(x=>x.target_type==='USER').map(x=>x.user_id));
     const depHtml=(state.departments||[]).filter(x=>x.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(d=>
       `<label><input type="checkbox" data-${prefix}-dep value="${d.id}" ${deps.has(d.id)?'checked':''}> <span>${esc(d.name)}</span></label>`).join('');
+    const posHtml=positions.filter(x=>x.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>{
+      const holders=currentHolders(p.id).map(personNameV21123).filter(Boolean);
+      return `<label><input type="checkbox" data-${prefix}-position value="${p.id}" ${poss.has(p.id)?'checked':''}> <span><strong>${esc(p.name)}</strong>${holders.length?` <span class="muted">· ${esc(holders.join(', '))}</span>`:' <span class="muted">· vacant</span>'}</span></label>`;
+    }).join('');
     const peopleHtml=(state.people||[]).filter(x=>x.active!==false&&x.report_only!==true).sort((a,b)=>String(a.display_name||a.email||'').localeCompare(String(b.display_name||b.email||''))).map(p=>
-      `<label><input type="checkbox" data-${prefix}-user value="${p.id}" ${users.has(p.id)?'checked':''}> <span>${esc(p.display_name||p.email||'User')}</span></label>`).join('');
-    return `<div class="full"><h4>Who needs to read it?</h4><p class="muted">Reading is an acknowledgement, not formal training. The exact approved version opened/read is recorded.</p>
-      <label class="check-row"><input id="${prefix}Everyone" type="checkbox" ${every?'checked':''}> Everyone</label>
-      <div class="form-grid">
-        <div><strong>Departments</strong><div class="generic-audience-v21119">${depHtml||'<span class="muted">No departments.</span>'}</div></div>
-        <div><strong>Specific people</strong><div class="generic-audience-v21119">${peopleHtml||'<span class="muted">No people.</span>'}</div></div>
+      `<label><input type="checkbox" data-${prefix}-user value="${p.id}" ${users.has(p.id)?'checked':''}> <span>${esc(personOptionLabel(p.id))}</span></label>`).join('');
+    return `<div class="full v21123-native-controls"><div class="row-between"><div><h4>Who needs to read it?</h4><p class="muted">Assign by department, position or person. Position assignments follow the current position holder.</p></div><label class="check-row"><input id="${prefix}Everyone" type="checkbox" ${every?'checked':''}> <strong>Everyone / whole hotel</strong></label></div>
+      <div class="v21123-reader-grid">
+        <details class="v21123-reader-box" ${deps.size?'open':''}><summary>Departments${deps.size?` · ${deps.size}`:''}</summary><div class="generic-audience-v21119">${depHtml||'<span class="muted">No departments.</span>'}</div></details>
+        <details class="v21123-reader-box" ${poss.size?'open':''}><summary>Positions${poss.size?` · ${poss.size}`:''}</summary><div class="generic-audience-v21119">${posHtml||'<span class="muted">No positions.</span>'}</div></details>
+        <details class="v21123-reader-box" ${users.size?'open':''}><summary>Specific people${users.size?` · ${users.size}`:''}</summary><div class="generic-audience-v21119">${peopleHtml||'<span class="muted">No people.</span>'}</div></details>
       </div>
-      <label>Read within (days)<input id="${prefix}DueDays" type="number" min="0" max="3650" value="${Number(dueDays)||14}"></label>
+      <label class="v21123-read-days">Read within (days)<input id="${prefix}DueDays" type="number" min="0" max="3650" value="${Number(dueDays)||14}"></label>
     </div>`;
   }
 
@@ -153,6 +286,7 @@
     return {
       everyone:!!$(`${prefix}Everyone`)?.checked,
       departments:[...document.querySelectorAll(`[data-${prefix}-dep]:checked`)].map(x=>x.value),
+      positions:[...document.querySelectorAll(`[data-${prefix}-position]:checked`)].map(x=>x.value),
       users:[...document.querySelectorAll(`[data-${prefix}-user]:checked`)].map(x=>x.value),
       dueDays:Math.max(0,Math.min(3650,Number($(`${prefix}DueDays`)?.value)||14))
     };
@@ -164,13 +298,15 @@
     const rows=[];
     if(sel.everyone)rows.push({document_id:documentId,target_type:'EVERYONE',due_days:sel.dueDays,created_by:state.user.id});
     if(!sel.everyone){
-      for(const id of sel.departments)rows.push({document_id:documentId,target_type:'DEPARTMENT',department_id:id,due_days:sel.dueDays,created_by:state.user.id});
-      for(const id of sel.users)rows.push({document_id:documentId,target_type:'USER',user_id:id,due_days:sel.dueDays,created_by:state.user.id});
+      for(const id of sel.departments||[])rows.push({document_id:documentId,target_type:'DEPARTMENT',department_id:id,due_days:sel.dueDays,created_by:state.user.id});
+      for(const id of sel.positions||[])rows.push({document_id:documentId,target_type:'POSITION',position_id:id,due_days:sel.dueDays,created_by:state.user.id});
+      for(const id of sel.users||[])rows.push({document_id:documentId,target_type:'USER',user_id:id,due_days:sel.dueDays,created_by:state.user.id});
     }
     if(rows.length){
       const ins=await sb.from('document_read_audiences_v21119').insert(rows);
       if(ins.error)throw ins.error;
     }
+    audiences=audiences.filter(x=>x.document_id!==documentId).concat(rows);
   }
 
   function showFolderEditor(id=''){
@@ -198,29 +334,41 @@
 
   function currentAudienceRows(docId){return audiences.filter(x=>x.document_id===docId)}
 
-  function showCreatePlain(templateId=''){
+  async function showCreatePlain(templateId=''){
+    await loadManagerData();
     if(!folders.length)return toast('Create a document folder first.');
     const t=templateId?state.documents.find(x=>x.id===templateId):null;
     const tv=t?(currentApproved(t)||api.currentVersion(t.id)):null;
     const content=tv?.editable_content||'';
     const selectedFolder=t?.folder_id||selectedFolderId||folders[0].id;
     const sourceAudience=t?currentAudienceRows(t.id):[];
-    const due=sourceAudience[0]?.due_days||14;
-    openModal(t?'Create document from template':'New plain controlled document / template',`<div class="form-grid">
+    const due=sourceAudience[0]?.due_days||14,issue=today(),freq=reviewFreq(t),review=addReviewInterval(issue,freq.value,freq.unit);
+    openModal(t?'Create document from template':'New plain controlled document / template',`<div class="form-grid v21123-native-controls" data-v21123-native-controls="1">
       <label>Folder<select id="v21119DocFolder">${folderOptions(selectedFolder)}</select></label>
       <label>Kind<select id="v21119DocKind"><option value="OTHER" ${t?.doc_type==='OTHER'?'selected':''}>Information</option><option value="POLICY" ${t?.doc_type==='POLICY'?'selected':''}>Policy</option><option value="PROCEDURE" ${t?.doc_type==='PROCEDURE'?'selected':''}>Procedure</option></select></label>
       <label>Title<input id="v21119DocTitle" placeholder="Document title"></label>
       <label>Reference (optional)<input id="v21119DocRef" placeholder="e.g. INFO-001"></label>
-      <label>Issue date<input id="v21119DocIssue" type="date" value="${today()}"></label>
-      <label>Review date<input id="v21119DocReview" type="date" value="${plusYear(today())}"></label>
-      <label>Responsible for review — name or title<input id="v21119ReviewOwner" value="${esc(t?.review_responsibility||'')}" placeholder="e.g. Maintenance Manager"></label>
-      <label>Responsible for approval — name or title<input id="v21119ApprovalOwner" value="${esc(t?.approval_responsibility||'')}" placeholder="e.g. General Manager"></label>
+      <label>Issue date<input id="v21119DocIssue" type="date" value="${issue}"></label>
+      ${reviewFrequencyHtml('v21123Create',t)}
+      <label>Next review date<input id="v21119DocReview" type="date" value="${review}"><span class="muted">Calculated from review frequency; exact date can be changed.</span></label>
+      <label>Responsible for review<select id="v21123CreateReviewResponsible">${responsibilityOptions(responsibilityValue(t,'review'))}</select><span class="muted">Position or named user.</span></label>
+      <label>Responsible for approval<select id="v21123CreateApprovalResponsible">${responsibilityOptions(responsibilityValue(t,'approval'))}</select><span class="muted">Position or named user.</span></label>
       <label class="check-row full"><input id="v21119IsTemplate" type="checkbox"> Save this as a reusable template</label>
       <label class="full">Document content<textarea id="v21119DocContent" class="generic-doc-content-v21119" placeholder="Paste or type the document information here.">${esc(content)}</textarea></label>
       ${audienceEditorHtml('v21119Create',sourceAudience,due)}
     </div>
     <div class="hint-box">The first version is created as <strong>v1 Pending approval</strong>. It must be opened and approved through the normal controlled-document workflow before assigned readers can use it.</div>
     <div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21119-save-plain data-template-source="${esc(templateId)}">Create pending document</button></div>`);
+    wireReviewFreq('v21123Create','v21119DocIssue','v21119DocReview');
+    const apply=()=>{
+      const sel=readAudienceSelection('v21119Create'),s=suggestedResponsible(sel);
+      const r=$('v21123CreateReviewResponsible'),a=$('v21123CreateApprovalResponsible');
+      if(r&&!r.dataset.manual&&s)r.value=s;if(a&&!a.dataset.manual&&s)a.value=s;
+    };
+    $('v21123CreateReviewResponsible')?.addEventListener('change',e=>e.target.dataset.manual='1');
+    $('v21123CreateApprovalResponsible')?.addEventListener('change',e=>e.target.dataset.manual='1');
+    $('modalBody')?.addEventListener('change',e=>{if(e.target.matches('#v21119CreateEveryone,[data-v21119Create-dep],[data-v21119Create-position]'))apply()});
+    if(!t)apply();
   }
 
   function makePdfBlob(meta,content){
@@ -257,8 +405,10 @@
   async function savePlain(templateId=''){
     if(!isManager())return;
     const folder_id=$('v21119DocFolder')?.value||null,title=clean($('v21119DocTitle')?.value),reference=clean($('v21119DocRef')?.value).toUpperCase()||null;
-    const doc_type=$('v21119DocKind')?.value||'OTHER',issue=$('v21119DocIssue')?.value||today(),review=$('v21119DocReview')?.value||plusYear(issue);
-    const review_responsibility=clean($('v21119ReviewOwner')?.value)||null,approval_responsibility=clean($('v21119ApprovalOwner')?.value)||null;
+    const doc_type=$('v21119DocKind')?.value||'OTHER',issue=$('v21119DocIssue')?.value||today();
+    const freq=getReviewFreq('v21123Create'),review=$('v21119DocReview')?.value||addReviewInterval(issue,freq.value,freq.unit);
+    const reviewSel=$('v21123CreateReviewResponsible')?.value||'',approvalSel=$('v21123CreateApprovalResponsible')?.value||'';
+    const resp={...responsibilityPayload(reviewSel,'review'),...responsibilityPayload(approvalSel,'approval')};
     const is_template=!!$('v21119IsTemplate')?.checked,content=clean($('v21119DocContent')?.value);
     const aud=readAudienceSelection('v21119Create');
     if(!folder_id)return toast('Choose a folder.');
@@ -269,7 +419,7 @@
     const pdf=makePdfBlob({title,reference,version,issue},content);
     const dIns=await sb.from('documents').insert({
       id:documentId,title,reference,doc_type,status:'ACTIVE',created_by:state.user.id,
-      folder_id,is_template,content_mode:'PLAIN_TEXT',review_responsibility,approval_responsibility,
+      folder_id,is_template,content_mode:'PLAIN_TEXT',review_frequency_value:freq.value,review_frequency_unit:freq.unit,...resp,
       created_from_document_id:templateId||null
     });
     if(dIns.error)return toast(dIns.error.message);
@@ -289,30 +439,41 @@
     closeModal();await api.refresh('Plain controlled document created as v1 Pending approval.');await loadManagerData();selectedFolderId=folder_id;ensureFolderWorkspace();
   }
 
-  function showGenericControls(docId){
+  async function showGenericControls(docId){
+    await loadManagerData();
     const d=state.documents.find(x=>x.id===docId);if(!d)return;
-    const rows=currentAudienceRows(docId),due=rows[0]?.due_days||14;
-    openModal('Folder, readers & responsibility',`<p><strong>${esc(d.reference?d.reference+' - ':'')}${esc(d.title)}</strong></p><div class="form-grid">
+    const rows=currentAudienceRows(docId),due=rows[0]?.due_days||14,v=pending(d)||currentApproved(d)||api.currentVersion(d.id),f=reviewFreq(d);
+    openModal('Folder, readers & responsibility',`<div class="v21123-native-controls" data-v21123-native-controls="1"><p><strong>${esc(d.reference?d.reference+' - ':'')}${esc(d.title)}</strong></p><div class="form-grid">
       <label>Folder<select id="v21119CtrlFolder"><option value="">Unfiled</option>${folderOptions(d.folder_id||'')}</select></label>
       <label class="check-row"><input id="v21119CtrlTemplate" type="checkbox" ${d.is_template?'checked':''}> Reusable template</label>
-      <label>Responsible for review — name or title<input id="v21119CtrlReviewOwner" value="${esc(d.review_responsibility||'')}"></label>
-      <label>Responsible for approval — name or title<input id="v21119CtrlApprovalOwner" value="${esc(d.approval_responsibility||'')}"></label>
+      <label>Responsible for review<select id="v21123CtrlReviewResponsible">${responsibilityOptions(responsibilityValue(d,'review'))}</select><span class="muted">Choose a position or active user.</span></label>
+      <label>Responsible for approval<select id="v21123CtrlApprovalResponsible">${responsibilityOptions(responsibilityValue(d,'approval'))}</select><span class="muted">Choose a position or active user.</span></label>
+      ${reviewFrequencyHtml('v21123Ctrl',d)}
+      <label>Next review date<input id="v21123CtrlReviewDate" type="date" value="${esc(v?.review_date||addReviewInterval(today(),f.value,f.unit))}"><span class="muted">Calculated from the frequency; exact date can be overridden.</span></label>
+      <input id="v21123CtrlBaseDate" type="hidden" value="${esc(v?.issue_date||today())}">
       ${audienceEditorHtml('v21119Ctrl',rows,due)}
-    </div><div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21119-save-controls="${docId}">Save controls</button></div>`);
+    </div><div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21119-save-controls="${docId}">Save controls</button></div></div>`);
+    wireReviewFreq('v21123Ctrl','v21123CtrlBaseDate','v21123CtrlReviewDate');
   }
 
   async function saveGenericControls(docId){
     const d=state.documents.find(x=>x.id===docId);if(!d)return;
+    const freq=getReviewFreq('v21123Ctrl'),reviewDate=$('v21123CtrlReviewDate')?.value||null;
+    const resp={...responsibilityPayload($('v21123CtrlReviewResponsible')?.value||'','review'),...responsibilityPayload($('v21123CtrlApprovalResponsible')?.value||'','approval')};
     const payload={
       folder_id:$('v21119CtrlFolder')?.value||null,
       is_template:!!$('v21119CtrlTemplate')?.checked,
-      review_responsibility:clean($('v21119CtrlReviewOwner')?.value)||null,
-      approval_responsibility:clean($('v21119CtrlApprovalOwner')?.value)||null
+      review_frequency_value:freq.value,review_frequency_unit:freq.unit,...resp
     };
     const up=await sb.from('documents').update(payload).eq('id',docId);
     if(up.error)return toast(up.error.message);
     try{await saveAudience(docId,readAudienceSelection('v21119Ctrl'))}catch(e){return toast(e.message||'Could not save reader audience.')}
-    closeModal();await api.refresh('Document folder, readers and responsibilities updated.');await loadManagerData();ensureFolderWorkspace();
+    const v=pending(d)||currentApproved(d)||api.currentVersion(d.id);
+    if(v&&reviewDate){
+      const vr=await sb.from('document_versions').update({review_date:reviewDate}).eq('id',v.id);
+      if(vr.error)return toast(`Controls saved, but review date failed: ${vr.error.message}`);
+    }
+    closeModal();await api.refresh('Document folder, readers, responsibilities and review frequency updated.');await loadManagerData();ensureFolderWorkspace();
   }
 
   function showEditText(docId){
@@ -358,10 +519,11 @@
 
   function audienceSummary(docId){
     const rows=currentAudienceRows(docId);if(!rows.length)return 'No required readers set';
-    if(rows.some(x=>x.target_type==='EVERYONE'))return 'Everyone';
+    if(rows.some(x=>x.target_type==='EVERYONE'))return 'Everyone / whole hotel';
     const deps=rows.filter(x=>x.target_type==='DEPARTMENT').map(x=>(state.departments||[]).find(d=>d.id===x.department_id)?.name).filter(Boolean);
+    const poss=rows.filter(x=>x.target_type==='POSITION').map(x=>positionName(x.position_id)).filter(Boolean);
     const users=rows.filter(x=>x.target_type==='USER').map(x=>(state.people||[]).find(p=>p.id===x.user_id)?.display_name).filter(Boolean);
-    return [...deps,...users].join(', ')||'Reader audience set';
+    return [...deps,...poss,...users].join(', ')||'Reader audience set';
   }
 
   function decorateDocumentModal(docId,mode='details'){

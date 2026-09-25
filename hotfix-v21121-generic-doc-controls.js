@@ -611,6 +611,7 @@
   async function decorateModal(){
     if(decorating)return;
     const body=$('modalBody');if(!body)return;
+    if(body.querySelector('[data-v21123-native-controls]'))return;
     decorating=true;
     try{
       if(body.querySelector('[data-v21119-save-plain]'))await decorateCreateModal();

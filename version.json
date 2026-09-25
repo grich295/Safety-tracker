@@ -1,6 +1,6 @@
 {
-  "version": "2.11.22",
-  "build_id": "v21122-training-restore-generic-controls-live-20260925",
+  "version": "2.11.23",
+  "build_id": "v21123-native-generic-doc-controls-20260925",
   "clean": true,
-  "notes": "Fixes the approval Training schedule regression and makes the v2.11.21 generic-document controls apply reliably even when a modal is opened before the long hotfix chain has finished loading. Training method/repeat/refresher controls remain visible. Generic documents now reliably replace free-text review/approval responsibility with Position/People dropdowns, use the tidied collapsible reader selector with Departments/Positions/Specific people, and expose editable review frequency/next review date. No database change beyond migrations already applied for v2.11.21."
+  "notes": "Rebuilds the generic-document controls natively inside the folder feature rather than relying on a later modal decorator. Folder/readers/responsibility now opens directly with Position/People dropdowns, review frequency, next review date, and a tidied collapsible reader selector for Departments, Positions and Specific people. Position responsibility and position read audiences use the configured Safety Tracker position data/current holders. Carries forward the v2.11.22 training-schedule visibility repair. No new SQL required; v2.11.21 database changes are already live."
 }
