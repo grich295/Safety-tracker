@@ -1,24 +1,19 @@
-SAFETY TRACKER v2.11.51 - ONE LOGIN + ORIGINAL SITE
+SAFETY TRACKER v2.11.52 - LOGIN FIX
 
 Upload ALL files in this ZIP to the Safety Tracker repository root.
 
-BACKEND IS ALREADY APPLIED:
-- Shared Inventory/Energy master-login endpoint deployed.
-- Safety master-session exchange deployed.
-- Safety shared-user provisioning/access endpoint deployed.
-- Main Hotel adopted as the Original Site and mapped to the shared master site.
-- No SQL needs to be run manually.
+ROOT CAUSE:
+v2.11.51 put the shared-login code inside the delayed hotfix loader.
+At the login screen that module was not running, so pressing Sign in never
+called the shared Inventory/Energy master login or the Safety session exchange.
 
-LOGIN:
-Safety now uses the SAME master email/username + password as Inventory/Energy.
-No separate Safety password is created when Safety access is switched on.
+FIX:
+v2.11.52 puts the shared-login handler directly inside config.js, which the
+login page always loads before the Safety core.
 
-PEOPLE & ACCESS:
-Use Give Safety access / Edit access.
-Choose Safety role, working view, Home Site and exact Safety sites.
-No site is assigned automatically.
+USE:
+Sign in to Safety with the SAME email/username and SAME password you currently
+use for Inventory/Energy.
 
-ORIGINAL SITE:
-Main Hotel is the original live Safety site.
-Its existing records stay there.
-New sites start clean.
+No database or Supabase changes are required. The v2.11.51 backend functions
+and Original Site database changes are already deployed.

@@ -1,6 +1,6 @@
 {
-  "version": "2.11.51",
-  "build_id": "v21151-master-login-original-site-20260925",
+  "version": "2.11.52",
+  "build_id": "v21152-direct-login-at-auth-screen-20260925",
   "clean": true,
-  "notes": "Moves Safety sign-in to the shared Inventory/Energy master account: same email/username and same password, while Safety keeps a hidden internal session for its existing database/RLS. Giving a shared user Safety access no longer creates a second credential; it provisions/links an internal Safety identity and applies only the selected Safety role/sites. Main Hotel is explicitly adopted and labelled as the Original Site. Existing records remain on Main Hotel and new sites remain clean. Includes the v2.11.50 Help/PPE setup layer."
+  "notes": "Fixes Safety sign-in after v2.11.51. The shared Inventory/Energy login now runs directly from config.js at the auth screen instead of waiting for the delayed hotfix loader. Same email/username and same password are retained. The v2.11.51 shared Safety access provisioning and Main Hotel Original Site work remain in place."
 }

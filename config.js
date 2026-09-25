@@ -3,6 +3,156 @@ window.SAFETY_TRACKER_CONFIG = {
   supabaseKey: "sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_"
 };
 
+/* v2.11.52 DIRECT SHARED LOGIN
+   This runs immediately from config.js at the login screen.
+   Do not move it back into the delayed hotfix loader.
+*/
+(function(){
+  if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21152)return;
+  window.__SAFETY_DIRECT_SHARED_LOGIN_V21152=true;
+
+  const MASTER_URL='https://zgmcxgumdsssngfgtmth.supabase.co';
+  const MASTER_KEY='sb_publishable_wRTwr1ZohznS-VLUjoSz2w_Nbv4qiZj';
+  const SAFETY_URL='https://qvgcralroduuoptbnctt.supabase.co';
+  const SAFETY_KEY='sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_';
+  const MASTER_LOGIN=MASTER_URL+'/functions/v1/master-login-v21151';
+  const EXCHANGE=SAFETY_URL+'/functions/v1/exchange-master-session-v21151';
+  const RESET_REDIRECT='https://grich295.github.io/inventory-tracker/';
+
+  let safetyClient=null;
+  const $=id=>document.getElementById(id);
+  const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
+
+  function client(){
+    if(safetyClient)return safetyClient;
+    if(!window.supabase)return null;
+    safetyClient=window.supabase.createClient(SAFETY_URL,SAFETY_KEY,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    });
+    return safetyClient;
+  }
+
+  function show(msg){
+    const box=$('authMessage');
+    if(box){box.hidden=false;box.textContent=msg}
+    else console.warn(msg);
+  }
+
+  function decorate(){
+    const input=$('loginEmail');
+    if(input){
+      input.type='text';
+      input.autocomplete='username';
+      input.placeholder='Email or username';
+      const label=input.closest('label');
+      if(label){
+        for(const n of [...label.childNodes]){
+          if(n.nodeType===Node.TEXT_NODE){n.textContent='Email or username';break}
+        }
+      }
+    }
+    const form=$('loginForm');
+    if(form&&!form.querySelector('.master-login-note-v21152')){
+      const note=document.createElement('div');
+      note.className='hint-box master-login-note-v21152';
+      note.innerHTML='<strong>One login:</strong> use the same email/username and password as Inventory/Energy.';
+      form.insertAdjacentElement('afterbegin',note);
+    }
+    const forgot=$('forgotPasswordBtn');
+    if(forgot)forgot.textContent='Forgot shared password?';
+  }
+
+  async function post(url,body,key){
+    const r=await fetch(url,{
+      method:'POST',
+      headers:{'content-type':'application/json','apikey':key},
+      body:JSON.stringify(body)
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data?.error||data?.message||('Request failed '+r.status));
+    return data;
+  }
+
+  async function signIn(identifier,password){
+    const master=await post(MASTER_LOGIN,{identifier,password},MASTER_KEY);
+    if(!master?.access_token)throw new Error('Shared login did not return a valid session.');
+
+    const exchange=await post(EXCHANGE,{master_access_token:master.access_token},SAFETY_KEY);
+    if(!exchange?.token_hash)throw new Error(exchange?.error||'Safety access is not enabled for this account.');
+
+    const sb=client();
+    if(!sb)throw new Error('Safety sign-in is still loading. Refresh once.');
+    const {data,error}=await sb.auth.verifyOtp({
+      token_hash:exchange.token_hash,
+      type:'magiclink'
+    });
+    if(error)throw error;
+    if(!data?.session)throw new Error('Safety session was not created.');
+    return data.session;
+  }
+
+  async function handleSubmit(e){
+    if(e.target?.id!=='loginForm')return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    decorate();
+    const identifier=clean($('loginEmail')?.value);
+    const password=$('loginPassword')?.value||'';
+    if(!identifier||!password)return show('Enter your email/username and password.');
+
+    const box=$('authMessage');if(box)box.hidden=true;
+    const btn=$('loginSubmitBtn');
+    const boot=$('loginBootStatus');
+    if(btn){btn.disabled=true;btn.textContent='Signing in…'}
+    if(boot)boot.textContent='Checking shared login…';
+
+    try{
+      await signIn(identifier,password);
+      if(boot)boot.textContent='Signed in. Opening Safety Tracker…';
+      location.reload();
+    }catch(err){
+      console.error('Safety shared login',err);
+      if(boot)boot.textContent='Ready to sign in.';
+      show(err?.message||'Sign-in failed.');
+      if(btn){btn.disabled=false;btn.textContent='Sign in'}
+    }
+  }
+
+  async function handleForgot(e){
+    if(!e.target.closest?.('#forgotPasswordBtn'))return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    decorate();
+    const identifier=clean($('loginEmail')?.value);
+    if(!identifier)return show('Enter your email address or username first.');
+    if(!identifier.includes('@')){
+      return show('Username-only account: ask an Admin to reset the shared password. That reset applies to Inventory, Energy and Safety.');
+    }
+
+    try{
+      const master=window.supabase.createClient(MASTER_URL,MASTER_KEY,{
+        auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
+      });
+      const {error}=await master.auth.resetPasswordForEmail(identifier,{redirectTo:RESET_REDIRECT});
+      if(error)throw error;
+      show('Shared password reset email sent. The new password is used for Inventory, Energy and Safety.');
+    }catch(err){
+      show(err?.message||'Could not send the shared password reset email.');
+    }
+  }
+
+  // config.js is loaded before the Safety core, so these capture handlers
+  // always win over the old Safety-specific login handlers.
+  window.addEventListener('submit',handleSubmit,true);
+  window.addEventListener('click',handleForgot,true);
+
+  document.addEventListener('DOMContentLoaded',decorate,{once:true});
+  window.addEventListener('pageshow',()=>setTimeout(decorate,40));
+  [40,150,400,900,1800].forEach(ms=>setTimeout(decorate,ms));
+})();
+
 (function(){
   if(window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED)return;
   window.__SAFETY_HOTFIX_LOADER_V21113_CONFIGURED=true;
@@ -94,7 +244,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21151';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21152';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
