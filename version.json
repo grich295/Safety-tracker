@@ -1,6 +1,6 @@
 {
-  "version": "2.11.30",
-  "build_id": "v21130-people-filter-dropdown-stability-20260925",
+  "version": "2.11.31",
+  "build_id": "v21131-universal-approval-scope-move-classify-20260925",
   "clean": true,
-  "notes": "Carries forward v2.11.29 approval modal repair. Fixes the People screen Active/Disabled/Recommended/All dropdown and search field being replaced by legacy retention decoration refreshes while in use. Preserves the focused native control and selected value during People-view DOM updates so the dropdown remains open long enough to select an option. No SQL required."
+  "notes": "Supersedes v2.11.29 approval handling. Adds a final universal approval scope layer. RA/COSHH/SSW always expose Everyone, Departments and specific people even when the core audience decorator fails; Policy/Procedure/Other also support Positions. Uses the core approval IDs/classes so legacy responsibility checks see the selected scope. Restores review frequency and Next review date deterministically. Adds Move / classify to every document so Admin/Manager can change document type/index and custom folder at any time without re-uploading or losing version/history. Carries forward People-filter stability. No SQL required."
 }
