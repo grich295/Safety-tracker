@@ -44,6 +44,7 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21089-site-location-tile.js','v21089-site-location-tile'],
       ['hotfix-v21090-responsibility-location-tree.js','v21090-responsibility-location-tree'],
       ['hotfix-v21091-report-evidence-retention.js','v21091-report-evidence-retention'],
+      ['hotfix-v21147-users-targeted-incident-review.js','v21147-users-targeted-incident-review'],
       ['hotfix-v21092-incident-review.js','v21092-incident-review'],
       ['hotfix-v21093-asbestos-location-cleanup.js','v21093-asbestos-location-cleanup'],
       ['hotfix-v21094-report-scope.js','v21094-report-scope'],
@@ -91,7 +92,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21146';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21147';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

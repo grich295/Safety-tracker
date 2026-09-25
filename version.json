@@ -1,6 +1,6 @@
 {
-  "version": "2.11.46",
-  "build_id": "v21146-global-people-site-specific-access-20260925",
+  "version": "2.11.47",
+  "build_id": "v21147-shared-users-targeted-incident-review-20260925",
   "clean": true,
-  "notes": "Clarifies and enforces People vs Site access. The global People & Access directory shows the shared Inventory/Energy users, but they are not automatically assigned to a Safety site. New Safety sites now start with only the Admin who creates the site. Sites has explicit Manage people controls for active Safety accounts. Viewer Access setup remains removed from Admin. Supabase create-site RPC has already been updated to creator-only initial access."
+  "notes": "Fixes the shared Inventory/Energy user directory visibility in Safety by using the corrected authenticated table permission. Redirects People entry points to the consolidated People & Access screen. Changes incident/policy review from department-wide scope to targeted controlled-document selection: choose the relevant RA/COSHH RA/SSW/etc, then only directly linked documents and linked TBT/training are included automatically. No whole department is flagged. New-site creator-only access from v2.11.46 remains in force."
 }
