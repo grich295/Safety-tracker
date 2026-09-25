@@ -1,6 +1,6 @@
 {
-  "version": "2.11.41",
-  "build_id": "v21141-people-page-flicker-root-fix-20260925",
+  "version": "2.11.42",
+  "build_id": "v21142-sites-admin-ui-20260925",
   "clean": true,
-  "notes": "Root fix for remaining People/Management flicker on Android. Guards the v2.10.91 body-wide People observer and stops its Search/Status toolbar being rebuilt with innerHTML while in use. Also retains the v2.11.40 broad-observer guard. Native People search/status controls stay mounted, so the status dropdown should remain open and selectable. No SQL/database change required."
+  "notes": "Adds a first-class Sites tile to Admin & Setup with a dedicated site-management interface. Admin can create a new clean Safety site from a proper form, see site status/current site/assigned-user counts, open READY sites, and jump to People & Access. New sites still follow the clean-start rule and remain SETUP REQUIRED until Safety site isolation is ready. No database change required; uses the existing v2.11.38 clean-site RPC. No body-wide DOM observer is used."
 }
