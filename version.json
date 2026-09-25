@@ -1,6 +1,6 @@
 {
-  "version": "2.11.29",
-  "build_id": "v21129-approval-modal-final-repair-20260925",
+  "version": "2.11.30",
+  "build_id": "v21130-people-filter-dropdown-stability-20260925",
   "clean": true,
-  "notes": "Replaces the v2.11.27 Policy/Procedure approval scope handler with a robust native checkbox selector for Everyone, Departments, Positions and specific people. Reader scope is saved before approval. Restores document review frequency and Next review date directly in every non-SDS approval modal and persists both on approval. RA/COSHH/SSW formal training audience remains unchanged. Carries forward v2.11.26 scroll/freeze protection and v2.11.28 generic reader layout fixes. No SQL required."
+  "notes": "Carries forward v2.11.29 approval modal repair. Fixes the People screen Active/Disabled/Recommended/All dropdown and search field being replaced by legacy retention decoration refreshes while in use. Preserves the focused native control and selected value during People-view DOM updates so the dropdown remains open long enough to select an option. No SQL required."
 }
