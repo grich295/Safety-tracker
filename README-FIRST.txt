@@ -1,20 +1,30 @@
-SAFETY TRACKER v2.11.42 - SITES USER INTERFACE
+SAFETY TRACKER v2.11.43
 
 Upload these 3 files to the Safety Tracker repository root:
 - config.js
-- hotfix-v21142-sites-ui.js
+- hotfix-v21143-stability-shared-users.js
 - version.json
 
-No Supabase/database update is required.
+DATABASE/BACKEND:
+Already applied. Do not run SQL manually.
+- Safety shared_app_users_v21143 mirror table created.
+- Shared Inventory/Energy export edge function deployed.
+- Safety admin-only sync edge function deployed.
 
-What changes:
-- Admin & Setup gets a clear SITES tile.
-- Sites opens a dedicated management screen.
-- CREATE NEW SITE opens a proper form instead of relying on prompts.
-- New sites start with clear operational records.
-- Site cards show READY / SETUP REQUIRED / CURRENT status and assigned-user count.
-- READY sites can be opened from the Sites screen.
-- SETUP REQUIRED sites remain protected until Safety site isolation is complete.
-- People & Access is linked directly from the Sites screen.
-- The older v2.11.39 injected Sites card is hidden so there is only one Sites interface.
-- No body-wide MutationObserver is used, to avoid reintroducing the mobile flicker issue.
+WHAT THIS FIXES:
+1. Remaining mobile flicker:
+   Legacy hotfixes were still watching the entire BODY or #appView and changing
+   the DOM they were observing. v2.11.43 blocks those whole-app observers.
+   Scoped observers for modals and specific lists remain available.
+
+2. Inventory users in Safety:
+   Safety > People now has an "All app users" section.
+   It lists the shared Inventory/Energy directory and badges each user's
+   Inventory, Energy and Safety status.
+   Admin opening Safety triggers a directory sync automatically.
+   "Sync users" is also available manually.
+
+IMPORTANT:
+Seeing a user in All app users does NOT grant them Safety access. Safety auth
+is still a separate Supabase project, so Safety access remains independently
+controlled until authentication is consolidated across the apps.

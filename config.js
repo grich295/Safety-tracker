@@ -10,6 +10,7 @@ window.SAFETY_TRACKER_CONFIG = {
   const scripts=[
       ['hotfix-v21113-runtime-stability.js','v21113-runtime-stability'],
       ['hotfix-v21125-modal-observer-governor.js','v21125-modal-observer-governor'],
+      ['hotfix-v21143-stability-shared-users.js','v21143-stability-shared-users'],
       ['hotfix-v21140-flicker-guard.js','v21140-flicker-guard'],
       ['hotfix-v21141-people-flicker-root.js','v21141-people-flicker-root'],
       ['hotfix-v21055-training-packs.js','v21055-training-packs'],
@@ -95,7 +96,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21142';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21143';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
