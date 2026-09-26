@@ -1,6 +1,6 @@
 {
-  "version": "2.11.57",
-  "build_id": "v21157-profile-training-permission-20260926",
+  "version": "2.11.58",
+  "build_id": "v21158-hod-profile-visible-instructor-20260926",
   "clean": true,
-  "notes": "Adds an explicit profile permission 'Can carry out instructor-led training'. Department Manager remains the automatic responsible owner for whole-site instructor-led training. Managers/Admins may always deliver; a User/Supervisor with this profile permission may deliver training for people in their own Department(s) without receiving full Manager access. The permission is available in People & Access for shared accounts and Safety-only accounts. Manual responsibility override remains available and may target authorised Training Instructors. Includes v2.11.56 responsibility, v2.11.55 Groups and v2.11.54 one-login/cache recovery."
+  "notes": "Makes the training-instructor option obvious via a dedicated Profile permissions control in People & Access. Adds one Head of Department (HOD) per department: HOD is selected in the person's profile and automatically becomes the Department Manager / responsible owner for the department from their Main/Default position. The database enforces one HOD per department. Multiple Supervisors remain allowed because Supervisor is a normal multi-holder position/title. Supervisors can be authorised to train by ticking Can carry out instructor-led training. The automatic Department Managers group now contains only the active HODs. Includes v2.11.57 instructor delivery logic, v2.11.55 Groups and v2.11.54 one-login/cache recovery."
 }
