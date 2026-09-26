@@ -1,6 +1,6 @@
 {
-  "version": "2.11.64",
-  "build_id": "v21164-pack-tbt-manager-cycle-20260926",
+  "version": "2.11.66",
+  "build_id": "v21166-people-department-oversight-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Adds controlled Word document packs with bulk upload/search/version history, independent file review schedules, configurable annual whole-pack acknowledgement date (January default only), 60/90-day recent-starter grace, exact acknowledgement version snapshots and audit reporting. Material file changes require that file only unless Major pack-wide change is selected. Toolbox Talks are additional instructor-led top-up reminders with frequency configured at Group level only and randomized/spread scheduling through the year. Preserves audited creator/uploader instructor-led self-completion only for authorised trainers. Adds Admin to Manager mode so Admin can work in primary-department scope while Admin mode retains all-department visibility. Includes the existing v2.11.58 HOD/instructor-profile controls in the loaded replacement hotfix. Database migrations for v2.11.63/v2.11.64 are already applied."
+  "notes": "Cumulative Safety Tracker build. Preserves v2.11.65 controlled document-set annual/individual review controls and all prior pack/TBT/Manager features. Simplifies People & Access so Main Department is selected directly and is independent from Main Position, with optional additional Departments and Positions. Official HOD is tied to Main Department. Adds Operational Overseer as a separate multi-Department responsibility that does not replace the official HOD. Manager mode can work across all managed/overseen Departments or drill into one selected Department. New Safety users default to the Safety site from which they are created. Existing HOD/profile compatibility functions now use Main Department rather than deriving Department from Position. Database changes for v2.11.66 are already applied."
 }
