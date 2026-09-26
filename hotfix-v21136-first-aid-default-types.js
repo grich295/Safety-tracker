@@ -378,12 +378,36 @@
     wireAugmentedModal(isNew);
   }
   async function openEnhancedEdit(userId){
-    const ctl=window.SafetyPeopleDepartmentScopeV21166;if(!ctl?.open)return toast('User setup is still loading.');
-    await ctl.open(userId);await augmentPersonModal({userId,isNew:false});
+    try{
+      const ctl=window.SafetyPeopleDepartmentScopeV21166;
+      if(!ctl?.open){toast('User setup is still loading.');return false}
+      await ctl.open(userId);
+      const modal=$('modal');
+      if(!modal?.open)throw new Error('The user editor did not open.');
+      await augmentPersonModal({userId,isNew:false});
+      if(!$('modalBody')?.querySelector('[data-v21168-save-user]'))throw new Error('The full user setup did not finish loading.');
+      return true;
+    }catch(e){
+      console.error('Safety v2.11.69 Edit User',e);
+      toast(e?.message||'Could not open User setup.');
+      return false;
+    }
   }
   async function openEnhancedCreate(){
-    const ctl=window.SafetyPeopleDepartmentScopeV21166;if(!ctl?.create)return toast('User setup is still loading.');
-    await ctl.create({});await augmentPersonModal({isNew:true});
+    try{
+      const ctl=window.SafetyPeopleDepartmentScopeV21166;
+      if(!ctl?.create){toast('User setup is still loading.');return false}
+      await ctl.create({});
+      const modal=$('modal');
+      if(!modal?.open)throw new Error('The new user editor did not open.');
+      await augmentPersonModal({isNew:true});
+      if(!$('modalBody')?.querySelector('[data-v21168-create-user]'))throw new Error('The full new-user setup did not finish loading.');
+      return true;
+    }catch(e){
+      console.error('Safety v2.11.69 Create User',e);
+      toast(e?.message||'Could not open new User setup.');
+      return false;
+    }
   }
 
   async function saveEnhancedExisting(userId,btn){
@@ -447,8 +471,8 @@
       const ep=e.target.closest?.('[data-v21168-edit-position]');if(ep){e.preventDefault();openPositionEditor(ep.dataset.v21168EditPosition);return}
       const tp=e.target.closest?.('[data-v21168-toggle-position]');if(tp){e.preventDefault();togglePosition(tp.dataset.v21168TogglePosition,tp.dataset.active==='1');return}
       const sp=e.target.closest?.('[data-v21168-save-position]');if(sp){e.preventDefault();e.stopImmediatePropagation();savePosition(sp.dataset.v21168SavePosition,sp);return}
-      if(e.target.closest?.('[data-v21168-new-user]')){e.preventDefault();openEnhancedCreate();return}
-      const eu=e.target.closest?.('[data-v21168-edit-user]');if(eu){e.preventDefault();openEnhancedEdit(eu.dataset.v21168EditUser);return}
+      if(e.target.closest?.('[data-v21168-new-user]')){e.preventDefault();e.stopImmediatePropagation();void openEnhancedCreate();return}
+      const eu=e.target.closest?.('[data-v21168-edit-user]');if(eu){e.preventDefault();e.stopImmediatePropagation();void openEnhancedEdit(eu.dataset.v21168EditUser);return}
       const su=e.target.closest?.('[data-v21168-save-user]');if(su){e.preventDefault();e.stopImmediatePropagation();saveEnhancedExisting(su.dataset.v21168SaveUser,su);return}
       const cu=e.target.closest?.('[data-v21168-create-user]');if(cu){e.preventDefault();e.stopImmediatePropagation();saveEnhancedNew(cu);return}
       if(e.target.closest?.('#mainNav button[data-view="reports"]'))setTimeout(queueDecorate,120);
@@ -493,7 +517,114 @@
     const obs=new MutationObserver(queueDecorate);const r=reportsView();if(r)obs.observe(r,{childList:true,subtree:true});
     [80,220,600,1200].forEach(ms=>setTimeout(queueDecorate,ms));
     if(history.state?.v21168Setup&&isAdmin())openSetup(history.state.v21168Setup,{push:false});
-    window.SafetySetupHubV21168={open:openSetup,reload:async()=>{await loadData(true);renderSetup(reportsView()?.dataset.v21168Setup||'users');queueDecorate()}};
+    window.SafetySetupHubV21168={open:openSetup,editUser:openEnhancedEdit,createUser:openEnhancedCreate,reload:async()=>{await loadData(true);renderSetup(reportsView()?.dataset.v21168Setup||'users');queueDecorate()}};
   }
   boot().catch(e=>console.warn('Safety Tracker v2.11.68 Setup Hub',e));
+})();
+
+
+/* Safety Tracker v2.11.69 CLEAN
+   Instructor visibility + User editor reliability.
+   - Keeps Instructor visible for Admin/Manager, HOD/Department Manager, or a user with
+     "Can carry out instructor-led training" even after the core navigation refreshes.
+   - Re-checks instructor authority after profile/access changes and on page/navigation events.
+   - If the instructor module originally booted before permission was available, reloads that
+     module once after authority is confirmed.
+   - v2.11.68 User Edit/Create buttons now stop older handlers and surface any editor error.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_INSTRUCTOR_USER_EDITOR_FIX_V21169)return;
+  window.__SAFETY_INSTRUCTOR_USER_EDITOR_FIX_V21169=true;
+
+  let api=null,state=null,sb=null,allowed=false,resolving=false,reloadAttempted=false,observer=null;
+  const $=id=>document.getElementById(id);
+  const toast=m=>{try{api?.toast?.(m)}catch(_e){console.log(m)}};
+  const role=()=>String(state?.profile?.role||'').toLowerCase();
+  const activeAccount=()=>!!state?.user&&state?.profile?.report_only!==true;
+  const globalManager=()=>activeAccount()&&['admin','manager'].includes(role())&&!(role()==='admin'&&state?.uiMode==='user');
+
+  function instructorButton(){return document.querySelector('#mainNav button[data-view="instructor"]')}
+  function keepVisible(){
+    const b=instructorButton();
+    if(!b||!allowed)return;
+    if(b.hidden)b.hidden=false;
+    b.setAttribute('aria-hidden','false');
+  }
+
+  async function recoverInstructorModule(){
+    if(!allowed||window.SafetyInstructorResponsibilityV21156||reloadAttempted)return;
+    const old=document.querySelector('script[data-safety-loader-v21113="hotfix-v21157-instructor-permission.js"]');
+    if(!old?.src)return;
+    reloadAttempted=true;
+    try{
+      window.__SAFETY_INSTRUCTOR_RESP_V21157=false;
+      const s=document.createElement('script');
+      s.async=false;
+      s.src=old.src+(old.src.includes('?')?'&':'?')+'repair=v21169';
+      s.onload=()=>setTimeout(()=>{keepVisible();try{window.SafetyInstructorResponsibilityV21156?.reload?.()}catch(_e){}},120);
+      s.onerror=()=>console.warn('Safety v2.11.69 could not reload instructor module');
+      (document.body||document.head||document.documentElement).appendChild(s);
+    }catch(e){console.warn('Safety v2.11.69 instructor module recovery',e)}
+  }
+
+  async function resolveAuthority(){
+    if(resolving||!sb||!state?.user)return;
+    resolving=true;
+    try{
+      if(globalManager())allowed=true;
+      else{
+        const [cap,hod]=await Promise.all([
+          sb.rpc('my_training_instructor_access_v21157'),
+          sb.rpc('my_department_manager_departments_v21156')
+        ]);
+        const row=cap.error?null:(Array.isArray(cap.data)?cap.data[0]:cap.data);
+        allowed=activeAccount()&&(row?.can_carry_out_training===true||(!hod.error&&(hod.data||[]).length>0));
+      }
+      keepVisible();
+      await recoverInstructorModule();
+    }catch(e){console.warn('Safety v2.11.69 instructor authority',e)}
+    finally{resolving=false}
+  }
+
+  function watchNav(){
+    const nav=$('mainNav');if(!nav||observer)return;
+    observer=new MutationObserver(muts=>{
+      if(!allowed)return;
+      for(const m of muts){
+        if(m.type==='attributes'||m.type==='childList'){queueMicrotask(keepVisible);break}
+      }
+    });
+    observer.observe(nav,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','style','class']});
+  }
+
+  function install(){
+    watchNav();
+    window.addEventListener('click',e=>{
+      const edit=e.target.closest?.('[data-v21168-edit-user]');
+      if(edit){
+        // v2.11.68 normally handles this first. This is a defensive fallback for a stale/rebuilt card.
+        setTimeout(()=>{
+          if(!$('modal')?.open)window.SafetySetupHubV21168?.editUser?.(edit.dataset.v21168EditUser);
+        },80);
+      }
+      if(e.target.closest?.('[data-v21168-save-user],[data-v21166-save-person],[data-v21158-save-profile],#mainNav button[data-view]')){
+        setTimeout(resolveAuthority,180);
+        setTimeout(keepVisible,420);
+      }
+    },true);
+    window.addEventListener('pageshow',()=>{setTimeout(resolveAuthority,80);setTimeout(keepVisible,350)});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){resolveAuthority();setTimeout(keepVisible,120)}});
+    [0,120,350,800,1600].forEach(ms=>setTimeout(()=>{resolveAuthority();keepVisible()},ms));
+    window.SafetyInstructorVisibilityV21169={refresh:resolveAuthority,show:keepVisible};
+  }
+
+  function boot(){
+    api=window.SafetyTrackerV2;
+    if(!api?.state||!api?.sb){setTimeout(boot,100);return}
+    state=api.state;sb=api.sb;
+    if(!state.user){setTimeout(boot,160);return}
+    install();
+  }
+  boot();
 })();
