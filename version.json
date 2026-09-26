@@ -1,6 +1,6 @@
 {
-  "version": "2.11.53",
-  "build_id": "v21153-shared-login-session-storage-fix-20260926",
+  "version": "2.11.54",
+  "build_id": "v21154-cache-recovery-shared-login-20260926",
   "clean": true,
-  "notes": "Fixes the remaining Safety login loop. The shared Inventory/Energy login and Safety OTP exchange were succeeding, but the Safety session was being stored under a different browser auth key from the one app-v21028.js reads. v2.11.53 uses the exact Safety core storage key, explicitly persists the session before reload, and removes the duplicate One login notice. No database change required."
+  "notes": "Fixes the phone remaining on cached v2.11.52 after newer files were uploaded. Fresh Safety service-worker cache generation deletes old safety-shell/runtime caches, forces network/no-store for config.js and version.json, and retains the v2.11.53 shared-session storage fix. Duplicate one-login panel remains suppressed. No database change required."
 }

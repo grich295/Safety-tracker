@@ -1,42 +1,65 @@
-const SHELL_CACHE='safety-shell-v21094-report-scope';
-const RUNTIME_CACHE='safety-runtime-v21094-report-scope';
-const SHELL=['./','./index.html','./styles-v21019.css','./app-v21028.js','./hotfix-v21046-baseline.js','./hotfix-v21055-training-packs.js','./hotfix-v21056-review-audit.js','./hotfix-v21057-linked-impact.js','./hotfix-v21058-app-created-ssw-revision.js','./hotfix-v21059-app-created-tbt-revision.js','./hotfix-v21060-refresher-method.js','./hotfix-v21061-retrain-now.js','./hotfix-v21062-revision-training-impact.js','./hotfix-v21063-pack-version-awareness.js','./hotfix-v21064-source-training-guard.js','./hotfix-v21065-strictest-method-wins.js','./hotfix-v21066-temporary-unsuitable.js','./hotfix-v21067-change-control-workflow.js','./hotfix-v21068-regression-hardening.js','./hotfix-v21069-positions-responsibilities.js','./hotfix-v21072-calendar-label-dedupe.js','./hotfix-v21073-register-downloads.js','./hotfix-v21074-register-pdf-pages.js','./hotfix-v21075-document-creation-toggle.js','./hotfix-v21076-help-document-links.js','./hotfix-v21077-creator-employees.js','./hotfix-v21078-ssw-ppe-tools.js','./hotfix-v21079-management-tiles.js','./hotfix-v21086-asbestos-catalogue.js','./hotfix-v21080-asbestos.js','./hotfix-v21082-asbestos-modal.js','./hotfix-v21083-admin-sections.js','./hotfix-v21084-tile-routes.js','./hotfix-v21085-admin-grouping.js','./hotfix-v21088-asbestos-full-analysis.js','./hotfix-v21087-asbestos-source-tools.js','./hotfix-v21089-site-location-tile.js','./hotfix-v21090-responsibility-location-tree.js','./hotfix-v21091-report-evidence-retention.js','./hotfix-v21092-incident-review.js','./hotfix-v21093-asbestos-location-cleanup.js','./hotfix-v21094-report-scope.js','./bulk-import-v21028.js','./demo-v2100.js','./config.js','./manifest.webmanifest','./version.json'];
-const RUNTIME=[
-'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
-'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',
-'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
-'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+const SHELL_CACHE='safety-shell-v21154-login-recovery';
+const RUNTIME_CACHE='safety-runtime-v21154-login-recovery';
+
+const SHELL=[
+  './',
+  './index.html',
+  './styles-v21019.css',
+  './config.js',
+  './app-v21028.js',
+  './hotfix-v21046-baseline.js',
+  './hotfix-v21151-master-login-original-site.js',
+  './hotfix-v21150-help-ppe-setup.js',
+  './version.json',
+  './manifest.webmanifest'
 ];
-self.addEventListener('install',e=>e.waitUntil(Promise.all([
-  caches.open(SHELL_CACHE).then(c=>Promise.all(SHELL.map(x=>c.add(x).catch(()=>null)))),
-  caches.open(RUNTIME_CACHE).then(c=>Promise.all(RUNTIME.map(x=>c.add(x).catch(()=>null))))
-]).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(Promise.all([
-  caches.keys().then(keys=>Promise.all(keys.filter(k=>/^safety-(?:shell|runtime)-/.test(k)&&![SHELL_CACHE,RUNTIME_CACHE].includes(k)).map(k=>caches.delete(k)))),
-  self.clients.claim()
-])));
-self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  const u=new URL(e.request.url);
-  if(u.searchParams.has('offline-file'))return;
-  if(e.request.mode==='navigate'){
-    e.respondWith(fetch(e.request).then(r=>{const cp=r.clone();caches.open(SHELL_CACHE).then(c=>c.put('./index.html',cp)).catch(()=>{});return r}).catch(()=>caches.match('./index.html')));
+
+self.addEventListener('install',event=>{
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    await Promise.all(keys.filter(k=>/^safety-(?:shell|runtime)-/i.test(k)).map(k=>caches.delete(k)));
+    const cache=await caches.open(SHELL_CACHE);
+    await Promise.all(SHELL.map(u=>cache.add(new Request(u,{cache:'reload'})).catch(()=>null)));
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener('activate',event=>{
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    await Promise.all(keys.filter(k=>/^safety-(?:shell|runtime)-/i.test(k)&&![SHELL_CACHE,RUNTIME_CACHE].includes(k)).map(k=>caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch',event=>{
+  if(event.request.method!=='GET')return;
+  const url=new URL(event.request.url);
+  if(url.searchParams.has('offline-file'))return;
+
+  // Never serve version/config from stale cache while online.
+  const critical=url.origin===self.location.origin &&
+    (url.pathname.endsWith('/version.json')||url.pathname.endsWith('/config.js'));
+
+  if(event.request.mode==='navigate' || critical || url.origin===self.location.origin){
+    event.respondWith((async()=>{
+      try{
+        const fresh=await fetch(new Request(event.request,{cache:'no-store'}));
+        if(fresh && fresh.ok){
+          const copy=fresh.clone();
+          caches.open(SHELL_CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});
+        }
+        return fresh;
+      }catch(_e){
+        const exact=await caches.match(event.request);
+        if(exact)return exact;
+        if(event.request.mode==='navigate')return (await caches.match('./index.html'))||Response.error();
+        const name=url.pathname.split('/').pop();
+        return (await caches.match('./'+name))||Response.error();
+      }
+    })());
     return;
   }
-  e.respondWith(fetch(e.request).then(r=>{
-    if(r&&(r.ok||r.type==='opaque')){
-      const cp=r.clone();
-      caches.open(u.origin===self.location.origin?SHELL_CACHE:RUNTIME_CACHE).then(c=>c.put(e.request,cp)).catch(()=>{});
-    }
-    return r;
-  }).catch(async()=>{
-    const exact=await caches.match(e.request);if(exact)return exact;
-    if(u.origin===self.location.origin){
-      const f=u.pathname.split('/').pop();
-      const fallback=await caches.match('./'+f);if(fallback)return fallback;
-    }
-    return Response.error();
-  }));
+
+  event.respondWith(fetch(event.request).catch(()=>caches.match(event.request)));
 });

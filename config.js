@@ -1,15 +1,43 @@
+/* Safety Tracker v2.11.54 CACHE RECOVERY
+   The phone was still serving v2.11.52 after v2.11.53 was uploaded.
+   Clear stale Safety caches once, then allow the current service worker to rebuild.
+*/
+(function(){
+  if(window.__SAFETY_CACHE_RECOVERY_V21154)return;
+  window.__SAFETY_CACHE_RECOVERY_V21154=true;
+  try{
+    const done=sessionStorage.getItem('safety-cache-recovery-v21154')==='1';
+    if(!done){
+      sessionStorage.setItem('safety-cache-recovery-v21154','1');
+      if(window.caches?.keys){
+        caches.keys().then(keys=>Promise.all(
+          keys.filter(k=>/^safety-(?:shell|runtime)-/i.test(k)).map(k=>caches.delete(k))
+        )).catch(()=>{});
+      }
+      if(navigator.serviceWorker?.getRegistrations){
+        navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(
+          regs.filter(r=>{
+            const u=r.active?.scriptURL||r.waiting?.scriptURL||r.installing?.scriptURL||'';
+            return /\/Safety-tracker\//i.test(u);
+          }).map(r=>r.update().catch(()=>{}))
+        )).catch(()=>{});
+      }
+    }
+  }catch(_e){}
+})();
+
 window.SAFETY_TRACKER_CONFIG = {
   supabaseUrl: "https://qvgcralroduuoptbnctt.supabase.co",
   supabaseKey: "sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_"
 };
 
-/* v2.11.53 DIRECT SHARED LOGIN
+/* v2.11.54 DIRECT SHARED LOGIN
    This runs immediately from config.js at the login screen.
    Do not move it back into the delayed hotfix loader.
 */
 (function(){
-  if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21153)return;
-  window.__SAFETY_DIRECT_SHARED_LOGIN_V21153=true;
+  if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21154)return;
+  window.__SAFETY_DIRECT_SHARED_LOGIN_V21154=true;
 
   const MASTER_URL='https://zgmcxgumdsssngfgtmth.supabase.co';
   const MASTER_KEY='sb_publishable_wRTwr1ZohznS-VLUjoSz2w_Nbv4qiZj';
@@ -59,9 +87,9 @@ window.SAFETY_TRACKER_CONFIG = {
     }
     const form=$('loginForm');
     document.querySelectorAll('.master-login-note-v21151').forEach(x=>x.remove());
-    if(form&&!form.querySelector('.master-login-note-v21153')){
+    if(form&&!form.querySelector('.master-login-note-v21154')){
       const note=document.createElement('div');
-      note.className='hint-box master-login-note-v21153';
+      note.className='hint-box master-login-note-v21154';
       note.innerHTML='<strong>One login:</strong> use the same email/username and password as Inventory/Energy.';
       form.insertAdjacentElement('afterbegin',note);
     }
@@ -258,7 +286,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21153';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21154';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;
