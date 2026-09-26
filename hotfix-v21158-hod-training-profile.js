@@ -1798,16 +1798,27 @@
     [0,30,100,240].forEach(ms=>setTimeout(forceHome,ms));
   }
 
+  function clearManagementDetailStateV21170(){
+    const r=$('reportsView');
+    if(r){
+      r.classList.remove('v21168-setup-active');
+      delete r.dataset.v21168Setup;
+    }
+    const setup=$('managementSetupV21168');
+    if(setup)setup.innerHTML='';
+    try{
+      const st={...(history.state||{})};
+      delete st.managementDetailV21167;
+      delete st.managementFromV21167;
+      delete st.v21168Setup;
+      history.replaceState({...st,safetyTracker:true,view:'reports',modal:false,guard:false},'',location.href);
+    }catch(_e){}
+  }
+
   function openHome(){
     if(!manager())return;
     detailSeq++;
-    try{
-      if(history.state?.managementDetailV21167||history.state?.managementFromV21167){
-        history.back();
-        scheduleHome();
-        return;
-      }
-    }catch(_e){}
+    clearManagementDetailStateV21170();
     baseShow('reports');
     scheduleHome();
   }
@@ -1918,10 +1929,7 @@
       );
       if(back&&manager()){
         e.preventDefault();e.stopImmediatePropagation();
-        if(history.state?.managementDetailV21167||history.state?.managementFromV21167){
-          history.back();
-          setTimeout(forceHome,80);
-        }else openHome();
+        openHome();
         return;
       }
 

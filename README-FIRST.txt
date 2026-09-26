@@ -1,20 +1,16 @@
-SAFETY TRACKER v2.11.69
+Safety Tracker v2.11.70 — MANAGEMENT HOME + MOBILE TILE FIX
 
-UPLOAD THESE FILES TO THE ROOT OF THE Safety-tracker GITHUB REPOSITORY AND REPLACE THE EXISTING FILES:
+Upload these 3 files to the ROOT of the Safety-tracker GitHub repository and replace the existing versions:
 
-1. hotfix-v21136-first-aid-default-types.js
-2. version.json
+1. hotfix-v21158-hod-training-profile.js
+2. hotfix-v21136-first-aid-default-types.js
+3. version.json
 
-No SQL is required for v2.11.69.
+No SQL / Supabase migration is required.
 
-FIXES
-- Instructor no longer disappears after another page/menu refresh. It remains visible for:
-  • Admin/Manager in their normal management view
-  • official HOD / Department Manager
-  • anyone with “Can carry out instructor-led training” enabled
-- Instructor authority is rechecked after profile/access changes and normal navigation.
-- If instructor permission becomes available after the instructor module first loaded, the module can recover once without a full code change.
-- Users → Edit setup now stops older click handlers, reports a visible error if opening fails, and has a fallback if a rebuilt user card misses the first click handler.
-- Create User gets the same reliable opening/error handling.
-
-This is cumulative and keeps the v2.11.68 Departments / Positions / Users setup hub.
+WHAT THIS FIXES
+- Management now behaves as a true home button. Tapping Management clears any open Management detail/setup state and opens the Management tile menu directly.
+- The in-page “← Management” controls do the same thing and no longer depend on browser-history timing.
+- Android/browser Back can still use normal history, but the visible Management controls are deterministic.
+- Departments / Positions / Users setup tiles are laid out correctly on phone screens. Their D / P / U icons now sit above the title instead of covering the first letters.
+- Preserves v2.11.69 Instructor visibility and User Edit/Create fixes and all earlier v2.11.68 setup work.
