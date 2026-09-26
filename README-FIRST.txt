@@ -1,19 +1,24 @@
-SAFETY TRACKER v2.11.52 - LOGIN FIX
+SAFETY TRACKER v2.11.53 - LOGIN SESSION FIX
 
 Upload ALL files in this ZIP to the Safety Tracker repository root.
 
+LIVE LOGS CONFIRMED:
+- Shared Inventory/Energy password login: HTTP 200
+- Safety access check: HTTP 200
+- Safety OTP verification: HTTP 200
+- Immediately after that, Safety data calls: HTTP 401
+
 ROOT CAUSE:
-v2.11.51 put the shared-login code inside the delayed hotfix loader.
-At the login screen that module was not running, so pressing Sign in never
-called the shared Inventory/Energy master login or the Safety session exchange.
+The new Safety session was stored under Supabase's default browser key, but the
+Safety core uses:
+  safety-tracker-supabase-auth-v2914
+
+After reload the core could not see the session it had just created, so it fell
+back to "Restoring sign-in...".
 
 FIX:
-v2.11.52 puts the shared-login handler directly inside config.js, which the
-login page always loads before the Safety core.
+v2.11.53 uses the exact same auth storage key as app-v21028.js and explicitly
+persists the exchanged session before reloading. It also removes the duplicated
+"One login" panel.
 
-USE:
-Sign in to Safety with the SAME email/username and SAME password you currently
-use for Inventory/Energy.
-
-No database or Supabase changes are required. The v2.11.51 backend functions
-and Original Site database changes are already deployed.
+No Supabase/database changes are required.

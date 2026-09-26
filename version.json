@@ -1,6 +1,6 @@
 {
-  "version": "2.11.52",
-  "build_id": "v21152-direct-login-at-auth-screen-20260925",
+  "version": "2.11.53",
+  "build_id": "v21153-shared-login-session-storage-fix-20260926",
   "clean": true,
-  "notes": "Fixes Safety sign-in after v2.11.51. The shared Inventory/Energy login now runs directly from config.js at the auth screen instead of waiting for the delayed hotfix loader. Same email/username and same password are retained. The v2.11.51 shared Safety access provisioning and Main Hotel Original Site work remain in place."
+  "notes": "Fixes the remaining Safety login loop. The shared Inventory/Energy login and Safety OTP exchange were succeeding, but the Safety session was being stored under a different browser auth key from the one app-v21028.js reads. v2.11.53 uses the exact Safety core storage key, explicitly persists the session before reload, and removes the duplicate One login notice. No database change required."
 }

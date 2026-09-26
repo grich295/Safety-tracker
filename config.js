@@ -3,13 +3,13 @@ window.SAFETY_TRACKER_CONFIG = {
   supabaseKey: "sb_publishable_RNVM7b_qqOIUDdnVjZqtzg_JzTih75_"
 };
 
-/* v2.11.52 DIRECT SHARED LOGIN
+/* v2.11.53 DIRECT SHARED LOGIN
    This runs immediately from config.js at the login screen.
    Do not move it back into the delayed hotfix loader.
 */
 (function(){
-  if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21152)return;
-  window.__SAFETY_DIRECT_SHARED_LOGIN_V21152=true;
+  if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21153)return;
+  window.__SAFETY_DIRECT_SHARED_LOGIN_V21153=true;
 
   const MASTER_URL='https://zgmcxgumdsssngfgtmth.supabase.co';
   const MASTER_KEY='sb_publishable_wRTwr1ZohznS-VLUjoSz2w_Nbv4qiZj';
@@ -27,7 +27,13 @@ window.SAFETY_TRACKER_CONFIG = {
     if(safetyClient)return safetyClient;
     if(!window.supabase)return null;
     safetyClient=window.supabase.createClient(SAFETY_URL,SAFETY_KEY,{
-      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+      auth:{
+        persistSession:true,
+        autoRefreshToken:true,
+        detectSessionInUrl:true,
+        storage:window.localStorage,
+        storageKey:'safety-tracker-supabase-auth-v2914'
+      }
     });
     return safetyClient;
   }
@@ -52,9 +58,10 @@ window.SAFETY_TRACKER_CONFIG = {
       }
     }
     const form=$('loginForm');
-    if(form&&!form.querySelector('.master-login-note-v21152')){
+    document.querySelectorAll('.master-login-note-v21151').forEach(x=>x.remove());
+    if(form&&!form.querySelector('.master-login-note-v21153')){
       const note=document.createElement('div');
-      note.className='hint-box master-login-note-v21152';
+      note.className='hint-box master-login-note-v21153';
       note.innerHTML='<strong>One login:</strong> use the same email/username and password as Inventory/Energy.';
       form.insertAdjacentElement('afterbegin',note);
     }
@@ -88,7 +95,14 @@ window.SAFETY_TRACKER_CONFIG = {
     });
     if(error)throw error;
     if(!data?.session)throw new Error('Safety session was not created.');
-    return data.session;
+
+    const {data:persisted,error:persistError}=await sb.auth.setSession({
+      access_token:data.session.access_token,
+      refresh_token:data.session.refresh_token
+    });
+    if(persistError)throw persistError;
+    if(!persisted?.session)throw new Error('Safety session could not be persisted.');
+    return persisted.session;
   }
 
   async function handleSubmit(e){
@@ -244,7 +258,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21152';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21153';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

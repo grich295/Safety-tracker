@@ -35,6 +35,7 @@
   }
 
   function decorateLogin(){
+    if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21153)return;
     const input=$('loginEmail');
     if(input){
       input.type='text';
@@ -295,11 +296,12 @@
 
   /* Window capture runs before v2.11.49 access handlers. */
   window.addEventListener('submit',e=>{
+    if(window.__SAFETY_DIRECT_SHARED_LOGIN_V21153)return;
     if(e.target?.id==='loginForm')handleSafetyLogin(e);
   },true);
 
   window.addEventListener('click',e=>{
-    if(e.target.closest?.('#forgotPasswordBtn')){handleForgot(e);return}
+    if(!window.__SAFETY_DIRECT_SHARED_LOGIN_V21153 && e.target.closest?.('#forgotPasswordBtn')){handleForgot(e);return}
 
     const edit=e.target.closest?.('[data-v21149-edit-shared]');
     if(edit){
