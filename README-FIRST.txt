@@ -1,27 +1,30 @@
-SAFETY TRACKER v2.11.54 - CACHE + LOGIN RECOVERY
+SAFETY TRACKER v2.11.55 - DYNAMIC GROUPS
 
 Upload ALL files in this ZIP to the Safety Tracker repository root.
 
-WHAT I CONFIRMED:
-The GitHub repository already contained v2.11.53, but the phone screenshot was
-still showing v2.11.52. The phone was therefore running cached Safety files.
+DATABASE:
+Already updated. Do not run SQL manually.
 
-LIVE AUTH LOGS ALSO SHOW:
-- Shared Inventory/Energy password accepted (200)
-- Safety access check accepted (200)
-- Safety OTP/session verification accepted (200)
-- Old page then made Safety data requests without the new session (401)
+NEW GROUPS:
+1. Department Managers
+   - built-in automatic group
+   - membership comes from the live Department Manager responsibility records
+   - adding/removing a Department Manager automatically changes the group
+   - any Training / Safety Awareness assigned to the group is recalculated
 
-v2.11.54:
-- changes the Safety service-worker cache generation
-- deletes previous Safety shell/runtime caches
-- makes config.js and version.json network/no-store while online
-- keeps the v2.11.53 exact Safety auth storage-key fix
-- suppresses the duplicate One login panel
+2. Custom groups
+   - Manager/Admin can create them
+   - add by JOB TITLE / POSITION
+   - add SPECIFIC PEOPLE
+   - optionally add WHOLE DEPARTMENTS
+   - rules can be mixed in one group
 
-IMPORTANT:
-After upload, fully close the Safety Tracker browser/PWA once and reopen it.
-The first reopen updates the service worker. If it still displays v2.11.52,
-close it once more and reopen: the newly activated worker will then serve v2.11.54.
+WHERE TO USE:
+- Controlled-document Training audience (RA / COSHH RA / SSW)
+- Standalone Training audience
+- Toolbox Talk audience
+- Safety Awareness / information audience
 
-No SQL/Supabase changes are required.
+Groups are site-scoped. New sites receive their own automatic Department Managers group.
+
+The existing v2.11.54 one-login/cache recovery is retained.

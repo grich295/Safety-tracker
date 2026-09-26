@@ -1,6 +1,6 @@
 {
-  "version": "2.11.54",
-  "build_id": "v21154-cache-recovery-shared-login-20260926",
+  "version": "2.11.55",
+  "build_id": "v21155-dynamic-groups-20260926",
   "clean": true,
-  "notes": "Fixes the phone remaining on cached v2.11.52 after newer files were uploaded. Fresh Safety service-worker cache generation deletes old safety-shell/runtime caches, forces network/no-store for config.js and version.json, and retains the v2.11.53 shared-session storage fix. Duplicate one-login panel remains suppressed. No database change required."
+  "notes": "Adds dynamic reusable Groups. Department Managers is a built-in automatic group driven by current Department Manager responsibility records. Managers/Admins can create custom groups from position titles, named people and/or whole departments. Groups are selectable in controlled-document Training audiences, standalone Training/TBT audiences and Safety Awareness audiences. Group membership changes automatically recalculate active assignments. Groups are site-scoped and every new site receives its own Department Managers group. Includes v2.11.54 cache/login recovery."
 }
