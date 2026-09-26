@@ -1,6 +1,6 @@
 {
-  "version": "2.11.71",
-  "build_id": "v21171-approval-save-reliability-20260926",
+  "version": "2.11.72",
+  "build_id": "v21172-document-set-responsibility-modal-tbt-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Preserves v2.11.70 Management navigation/formatting, v2.11.69 Instructor/User editor fixes, v2.11.68 simplified Departments/Positions/Users setup, v2.11.66 People/Department/Operational Overseer controls and v2.11.65 controlled document-set reviews. Repairs Save approval decision so Admin approval cannot be left disabled by the older responsibility decorator, handles the approval click deterministically, and shows approval validation/database feedback inside the modal so mobile users can see why an approval was not saved. No database change required."
+  "notes": "Cumulative Safety Tracker build. Preserves v2.11.71 approval reliability and all prior v2.11.65-v2.11.70 features. Fixes modal validation/warning messages being hidden behind dialogs and clarifies that Group TBT settings apply only to optional automatic refresher scheduling, not normal TBT assignment. Rebuilds the controlled document-set folder editor into clear mobile sections. Overall annual-review responsibility and default file-review responsibility can now be assigned using the normal targets: Everyone, Departments, Positions, Groups or specific people. Keeps acknowledgement audience separate from review responsibility and retains advanced annual/periodic rules in a collapsed Advanced section. Database support for flexible responsibility targets is included and already applied."
 }

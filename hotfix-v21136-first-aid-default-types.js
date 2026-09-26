@@ -797,3 +797,485 @@
   boot();
 })();
 
+/* Safety Tracker v2.11.72 CLEAN
+   Modal feedback visibility + TBT assignment wording.
+   - Mirrors toast/validation messages into any open modal so warnings are never hidden behind <dialog>.
+   - Gives immediate approval blockers beside the Save approval decision button.
+   - Clarifies that Group settings control only automatic TBT refresher frequency; normal TBT assignment remains available.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_MODAL_FEEDBACK_TBT_V21172)return;
+  window.__SAFETY_MODAL_FEEDBACK_TBT_V21172=true;
+  const $=id=>document.getElementById(id);
+
+  function messageKind(msg){
+    const t=String(msg||'').toLowerCase();
+    return /saved|approved|accepted|updated|complete|recorded|success/.test(t) &&
+      !/not saved|not approved|failed|error|cannot|can't|could not|required|choose|tick|open /.test(t)
+      ?'success':'danger';
+  }
+  function showModalMessage(msg,kind){
+    const modal=$('modal'),body=$('modalBody');
+    if(!modal?.open||!body||!String(msg||'').trim())return;
+    let box=$('modalFeedbackV21172');
+    if(!box){
+      box=document.createElement('div');
+      box.id='modalFeedbackV21172';
+      const actions=[...body.querySelectorAll('.actions')].pop();
+      if(actions)actions.insertAdjacentElement('beforebegin',box);else body.appendChild(box);
+    }
+    box.className=(kind||messageKind(msg))==='success'?'success-note':'danger-note';
+    box.innerHTML=`<strong>${(kind||messageKind(msg))==='success'?'Status':'Action needed'}</strong><br>${String(msg)}`;
+    box.hidden=false;
+    try{box.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(_e){}
+  }
+  function mirrorToast(){
+    const t=$('toast');
+    if(!t||t.hidden)return;
+    const msg=String(t.textContent||'').trim();
+    if(msg)showModalMessage(msg,messageKind(msg));
+  }
+  function approvalPrecheck(){
+    const body=$('modalBody');
+    if(!body?.querySelector('[data-save-version-approval]'))return true;
+    const open=$('approvalOpenStatus');
+    if(open && !/opened\s*✓?/i.test(String(open.textContent||''))){
+      showModalMessage('Open the exact pending file using “Open pending file” before approving it.','danger');
+      return false;
+    }
+    if($('approvalAck') && !$('approvalAck').checked){
+      showModalMessage('Tick the confirmation that you reviewed the exact pending document.','danger');
+      return false;
+    }
+    return true;
+  }
+
+  function tidyTbtCopy(){
+    const box=$('tbtGroupTopupsV21164');
+    if(box){
+      const h=box.querySelector('h3');
+      if(h)h.textContent='Toolbox Talk automatic refreshers';
+      const p=box.querySelector('h3 + p');
+      if(p)p.textContent='Optional automatic refresher frequency is set by Group. This does not restrict normal Toolbox Talk assignment — TBTs can still be assigned through the usual assignment controls just like other training.';
+    }
+    const title=$('modalTitle');
+    const body=$('modalBody');
+    if(title&&body&&/TBT Group top-ups/i.test(title.textContent||'')){
+      title.textContent='TBT automatic refresher schedule';
+      const paras=[...body.querySelectorAll('p.muted')];
+      for(const p of paras){
+        const t=p.textContent||'';
+        if(/applies to the Group as a whole/i.test(t))p.textContent='This setting controls only the Group’s optional automatic refresher schedule. It does not change who a Toolbox Talk can be assigned to through the normal assignment controls.';
+        if(/avoids individual frequency settings/i.test(t))p.textContent='The automatic scheduler rotates through the selected approved Toolbox Talks. Normal one-off or required TBT assignments remain unchanged.';
+      }
+    }
+  }
+
+  function install(){
+    const toast=$('toast');
+    if(toast){
+      const obs=new MutationObserver(mirrorToast);
+      obs.observe(toast,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:['hidden','style','class']});
+    }
+    const modal=$('modal');
+    if(modal){
+      const obs=new MutationObserver(()=>{tidyTbtCopy();setTimeout(mirrorToast,0)});
+      obs.observe(modal,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});
+    }
+    const pageObs=new MutationObserver(tidyTbtCopy);
+    pageObs.observe(document.body,{childList:true,subtree:true});
+
+    window.addEventListener('click',e=>{
+      const b=e.target.closest?.('[data-save-version-approval]');
+      if(b){
+        // Do not stop the core save handler. We only surface the blocker in the open modal.
+        approvalPrecheck();
+        setTimeout(mirrorToast,30);setTimeout(mirrorToast,180);setTimeout(mirrorToast,600);
+      }
+    },true);
+    [80,250,700,1400].forEach(ms=>setTimeout(tidyTbtCopy,ms));
+    window.SafetyModalFeedbackTbtV21172={mirrorToast,tidyTbtCopy,showModalMessage};
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+
+/* Safety Tracker v2.11.72 CLEAN
+   Controlled document-set setup cleanup + flexible responsibility assignment.
+   - Rebuilds the folder/document-set editor into clear mobile-friendly sections.
+   - Overall annual-review responsibility and default file-review responsibility support
+     Everyone, Departments, Positions, Groups and specific people.
+   - Keeps the sign-off/acknowledgement audience separate from review responsibility.
+   - Mirrors toast/warning messages inside open modals so mobile users can see them.
+   - Clarifies that TBT Group settings are only for optional automatic refresher scheduling;
+     normal TBT assignment remains separate.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_DOCUMENT_SET_RESP_UI_V21172)return;
+  window.__SAFETY_DOCUMENT_SET_RESP_UI_V21172=true;
+
+  let api=null,state=null,sb=null,observer=null,toastObserver=null,decorating=false;
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const isManagerUi=()=>['admin','manager'].includes(String(state?.profile?.role||'').toLowerCase())&&state?.profile?.report_only!==true&&state?.uiMode!=='user';
+  const isAdmin=()=>String(state?.profile?.role||'').toLowerCase()==='admin'&&state?.profile?.report_only!==true&&state?.uiMode!=='user'&&state?.uiMode!=='manager';
+  const managerMode=()=>String(state?.uiMode||'').toLowerCase()==='manager' || String(state?.profile?.role||'').toLowerCase()==='manager';
+  const todayIso=()=>new Date().toISOString().slice(0,10);
+
+  function openModal(title,html){
+    const m=$('modal'),h=$('modalTitle'),b=$('modalBody');if(!m||!b)return;
+    if(h)h.textContent=title;b.innerHTML=html;
+    try{if(!m.open)m.showModal()}catch(_e){m.setAttribute('open','')}
+  }
+  function closeModal(){try{$('modal')?.close()}catch(_e){$('modal')?.removeAttribute('open')}}
+  function showInline(msg,type='danger'){
+    const body=$('modalBody');if(!body||!$('modal')?.open)return;
+    let box=$('modalInlineNoticeV21172');
+    if(!box){
+      box=document.createElement('div');box.id='modalInlineNoticeV21172';
+      body.insertAdjacentElement('afterbegin',box);
+    }
+    box.className=type==='success'?'success-note v21172-inline-notice':'danger-note v21172-inline-notice';
+    box.innerHTML=`<strong>${type==='success'?'Saved':'Check this'}</strong><br>${esc(msg)}`;
+    try{box.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(_e){}
+  }
+  function toast(msg){
+    try{api?.toast?.(msg)}catch(_e){}
+    if($('modal')?.open)showInline(msg,/saved|updated|complete|success/i.test(String(msg))?'success':'danger');
+  }
+
+  function safeDate(year,month,day){
+    const last=new Date(year,month,0).getDate();
+    return new Date(year,month-1,Math.min(Math.max(1,Number(day)||1),last),12,0,0);
+  }
+  function nextOccurrence(month,day){
+    const now=new Date(),t=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12,0,0);let y=now.getFullYear();let d=safeDate(y,month,day);
+    if(d<t)d=safeDate(++y,month,day);return d.toISOString().slice(0,10);
+  }
+  function reviewOccurrence(signoffIso,month,day){
+    const sign=new Date(signoffIso+'T12:00:00');let d=safeDate(sign.getFullYear(),month,day);
+    if(d>=sign)d=safeDate(sign.getFullYear()-1,month,day);return d.toISOString().slice(0,10);
+  }
+  function minusOneMonth(iso){
+    const d=new Date(iso+'T12:00:00'),first=new Date(d.getFullYear(),d.getMonth()-1,1,12),last=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
+    return new Date(first.getFullYear(),first.getMonth(),Math.min(d.getDate(),last),12).toISOString().slice(0,10);
+  }
+  function presetFor(value,unit,annual=false){
+    if(annual)return 'ANNUAL_ONLY';
+    const k=`${Number(value)||0}|${String(unit||'MONTHS').toUpperCase()}`;
+    return ({'1|MONTHS':'MONTHLY','3|MONTHS':'QUARTERLY','6|MONTHS':'SIX_MONTHLY','12|MONTHS':'TWELVE_MONTHLY'})[k]||'CUSTOM';
+  }
+  function presetValues(preset,value,unit){
+    if(preset==='MONTHLY')return {mode:'PERIODIC_OVERRIDE',value:1,unit:'MONTHS'};
+    if(preset==='QUARTERLY')return {mode:'PERIODIC_OVERRIDE',value:3,unit:'MONTHS'};
+    if(preset==='SIX_MONTHLY')return {mode:'PERIODIC_OVERRIDE',value:6,unit:'MONTHS'};
+    if(preset==='TWELVE_MONTHLY')return {mode:'PERIODIC_OVERRIDE',value:12,unit:'MONTHS'};
+    if(preset==='ANNUAL_ONLY')return {mode:'ANNUAL_ONLY',value:12,unit:'MONTHS'};
+    return {mode:'PERIODIC_OVERRIDE',value:Math.max(1,Number(value)||3),unit:String(unit||'MONTHS').toUpperCase()};
+  }
+
+  async function scopeData(){
+    const [d,p,pd,pr,ud,g,rt]=await Promise.all([
+      sb.from('departments').select('*').eq('active',true).order('name'),
+      sb.from('safety_positions_v21069').select('*').eq('active',true).order('name'),
+      sb.from('safety_position_departments_v21069').select('*'),
+      sb.from('profiles').select('id,display_name,email,login_username,active,report_only').eq('active',true).order('display_name'),
+      sb.from('user_departments').select('*'),
+      sb.from('safety_groups_v21155').select('*').eq('active',true).order('name'),
+      sb.from('document_pack_responsibility_targets_v21172').select('*')
+    ]);
+    let departments=d.error?[]:(d.data||[]),positions=p.error?[]:(p.data||[]),positionDepartments=pd.error?[]:(pd.data||[]),people=pr.error?(state?.people||[]):(pr.data||[]),userDepartments=ud.error?[]:(ud.data||[]),groups=g.error?[]:(g.data||[]),responsibilities=rt.error?[]:(rt.data||[]);
+    people=people.filter(x=>x.active!==false&&x.report_only!==true);
+
+    if(managerMode()&&!isAdmin()){
+      const s=await sb.rpc('my_manager_scope_departments_v21166');
+      const allowed=new Set((s.error?[]:(s.data||[])).map(x=>x.department_id));
+      departments=departments.filter(x=>allowed.has(x.id));
+      positions=positions.filter(x=>positionDepartments.some(y=>y.position_id===x.id&&allowed.has(y.department_id)) || allowed.has(x.primary_department_id));
+      people=people.filter(x=>userDepartments.some(y=>y.user_id===x.id&&allowed.has(y.department_id)));
+      const eligible=[];
+      for(const gr of groups){
+        const m=await sb.rpc('group_resolved_users_v21155',{p_group_id:gr.id});
+        const rows=m.error?[]:(m.data||[]);
+        if(rows.length&&rows.every(x=>people.some(p0=>p0.id===x.user_id)))eligible.push(gr);
+      }
+      groups=eligible;
+    }
+    return {departments,positions,people,groups,responsibilities};
+  }
+
+  function targetSummary(rows,ctx){
+    if(!rows?.length)return 'Not assigned';
+    if(rows.some(x=>x.target_type==='EVERYONE'))return 'Everyone';
+    const bits=[];
+    const ds=rows.filter(x=>x.target_type==='DEPARTMENT').map(x=>ctx.departments.find(y=>y.id===x.department_id)?.name).filter(Boolean);
+    const ps=rows.filter(x=>x.target_type==='POSITION').map(x=>ctx.positions.find(y=>y.id===x.position_id)?.name).filter(Boolean);
+    const gs=rows.filter(x=>x.target_type==='GROUP').map(x=>ctx.groups.find(y=>y.id===x.group_id)?.name).filter(Boolean);
+    const us=rows.filter(x=>x.target_type==='USER').map(x=>{const p=ctx.people.find(y=>y.id===x.user_id);return p?.display_name||p?.login_username||p?.email}).filter(Boolean);
+    if(ds.length)bits.push(ds.join(', '));if(ps.length)bits.push('Positions: '+ps.join(', '));if(gs.length)bits.push('Groups: '+gs.join(', '));if(us.length)bits.push('People: '+us.join(', '));
+    return bits.join(' · ')||'Assigned';
+  }
+  function picker(prefix,label,rows,ctx,help,allowEveryone=true){
+    const everyone=rows.some(x=>x.target_type==='EVERYONE');
+    const deps=new Set(rows.filter(x=>x.target_type==='DEPARTMENT').map(x=>x.department_id));
+    const pos=new Set(rows.filter(x=>x.target_type==='POSITION').map(x=>x.position_id));
+    const grps=new Set(rows.filter(x=>x.target_type==='GROUP').map(x=>x.group_id));
+    const users=new Set(rows.filter(x=>x.target_type==='USER').map(x=>x.user_id));
+    return `<details class="v21172-assignment" ${rows.length?'open':''}>
+      <summary><span><strong>${esc(label)}</strong><small>${esc(targetSummary(rows,ctx))}</small></span></summary>
+      <div class="v21172-assignment-body">
+        ${help?`<p class="muted">${esc(help)}</p>`:''}
+        ${allowEveryone?`<label class="check-row v21172-everyone"><input id="${prefix}Everyone" type="checkbox" ${everyone?'checked':''} ${managerMode()&&!isAdmin()?'disabled':''}> <strong>Everyone / whole site</strong></label>`:''}
+        <div class="v21172-choice-grid">
+          <details><summary>Departments${deps.size?` · ${deps.size}`:''}</summary><div class="v21172-choice-list">${ctx.departments.map(x=>`<label><input type="checkbox" data-${prefix}-department value="${esc(x.id)}" ${deps.has(x.id)?'checked':''}> <span>${esc(x.name)}</span></label>`).join('')||'<span class="muted">None available.</span>'}</div></details>
+          <details><summary>Positions${pos.size?` · ${pos.size}`:''}</summary><div class="v21172-choice-list">${ctx.positions.map(x=>`<label><input type="checkbox" data-${prefix}-position value="${esc(x.id)}" ${pos.has(x.id)?'checked':''}> <span>${esc(x.name)}</span></label>`).join('')||'<span class="muted">None available.</span>'}</div></details>
+          <details><summary>Groups${grps.size?` · ${grps.size}`:''}</summary><div class="v21172-choice-list">${ctx.groups.map(x=>`<label><input type="checkbox" data-${prefix}-group value="${esc(x.id)}" ${grps.has(x.id)?'checked':''}> <span>${esc(x.name)}</span></label>`).join('')||'<span class="muted">None available.</span>'}</div></details>
+          <details><summary>Specific people${users.size?` · ${users.size}`:''}</summary><div class="v21172-choice-list">${ctx.people.map(x=>`<label><input type="checkbox" data-${prefix}-user value="${esc(x.id)}" ${users.has(x.id)?'checked':''}> <span>${esc(x.display_name||x.login_username||x.email||'User')}</span></label>`).join('')||'<span class="muted">None available.</span>'}</div></details>
+        </div>
+      </div>
+    </details>`;
+  }
+  function readPicker(prefix){
+    return {
+      everyone:!!$(`${prefix}Everyone`)?.checked,
+      departments:[...document.querySelectorAll(`[data-${prefix}-department]:checked`)].map(x=>x.value),
+      positions:[...document.querySelectorAll(`[data-${prefix}-position]:checked`)].map(x=>x.value),
+      groups:[...document.querySelectorAll(`[data-${prefix}-group]:checked`)].map(x=>x.value),
+      users:[...document.querySelectorAll(`[data-${prefix}-user]:checked`)].map(x=>x.value)
+    };
+  }
+  function pickerHasAny(x){return !!(x.everyone||x.departments.length||x.positions.length||x.groups.length||x.users.length)}
+  function packAudienceRows(aud){return (aud||[]).map(x=>({...x,target_type:x.target_type==='USER'?'USER':x.target_type}));}
+  function oldResponsibilityRows(pack,kind){
+    if(!pack)return [];
+    if(kind==='OVERALL_REVIEW'){
+      if(pack.overall_review_responsible_user_id)return [{target_type:'USER',user_id:pack.overall_review_responsible_user_id}];
+      if(pack.overall_review_responsible_position_id)return [{target_type:'POSITION',position_id:pack.overall_review_responsible_position_id}];
+    }else{
+      if(pack.default_item_reviewer_user_id)return [{target_type:'USER',user_id:pack.default_item_reviewer_user_id}];
+      if(pack.default_item_reviewer_position_id)return [{target_type:'POSITION',position_id:pack.default_item_reviewer_position_id}];
+    }
+    return [];
+  }
+
+  async function decorateFolderEditor(){
+    if(decorating||!isManagerUi())return;
+    const body=$('modalBody'),controlled=$('v21165ControlledSet');
+    if(!body||!controlled||body.dataset.v21172==='1')return;
+    decorating=true;
+    try{
+      const oldSave=body.querySelector('[data-v21165-save-folder-set]');
+      if(!oldSave)return;
+      const folderId=oldSave.dataset.v21165SaveFolderSet||'';
+      const [ctx,fr,pr,ar]=await Promise.all([
+        scopeData(),
+        folderId?sb.from('document_folders_v21119').select('*').eq('id',folderId).maybeSingle():Promise.resolve({data:null}),
+        folderId?sb.from('document_packs_v21160').select('*').eq('folder_id',folderId).maybeSingle():Promise.resolve({data:null}),
+        folderId?sb.from('document_packs_v21160').select('id').eq('folder_id',folderId).maybeSingle():Promise.resolve({data:null})
+      ]);
+      const folder=fr?.data||null,pack=pr?.data||null,packId=pack?.id||ar?.data?.id||null;
+      let audiences=[],resp=[];
+      if(packId){
+        const [a,r]=await Promise.all([
+          sb.from('document_pack_audiences_v21160').select('*').eq('pack_id',packId),
+          sb.from('document_pack_responsibility_targets_v21172').select('*').eq('pack_id',packId)
+        ]);
+        audiences=a.error?[]:(a.data||[]);resp=r.error?[]:(r.data||[]);
+      }
+      let overall=resp.filter(x=>x.responsibility_kind==='OVERALL_REVIEW');
+      let defaults=resp.filter(x=>x.responsibility_kind==='DEFAULT_FILE_REVIEWER');
+      if(!overall.length)overall=oldResponsibilityRows(pack,'OVERALL_REVIEW');
+      if(!defaults.length)defaults=oldResponsibilityRows(pack,'DEFAULT_FILE_REVIEWER');
+
+      const enabled=folder?!!folder.controlled_set_enabled:!!controlled.checked;
+      const signoff=pack?nextOccurrence(pack.annual_ack_month||1,pack.annual_ack_day||31):(body.querySelector('#v21165AnnualSignoff')?.value||nextOccurrence(1,31));
+      const review=pack?reviewOccurrence(signoff,pack.annual_review_month||12,pack.annual_review_day||31):(body.querySelector('#v21165AnnualReview')?.value||minusOneMonth(signoff));
+      const defaultPreset=presetFor(pack?.default_review_frequency_value||12,pack?.default_review_frequency_unit||'MONTHS',(pack?.default_item_review_schedule_mode||'ANNUAL_ONLY')==='ANNUAL_ONLY');
+      const due=audiences[0]?.due_days||14;
+
+      body.dataset.v21172='1';
+      body.innerHTML=`
+        <div class="v21172-folder-head section-card">
+          <div class="form-grid v21172-basic-grid">
+            <label class="full">Folder name<input id="v21172FolderName" value="${esc(folder?.name||body.querySelector('#v21165FolderName')?.value||'')}" placeholder="e.g. Crisis management plan"></label>
+            <label class="full">Description<textarea id="v21172FolderDescription" rows="2" placeholder="What belongs in this folder?">${esc(folder?.description||'')}</textarea></label>
+            <label>Sort order<input id="v21172FolderSort" type="number" value="${Number(folder?.sort_order||0)}"></label>
+          </div>
+          <label class="check-row v21172-control-switch"><input id="v21172ControlledSet" type="checkbox" ${enabled?'checked':''}> <span><strong>Controlled document set</strong><small>Annual file review + staff acknowledgement</small></span></label>
+        </div>
+
+        <div id="v21172ControlledFields" ${enabled?'':'hidden'}>
+          <section class="section-card v21172-section">
+            <div class="v21172-section-title"><span class="v21172-step">1</span><div><h4>Annual cycle</h4><p class="muted">Set the review deadline and the later staff sign-off date.</p></div></div>
+            <div class="form-grid v21172-two-col">
+              <label>File-review deadline<input id="v21172AnnualReview" type="date" value="${esc(review)}"></label>
+              <label>Staff sign-off due<input id="v21172AnnualSignoff" type="date" value="${esc(signoff)}"></label>
+              <label>Review opens before deadline (days)<input id="v21172ReviewWindow" type="number" min="0" max="366" value="${Number(pack?.annual_review_window_days??45)}"></label>
+              <label>Recent-starter grace (days)<input id="v21172StarterGrace" type="number" min="0" max="365" value="${Number(pack?.new_starter_grace_days??90)}"></label>
+            </div>
+          </section>
+
+          <section class="section-card v21172-section">
+            <div class="v21172-section-title"><span class="v21172-step">2</span><div><h4>Review responsibility</h4><p class="muted">Choose who owns the annual review and who normally reviews individual files.</p></div></div>
+            ${picker('v21172Overall','Overall annual-review responsibility',overall,ctx,'Choose one or more standard assignment targets. This controls who is presented with the overall review responsibility.')}
+            ${picker('v21172Default','Default reviewer for individual files',defaults,ctx,'Individual files can still override this default reviewer.')}
+          </section>
+
+          <section class="section-card v21172-section">
+            <div class="v21172-section-title"><span class="v21172-step">3</span><div><h4>Who must acknowledge the set?</h4><p class="muted">This is separate from review responsibility.</p></div></div>
+            ${picker('v21172Audience','Acknowledgement audience',packAudienceRows(audiences),ctx,'These people receive the controlled-set acknowledgement requirement.')}
+            <label class="v21172-due">Initial / material-change acknowledgement due within <input id="v21172AudienceDue" type="number" min="1" max="365" value="${Number(due)}"> days</label>
+          </section>
+
+          <details class="section-card v21172-advanced">
+            <summary><strong>Advanced review settings</strong><span>Default frequency, overlap rule and sign-off gate</span></summary>
+            <div class="v21172-advanced-body form-grid v21172-two-col">
+              <label>Default file review schedule<select id="v21172DefaultSchedule"><option value="ANNUAL_ONLY" ${defaultPreset==='ANNUAL_ONLY'?'selected':''}>Annual only</option><option value="MONTHLY" ${defaultPreset==='MONTHLY'?'selected':''}>Monthly + annual</option><option value="QUARTERLY" ${defaultPreset==='QUARTERLY'?'selected':''}>Quarterly + annual</option><option value="SIX_MONTHLY" ${defaultPreset==='SIX_MONTHLY'?'selected':''}>Every 6 months + annual</option><option value="TWELVE_MONTHLY" ${defaultPreset==='TWELVE_MONTHLY'?'selected':''}>Every 12 months + annual</option><option value="CUSTOM" ${defaultPreset==='CUSTOM'?'selected':''}>Custom periodic + annual</option></select></label>
+              <div id="v21172DefaultCustom" class="form-grid full" ${defaultPreset==='CUSTOM'?'':'hidden'}><label>Every<input id="v21172DefaultValue" type="number" min="1" value="${Number(pack?.default_review_frequency_value||3)}"></label><label>Unit<select id="v21172DefaultUnit"><option value="DAYS" ${pack?.default_review_frequency_unit==='DAYS'?'selected':''}>Days</option><option value="MONTHS" ${pack?.default_review_frequency_unit!=='DAYS'&&pack?.default_review_frequency_unit!=='YEARS'?'selected':''}>Months</option><option value="YEARS" ${pack?.default_review_frequency_unit==='YEARS'?'selected':''}>Years</option></select></label></div>
+              <label>Annual / periodic overlap<select id="v21172OverlapMode"><option value="SAME_MONTH" ${(pack?.review_overlap_mode||'SAME_MONTH')==='SAME_MONTH'?'selected':''}>Same month — annual counts for both</option><option value="DAYS" ${pack?.review_overlap_mode==='DAYS'?'selected':''}>Within a number of days</option><option value="NEVER" ${pack?.review_overlap_mode==='NEVER'?'selected':''}>Never combine</option></select></label>
+              <label id="v21172OverlapDaysWrap" ${pack?.review_overlap_mode==='DAYS'?'':'hidden'}>Overlap window (days)<input id="v21172OverlapDays" type="number" min="0" max="366" value="${Number(pack?.review_overlap_days??31)}"></label>
+              <label class="check-row full"><input id="v21172RequireAll" type="checkbox" ${pack?.require_all_reviews_before_signoff===false?'':'checked'}> Require all active files to complete annual review before staff sign-off opens</label>
+            </div>
+          </details>
+
+          <div class="hint-box v21172-rule"><strong>Review rule:</strong> each file is reviewed individually. If a periodic review overlaps the annual review under the rule above, the annual review satisfies both.</div>
+        </div>
+        <div class="actions v21172-actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21172-save-folder-set="${esc(folderId)}">Save folder</button></div>`;
+
+      const syncControlled=()=>{$('v21172ControlledFields').hidden=!$('v21172ControlledSet')?.checked};
+      $('v21172ControlledSet')?.addEventListener('change',syncControlled);syncControlled();
+      let reviewManual=false;
+      $('v21172AnnualReview')?.addEventListener('change',()=>reviewManual=true);
+      $('v21172AnnualSignoff')?.addEventListener('change',()=>{if(!reviewManual&&$('v21172AnnualReview'))$('v21172AnnualReview').value=minusOneMonth($('v21172AnnualSignoff').value)});
+      $('v21172DefaultSchedule')?.addEventListener('change',()=>{$('v21172DefaultCustom').hidden=$('v21172DefaultSchedule').value!=='CUSTOM'});
+      $('v21172OverlapMode')?.addEventListener('change',()=>{$('v21172OverlapDaysWrap').hidden=$('v21172OverlapMode').value!=='DAYS'});
+      body.querySelectorAll('.v21172-assignment').forEach(box=>{
+        const everyone=box.querySelector('.v21172-everyone input');
+        const sync=()=>box.querySelectorAll('.v21172-choice-list input').forEach(x=>x.disabled=!!everyone?.checked);
+        box.addEventListener('change',sync);sync();
+      });
+    }catch(e){console.error('v2.11.72 folder editor',e);showInline(e?.message||'Could not load the document-set setup.')}finally{decorating=false}
+  }
+
+  async function saveAudience(packId,selection,due){
+    const del=await sb.from('document_pack_audiences_v21160').delete().eq('pack_id',packId);if(del.error)throw del.error;
+    const rows=[];
+    if(selection.everyone&&!managerMode())rows.push({pack_id:packId,target_type:'EVERYONE',due_days:due,created_by:state.user.id});
+    else{
+      selection.departments.forEach(id=>rows.push({pack_id:packId,target_type:'DEPARTMENT',department_id:id,due_days:due,created_by:state.user.id}));
+      selection.positions.forEach(id=>rows.push({pack_id:packId,target_type:'POSITION',position_id:id,due_days:due,created_by:state.user.id}));
+      selection.groups.forEach(id=>rows.push({pack_id:packId,target_type:'GROUP',group_id:id,due_days:due,created_by:state.user.id}));
+      selection.users.forEach(id=>rows.push({pack_id:packId,target_type:'USER',user_id:id,due_days:due,created_by:state.user.id}));
+    }
+    if(rows.length){const ins=await sb.from('document_pack_audiences_v21160').insert(rows);if(ins.error)throw ins.error}
+  }
+  async function saveResponsibility(packId,kind,selection){
+    const r=await sb.rpc('set_document_pack_responsibility_v21172',{
+      p_pack_id:packId,p_responsibility_kind:kind,p_everyone:!!selection.everyone,
+      p_department_ids:selection.departments,p_position_ids:selection.positions,p_group_ids:selection.groups,p_user_ids:selection.users
+    });
+    if(r.error)throw r.error;
+  }
+
+  async function saveFolder(button){
+    const folderId=button.dataset.v21172SaveFolderSet||null;
+    const name=clean($('v21172FolderName')?.value),description=clean($('v21172FolderDescription')?.value)||null,sort=Number($('v21172FolderSort')?.value)||0,enabled=!!$('v21172ControlledSet')?.checked;
+    if(!name)return showInline('Folder name is required.');
+    const signoff=$('v21172AnnualSignoff')?.value||nextOccurrence(1,31),review=$('v21172AnnualReview')?.value||minusOneMonth(signoff);
+    if(enabled&&new Date(review+'T12:00:00')>=new Date(signoff+'T12:00:00'))return showInline('The annual file-review deadline must be before the staff sign-off date.');
+    const overall=readPicker('v21172Overall'),def=readPicker('v21172Default'),aud=readPicker('v21172Audience');
+    if(enabled&&!pickerHasAny(overall))return showInline('Choose who has overall annual-review responsibility.');
+    if(enabled&&!pickerHasAny(def))return showInline('Choose the default reviewer for individual files.');
+    if(enabled&&!pickerHasAny(aud))return showInline('Choose who must acknowledge the document set.');
+    if(managerMode()&&(overall.everyone||def.everyone||aud.everyone))return showInline('Manager mode cannot assign Everyone / whole site. Switch to Admin for site-wide assignment.');
+    const s=new Date(signoff+'T12:00:00'),rv=new Date(review+'T12:00:00'),pv=presetValues($('v21172DefaultSchedule')?.value||'ANNUAL_ONLY',$('v21172DefaultValue')?.value,$('v21172DefaultUnit')?.value);
+    const due=Math.max(1,Math.min(365,Number($('v21172AudienceDue')?.value)||14));
+    button.disabled=true;const old=button.textContent;button.textContent='Saving…';
+    try{
+      const r=await sb.rpc('save_document_folder_set_v21165',{
+        p_folder_id:folderId||null,p_name:name,p_description:description,p_sort_order:sort,p_controlled_set_enabled:enabled,
+        p_annual_signoff_month:s.getMonth()+1,p_annual_signoff_day:s.getDate(),p_annual_review_month:rv.getMonth()+1,p_annual_review_day:rv.getDate(),
+        p_grace_days:Math.max(0,Math.min(365,Number($('v21172StarterGrace')?.value)||0)),p_default_review_mode:pv.mode,p_default_review_value:pv.value,p_default_review_unit:pv.unit,
+        p_overall_review_user_id:null,p_overall_review_position_id:null,p_default_reviewer_user_id:null,p_default_reviewer_position_id:null,
+        p_overlap_mode:$('v21172OverlapMode')?.value||'SAME_MONTH',p_overlap_days:Math.max(0,Math.min(366,Number($('v21172OverlapDays')?.value)||31)),
+        p_annual_review_window_days:Math.max(0,Math.min(366,Number($('v21172ReviewWindow')?.value)||45)),p_require_all_reviews:!!$('v21172RequireAll')?.checked
+      });
+      if(r.error)throw r.error;
+      const packId=r.data?.pack_id||null;
+      if(enabled&&packId){
+        await Promise.all([
+          saveResponsibility(packId,'OVERALL_REVIEW',overall),
+          saveResponsibility(packId,'DEFAULT_FILE_REVIEWER',def)
+        ]);
+        await saveAudience(packId,aud,due);
+        const er=await sb.rpc('ensure_document_pack_requirements_v21165',{p_pack_id:packId});if(er.error)throw er.error;
+      }
+      closeModal();
+      try{await window.SafetyGenericDocumentsV21119?.refresh?.()}catch(_e){}
+      try{await window.SafetyPackTbtManagerV21164?.reload?.()}catch(_e){}
+      try{await window.SafetyDocumentSetReviewV21165?.reload?.()}catch(_e){}
+      toast(enabled?'Controlled document-set settings saved.':'Folder saved. Controlled-set rules are switched off but retained.');
+    }catch(e){console.error('v2.11.72 save folder',e);showInline(e?.message||'Could not save folder settings.');button.disabled=false;button.textContent=old}
+  }
+
+  function mirrorToast(){
+    const t=$('toast');if(!t||!$('modal')?.open||t.hidden)return;
+    const msg=clean(t.textContent);if(msg)showInline(msg,/saved|updated|complete|success/i.test(msg)?'success':'danger');
+  }
+  function installToastMirror(){
+    const t=$('toast');if(!t||toastObserver)return;
+    toastObserver=new MutationObserver(()=>setTimeout(mirrorToast,0));
+    toastObserver.observe(t,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+  }
+  function clarifyTbt(){
+    const box=$('tbtGroupTopupsV21164');if(!box)return;
+    const h=box.querySelector('h3'),p=box.querySelector('h3')?.parentElement?.querySelector('p');
+    if(h)h.textContent='Optional automatic TBT refresher schedule';
+    if(p)p.textContent='This section only controls extra automatic/random refresher scheduling for Groups. It does not restrict normal Toolbox Talk assignment, which remains separate in Training.';
+    box.querySelectorAll('p.muted').forEach(x=>{if(/Frequency is set for a Group only|avoids individual frequency settings/i.test(x.textContent||''))x.textContent='Automatic refresher frequency is configured here for the selected Group. Normal TBT assignment is unaffected.'});
+  }
+
+  function installStyles(){
+    if($('v21172Styles'))return;const s=document.createElement('style');s.id='v21172Styles';s.textContent=`
+      .v21172-inline-notice{position:sticky;top:0;z-index:5;margin:0 0 12px}
+      .v21172-folder-head{margin-bottom:12px}.v21172-basic-grid{grid-template-columns:minmax(0,1fr) 120px}
+      .v21172-control-switch{margin-top:12px;padding:12px;border:1px solid var(--border,#475569);border-radius:10px;align-items:flex-start}
+      .v21172-control-switch span{display:grid;gap:3px}.v21172-control-switch small{font-weight:400;color:var(--muted,#94a3b8)}
+      .v21172-section{margin:12px 0}.v21172-section-title{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px}.v21172-section-title h4{margin:0}.v21172-section-title p{margin:4px 0 0}
+      .v21172-step{display:grid;place-items:center;min-width:30px;height:30px;border-radius:999px;background:var(--brand,#0b2b59);font-weight:800}
+      .v21172-two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .v21172-assignment{border:1px solid var(--border,#475569);border-radius:10px;margin:8px 0;overflow:hidden;background:rgba(255,255,255,.02)}
+      .v21172-assignment>summary{cursor:pointer;padding:12px 14px;list-style:none}.v21172-assignment>summary::-webkit-details-marker{display:none}.v21172-assignment>summary span{display:grid;gap:4px}.v21172-assignment>summary small{color:var(--muted,#94a3b8);font-weight:400;white-space:normal}
+      .v21172-assignment[open]>summary{border-bottom:1px solid var(--border,#475569)}.v21172-assignment-body{padding:12px}
+      .v21172-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.v21172-choice-grid>details{border:1px solid var(--border,#475569);border-radius:8px;overflow:hidden}.v21172-choice-grid>details>summary{padding:9px 10px;font-weight:700;cursor:pointer}.v21172-choice-list{max-height:190px;overflow:auto;border-top:1px solid var(--border,#475569);padding:7px}.v21172-choice-list label{display:flex;gap:8px;padding:7px 5px;align-items:flex-start}.v21172-choice-list input{margin-top:3px}
+      .v21172-due{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.v21172-due input{max-width:100px}
+      .v21172-advanced{margin:12px 0;padding:0}.v21172-advanced>summary{cursor:pointer;padding:14px}.v21172-advanced>summary span{display:block;color:var(--muted,#94a3b8);font-weight:400;margin-top:3px}.v21172-advanced-body{padding:0 14px 14px}.v21172-rule{margin:12px 0}.v21172-actions{position:sticky;bottom:0;background:var(--panel,#111827);padding:10px 0 2px;z-index:4}
+      @media(max-width:720px){.v21172-basic-grid,.v21172-two-col,.v21172-choice-grid{grid-template-columns:1fr}.v21172-section{padding:14px}.v21172-assignment>summary{padding:12px}.v21172-choice-list{max-height:160px}.v21172-actions button{flex:1}.v21172-step{min-width:28px;height:28px}}
+    `;document.head.appendChild(s);
+  }
+
+  function install(){
+    if(observer)return;
+    installStyles();
+    const body=$('modalBody');
+    if(body){observer=new MutationObserver(()=>{
+      if($('modal')?.open)setTimeout(decorateFolderEditor,0)
+    });observer.observe(body,{childList:true,subtree:true})}
+    window.addEventListener('click',e=>{
+      const save=e.target.closest?.('[data-v21172-save-folder-set]');
+      if(save){e.preventDefault();e.stopImmediatePropagation();void saveFolder(save);return}
+      if(e.target.closest?.('[data-v21119-edit-folder],[data-v21119-new-folder],[data-v21165-edit-linked-folder]'))setTimeout(decorateFolderEditor,80);
+    },true);
+    window.addEventListener('pageshow',()=>setTimeout(decorateFolderEditor,300));
+    [150,500,1200].forEach(ms=>setTimeout(decorateFolderEditor,ms));
+    window.SafetyDocumentSetResponsibilityV21172={refresh:decorateFolderEditor};
+  }
+
+  function boot(){
+    api=window.SafetyTrackerV2;if(!api?.state||!api?.sb){setTimeout(boot,120);return}
+    state=api.state;sb=api.sb;if(!state.user)return;install();
+  }
+  boot();
+})();
