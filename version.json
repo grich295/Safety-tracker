@@ -1,6 +1,6 @@
 {
-  "version": "2.11.55",
-  "build_id": "v21155-dynamic-groups-20260926",
+  "version": "2.11.56",
+  "build_id": "v21156-instructor-department-responsibility-20260926",
   "clean": true,
-  "notes": "Adds dynamic reusable Groups. Department Managers is a built-in automatic group driven by current Department Manager responsibility records. Managers/Admins can create custom groups from position titles, named people and/or whole departments. Groups are selectable in controlled-document Training audiences, standalone Training/TBT audiences and Safety Awareness audiences. Group membership changes automatically recalculate active assignments. Groups are site-scoped and every new site receives its own Department Managers group. Includes v2.11.54 cache/login recovery."
+  "notes": "Instructor-led Training now defaults responsibility to each trainee's Department Manager. Whole-site training is therefore automatically split by each person's primary department. Managers/Admins can manually override the responsible manager per assignment, while any authorised Manager/Admin may still deliver the training and the signed-in person who records attendance is retained as the actual instructor. Department Managers can use the Instructor view for their own departments without receiving full Safety Manager access. Includes v2.11.55 Groups and v2.11.54 one-login/cache recovery."
 }

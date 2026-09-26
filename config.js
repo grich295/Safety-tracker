@@ -206,6 +206,7 @@ window.SAFETY_TRACKER_CONFIG = {
       ['hotfix-v21149-access-click-fix.js','v21149-access-click-fix'],
       ['hotfix-v21150-help-ppe-setup.js','v21150-help-ppe-setup'],
       ['hotfix-v21155-groups.js','v21155-groups'],
+      ['hotfix-v21156-instructor-responsibility.js','v21156-instructor-responsibility'],
       ['hotfix-v21055-training-packs.js','v21055-training-packs'],
       ['hotfix-v21056-review-audit.js','v21056-review-audit'],
       ['hotfix-v21057-linked-impact.js','v21057-linked-impact'],
@@ -287,7 +288,7 @@ window.SAFETY_TRACKER_CONFIG = {
       if(existing?.dataset.loaded==='1'){loaded.add(src);return resolve(true)}
       const s=existing||document.createElement('script');
       if(!existing){
-        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21155';
+        const build=window.SAFETY_BUILD?.build_id||window.SAFETY_BUILD?.version||'v21156';
         s.src=`${src}?v=${encodeURIComponent(token+'-'+build)}`;
         s.async=false;
         s.dataset.safetyLoaderV21113=src;

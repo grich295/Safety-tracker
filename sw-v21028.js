@@ -1,5 +1,5 @@
-const SHELL_CACHE='safety-shell-v21155-groups';
-const RUNTIME_CACHE='safety-runtime-v21155-groups';
+const SHELL_CACHE='safety-shell-v21156-instructor-responsibility';
+const RUNTIME_CACHE='safety-runtime-v21156-instructor-responsibility';
 
 const SHELL=[
   './',
@@ -11,6 +11,7 @@ const SHELL=[
   './hotfix-v21151-master-login-original-site.js',
   './hotfix-v21150-help-ppe-setup.js',
   './hotfix-v21155-groups.js',
+  './hotfix-v21156-instructor-responsibility.js',
   './version.json',
   './manifest.webmanifest'
 ];
