@@ -1,6 +1,6 @@
 {
-  "version": "2.11.56",
-  "build_id": "v21156-instructor-department-responsibility-20260926",
+  "version": "2.11.57",
+  "build_id": "v21157-profile-training-permission-20260926",
   "clean": true,
-  "notes": "Instructor-led Training now defaults responsibility to each trainee's Department Manager. Whole-site training is therefore automatically split by each person's primary department. Managers/Admins can manually override the responsible manager per assignment, while any authorised Manager/Admin may still deliver the training and the signed-in person who records attendance is retained as the actual instructor. Department Managers can use the Instructor view for their own departments without receiving full Safety Manager access. Includes v2.11.55 Groups and v2.11.54 one-login/cache recovery."
+  "notes": "Adds an explicit profile permission 'Can carry out instructor-led training'. Department Manager remains the automatic responsible owner for whole-site instructor-led training. Managers/Admins may always deliver; a User/Supervisor with this profile permission may deliver training for people in their own Department(s) without receiving full Manager access. The permission is available in People & Access for shared accounts and Safety-only accounts. Manual responsibility override remains available and may target authorised Training Instructors. Includes v2.11.56 responsibility, v2.11.55 Groups and v2.11.54 one-login/cache recovery."
 }

@@ -134,18 +134,25 @@
 
   /* -------- Shared user -> Safety access (no second password) -------- */
   async function loadAccessContext(sourceId){
-    const [user,link,sites,siteRows,mods]=await Promise.all([
+    const [user,link,sites,siteRows,mods,caps]=await Promise.all([
       sb.from('shared_app_users_v21143').select('*').eq('source_user_id',sourceId).maybeSingle(),
       sb.from('shared_safety_user_links_v21148').select('*').eq('source_user_id',sourceId).maybeSingle(),
       sb.from('organisation_sites_v21137').select('*').eq('active',true).order('name'),
       sb.from('app_site_access_v21137').select('*').eq('module_key','safety'),
-      sb.from('app_module_access_v21137').select('*').eq('module_key','safety')
+      sb.from('app_module_access_v21137').select('*').eq('module_key','safety'),
+      sb.from('app_user_capabilities_v21137').select('*').eq('module_key','safety').eq('capability_key','training_instructor')
     ]);
     const shared=user.data;
     const safetyUserId=link.data?.safety_user_id||null;
     const module=safetyUserId?(mods.data||[]).find(x=>x.user_id===safetyUserId):null;
     const assigned=safetyUserId?(siteRows.data||[]).filter(x=>x.user_id===safetyUserId&&x.enabled!==false):[];
-    return {shared,safetyUserId,module,sites:sites.data||[],assigned};
+    const canDeliverTraining=!!safetyUserId && (caps.data||[]).some(x=>
+      x.user_id===safetyUserId &&
+      x.scope_type==='APP' &&
+      x.scope_id==='' &&
+      x.enabled===true
+    );
+    return {shared,safetyUserId,module,sites:sites.data||[],assigned,canDeliverTraining};
   }
 
   function siteChecks(ctx){
@@ -213,6 +220,15 @@
       </div>
 
       <div class="section-card">
+        <h4>Training permission</h4>
+        <label class="check-row">
+          <input id="masterCanDeliverTrainingV21157" type="checkbox" ${ctx.canDeliverTraining?'checked':''}>
+          Can carry out instructor-led training
+        </label>
+        <p class="muted">Use this for Supervisors or other suitable people without giving them full Manager access. They can deliver training for people in their own Department(s). The Department Manager remains the default responsible owner.</p>
+      </div>
+
+      <div class="section-card">
         <h4>Safety sites</h4>
         <p class="muted">Tick only the sites this person needs. New sites never inherit existing users.</p>
         <div>${siteChecks(ctx)}</div>
@@ -244,7 +260,8 @@
           role,
           preferred_view:preferred,
           home_site_id:home,
-          site_ids:siteIds
+          site_ids:siteIds,
+          can_deliver_training:!!$('masterCanDeliverTrainingV21157')?.checked
         }
       });
       if(error)throw error;
