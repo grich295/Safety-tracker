@@ -1,6 +1,6 @@
 {
-  "version": "2.11.73",
-  "build_id": "v21173-training-hub-general-positions-20260926",
+  "version": "2.11.74",
+  "build_id": "v21174-folder-hard-copy-audit-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Adds a Training Hub with separate H&S and General / Operational Training. General training can use uploaded PDFs or built-in copy/paste content; built-in content is version controlled with change summaries and history. Supports self-training and instructor-led delivery. Standardises Training and Safety Awareness audience options to Everyone, Departments, Positions, Groups and specific people, with live position-based assignment. Adds a Full Training Register Excel report with site, person, department, position, group, domain, category, assignment, due/completion, instructor, renewal, evidence/material and built-in content change history. General / Operational training is kept out of H&S compliance and H&S monthly reporting. Database migration already applied."
+  "notes": "Cumulative Safety Tracker build. Preserves v2.11.73 Training Hub and all prior features. Adds Manager/Admin folder-level 'Download current folder ZIP' for every document folder, containing the current operative files, INDEX.csv and README for hard-copy/offline control. Adds a separate locked Excel History / Audit Report covering current register, file/version updates, controlled reviews, document acknowledgements, linked training assignments/completions, document activity, and controlled document-pack audit/sign-off snapshots where applicable. Individual current files remain downloadable so a hard-copy folder can be updated one file at a time. No database change required."
 }

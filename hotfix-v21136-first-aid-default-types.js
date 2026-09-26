@@ -2087,3 +2087,439 @@
   boot().catch(e=>console.warn('Safety Tracker v2.11.73 Training Hub',e));
 })();
 
+/* Safety Tracker v2.11.74 CLEAN
+   Folder hard-copy snapshot + separate folder history/audit report.
+   - Available on every generic document folder.
+   - Current Folder ZIP contains only current/operative files plus INDEX.csv and README.
+   - Controlled document sets include latest pack Word files; generic folders include approved/current document files.
+   - History / Audit Excel is separate and includes file/version history, reviews, document acknowledgements,
+     linked training assignment/completion history, document activity, and controlled-pack audit/snapshot data.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_FOLDER_EXPORTS_V21174)return;
+  window.__SAFETY_FOLDER_EXPORTS_V21174=true;
+
+  let api=null,state=null,sb=null,observer=null;
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const today=()=>new Date().toISOString().slice(0,10);
+  const nowText=()=>new Date().toLocaleString('en-GB');
+  const role=()=>String(state?.profile?.role||'').toLowerCase();
+  const canManage=()=>['admin','manager'].includes(role())&&state?.profile?.report_only!==true&&state?.uiMode!=='user';
+  const toast=m=>{try{api?.toast?.(m)}catch(_e){console.log(m)}};
+
+  function safeName(v,fallback='file'){
+    const s=String(v||fallback).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'');
+    return (s||fallback).slice(0,160);
+  }
+  function csv(v){
+    const s=String(v??'');
+    return /[",\r\n]/.test(s)?`"${s.replaceAll('"','""')}"`:s;
+  }
+  function downloadBlob(blob,fileName){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=fileName;a.rel='noopener';a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{try{a.remove()}catch(_e){}try{URL.revokeObjectURL(url)}catch(_e){}},30000);
+  }
+  function personName(id){
+    const p=(state?.people||state?.profiles||[]).find(x=>x.id===id);
+    return p?.display_name||p?.email||'';
+  }
+  function departmentNames(userId){
+    const ids=(state?.userDepartments||[]).filter(x=>x.user_id===userId).map(x=>x.department_id);
+    return [...new Set(ids.map(id=>(state?.departments||[]).find(d=>d.id===id)?.name).filter(Boolean))].join(', ');
+  }
+  function currentGenericVersion(doc,versions){
+    const rows=versions.filter(v=>v.document_id===doc.id);
+    return rows.find(v=>v.status==='CURRENT'&&String(v.approval_status||'APPROVED')==='APPROVED')||null;
+  }
+  function currentPackVersion(item,versions){
+    return versions.filter(v=>v.item_id===item.id).sort((a,b)=>(Number(b.version_no)||0)-(Number(a.version_no)||0)||new Date(b.created_at||0)-new Date(a.created_at||0))[0]||null;
+  }
+  async function from(table,fn){
+    const q=fn(sb.from(table).select('*'));
+    const r=await q;if(r.error)throw r.error;return r.data||[];
+  }
+  async function loadFolder(folderId,{history=false}={}){
+    const fr=await sb.from('document_folders_v21119').select('*').eq('id',folderId).maybeSingle();
+    if(fr.error)throw fr.error;
+    const folder=fr.data;if(!folder)throw new Error('Document folder not found.');
+
+    const dr=await sb.from('documents').select('*').eq('folder_id',folderId).order('reference');
+    if(dr.error)throw dr.error;
+    const docs=dr.data||[],docIds=docs.map(x=>x.id);
+    let docVersions=[];
+    if(docIds.length){
+      const r=await sb.from('document_versions').select('*').in('document_id',docIds).order('created_at',{ascending:false});
+      if(r.error)throw r.error;docVersions=r.data||[];
+    }
+
+    const pr=await sb.from('document_packs_v21160').select('*').eq('folder_id',folderId).eq('active',true).limit(1);
+    if(pr.error)throw pr.error;
+    const pack=pr.data?.[0]||null;
+    let packItems=[],packVersions=[],packReviews=[],packAudit=[],packSnapshots=[];
+    if(pack){
+      const ir=await sb.from('document_pack_items_v21160').select('*').eq('pack_id',pack.id).order('sort_order');
+      if(ir.error)throw ir.error;packItems=ir.data||[];
+      const itemIds=packItems.map(x=>x.id);
+      if(itemIds.length){
+        const vr=await sb.from('document_pack_item_versions_v21160').select('*').in('item_id',itemIds).order('created_at',{ascending:false});
+        if(vr.error)throw vr.error;packVersions=vr.data||[];
+      }
+      if(history){
+        const rr=await sb.from('document_pack_item_reviews_v21165').select('*').eq('pack_id',pack.id).order('completed_at',{ascending:false});
+        if(rr.error)throw rr.error;packReviews=rr.data||[];
+        const [ar,sr]=await Promise.all([
+          sb.rpc('document_pack_audit_report_v21162',{p_pack_id:pack.id}),
+          sb.rpc('document_pack_snapshot_report_v21163',{p_pack_id:pack.id})
+        ]);
+        if(!ar.error)packAudit=ar.data||[];
+        if(!sr.error)packSnapshots=sr.data||[];
+      }
+    }
+
+    const ctx={folder,docs,docIds,docVersions,pack,packItems,packVersions,packReviews,packAudit,packSnapshots};
+    if(!history)return ctx;
+
+    let documentReviews=[],documentActivity=[],documentAssignments=[],documentSignoffs=[],trainingLinks=[];
+    if(docIds.length){
+      const [rr,ar,asr,lr]=await Promise.all([
+        sb.from('document_reviews').select('*').in('document_id',docIds).order('reviewed_at',{ascending:false}),
+        sb.from('document_activity').select('*').in('document_id',docIds).order('occurred_at',{ascending:false}),
+        sb.from('document_assignments').select('*').in('document_version_id',docVersions.map(x=>x.id).length?docVersions.map(x=>x.id):['00000000-0000-0000-0000-000000000000']),
+        sb.from('training_document_links').select('*').in('document_id',docIds)
+      ]);
+      if(rr.error)throw rr.error;if(ar.error)throw ar.error;if(asr.error)throw asr.error;if(lr.error)throw lr.error;
+      documentReviews=rr.data||[];documentActivity=ar.data||[];documentAssignments=asr.data||[];trainingLinks=lr.data||[];
+      const versionIds=docVersions.map(x=>x.id);
+      if(versionIds.length){
+        const sr=await sb.from('document_signoffs').select('*').in('document_version_id',versionIds).order('signed_at',{ascending:false});
+        if(sr.error)throw sr.error;documentSignoffs=sr.data||[];
+      }
+    }
+
+    const trainingIds=new Set(trainingLinks.map(x=>x.training_session_id));
+    if(docIds.length){
+      const tr=await sb.from('training_sessions').select('*').in('source_document_id',docIds);
+      if(tr.error)throw tr.error;(tr.data||[]).forEach(x=>trainingIds.add(x.id));
+    }
+    let training=[],trainingAssignments=[],trainingSignoffs=[],trainingActivity=[];
+    const tids=[...trainingIds];
+    if(tids.length){
+      const [tr,ta,ts,act]=await Promise.all([
+        sb.from('training_sessions').select('*').in('id',tids),
+        sb.from('training_assignments').select('*').in('training_session_id',tids).order('assigned_at',{ascending:false}),
+        sb.from('training_signoffs').select('*').in('training_session_id',tids).order('signed_at',{ascending:false}),
+        sb.from('document_activity').select('*').in('training_session_id',tids).order('occurred_at',{ascending:false})
+      ]);
+      if(tr.error)throw tr.error;if(ta.error)throw ta.error;if(ts.error)throw ts.error;if(act.error)throw act.error;
+      training=tr.data||[];trainingAssignments=ta.data||[];trainingSignoffs=ts.data||[];trainingActivity=act.data||[];
+    }
+
+    const userIds=[...new Set([
+      ...documentReviews.map(x=>x.reviewer_id),
+      ...documentAssignments.map(x=>x.user_id),
+      ...documentSignoffs.map(x=>x.user_id),
+      ...trainingAssignments.map(x=>x.user_id),
+      ...trainingSignoffs.map(x=>x.user_id),
+      ...packReviews.map(x=>x.completed_by)
+    ].filter(Boolean))];
+    let userPositions=[],positions=[];
+    if(userIds.length){
+      const upr=await sb.from('safety_user_positions_v21069').select('*').in('user_id',userIds);
+      if(!upr.error)userPositions=upr.data||[];
+    }
+    const posIds=[...new Set(userPositions.map(x=>x.position_id).filter(Boolean))];
+    if(posIds.length){
+      const por=await sb.from('safety_positions_v21069').select('*').in('id',posIds);
+      if(!por.error)positions=por.data||[];
+    }
+
+    return {...ctx,documentReviews,documentActivity,documentAssignments,documentSignoffs,trainingLinks,training,trainingAssignments,trainingSignoffs,trainingActivity,userPositions,positions};
+  }
+
+  function indexRows(ctx){
+    const rows=[];
+    for(const d of ctx.docs.filter(x=>x.status!=='ARCHIVED')){
+      const v=currentGenericVersion(d,ctx.docVersions);
+      rows.push({
+        source:'Controlled document',reference:d.reference||'',title:d.title||'',type:d.doc_type||'',
+        version:v?.version_label||'',issue_date:v?.issue_date||'',review_date:v?.review_date||'',
+        file_name:v?.file_name||'',included:!!v,status:v?'Approved/current':'Not included - no approved/current file'
+      });
+    }
+    for(const i of ctx.packItems.filter(x=>x.active!==false)){
+      const v=currentPackVersion(i,ctx.packVersions);
+      rows.push({
+        source:'Document-set file',reference:'',title:i.title||'',type:'Document set file',
+        version:v?.version_no||'',issue_date:v?.created_at?String(v.created_at).slice(0,10):'',
+        review_date:i.next_review_date||'',file_name:v?.file_name||'',included:!!v,
+        status:v?'Current pack file':'Not included - no file version'
+      });
+    }
+    return rows;
+  }
+
+  async function downloadCurrentFolder(folderId,button){
+    if(!canManage())return;
+    if(!window.JSZip)return toast('ZIP library did not load. Refresh and try again.');
+    const old=button?.textContent||'Download current folder ZIP';
+    if(button){button.disabled=true;button.textContent='Preparing folder…'}
+    try{
+      const ctx=await loadFolder(folderId,{history:false});
+      const zip=new JSZip(),rows=indexRows(ctx),used=new Set(),failures=[];
+      const filesFolder=zip.folder('Current files');
+      let all=[];
+      for(const d of ctx.docs.filter(x=>x.status!=='ARCHIVED')){
+        const v=currentGenericVersion(d,ctx.docVersions);
+        if(v)all.push({kind:'DOC',title:d.title||v.file_name,reference:d.reference||'',file:v.file_name||`${d.title||'document'}.pdf`,path:v.storage_path,editable:v.editable_content||null});
+      }
+      for(const i of ctx.packItems.filter(x=>x.active!==false)){
+        const v=currentPackVersion(i,ctx.packVersions);
+        if(v)all.push({kind:'PACK',title:i.title||v.file_name,reference:'',file:v.file_name||`${i.title||'document'}.docx`,path:v.storage_path,editable:null});
+      }
+      const unique=n=>{
+        let name=safeName(n,'document'),base=name,ext='';
+        const m=name.match(/^(.*?)(\.[A-Za-z0-9]{1,8})$/);if(m){base=m[1];ext=m[2]}
+        let k=2;while(used.has(name.toLowerCase()))name=`${base} (${k++})${ext}`;
+        used.add(name.toLowerCase());return name;
+      };
+      for(let n=0;n<all.length;n++){
+        const x=all[n];if(button)button.textContent=`Adding ${n+1} of ${all.length}…`;
+        const prefix=x.reference?`${x.reference} - `:'';
+        const name=unique(prefix+x.file);
+        try{
+          if(x.path){
+            const r=await sb.storage.from('safety-files').download(x.path);
+            if(r.error)throw r.error;
+            filesFolder.file(name,r.data);
+          }else if(x.editable){
+            filesFolder.file(unique(`${prefix}${x.title}.txt`),String(x.editable));
+          }else failures.push(`${x.title}: no stored file`);
+        }catch(e){failures.push(`${x.title}: ${e.message||e}`)}
+      }
+
+      const head=['Source','Reference','Title','Type','Version','Issue date','Review date','File name','Included','Status'];
+      const lines=[head.map(csv).join(',')];
+      for(const r of rows)lines.push([r.source,r.reference,r.title,r.type,r.version,r.issue_date,r.review_date,r.file_name,r.included?'Yes':'No',r.status].map(csv).join(','));
+      zip.file('INDEX.csv',lines.join('\r\n'));
+      const readme=[
+        `Safety Tracker - Current Folder Snapshot`,
+        ``,
+        `Folder: ${ctx.folder.name}`,
+        `Generated: ${nowText()}`,
+        `Safety Tracker: v${window.SAFETY_BUILD?.version||'2.11.74'}`,
+        `Controlled document set: ${ctx.pack?'Yes':'No'}`,
+        `Files included: ${all.length-failures.length}`,
+        ``,
+        `PURPOSE`,
+        `This ZIP is the current hard-copy/offline snapshot of this folder at the generated date/time.`,
+        `When an individual controlled file is updated later, download the new current file from Safety Tracker and replace only that file in the hard-copy set.`,
+        `The separate History / Audit Report remains the evidence of file changes, reviews, acknowledgements and linked training history.`,
+        ``,
+        `INDEX.csv lists the current file/version details used for this snapshot.`,
+        ...(failures.length?[``,`FILES NOT INCLUDED`,`The following files could not be added to this ZIP:`,...failures]:[])
+      ];
+      zip.file('README.txt',readme.join('\r\n'));
+      if(button)button.textContent='Compressing ZIP…';
+      const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>{if(button&&m.percent)button.textContent=`Compressing ${Math.round(m.percent)}%…`});
+      downloadBlob(blob,`${safeName(ctx.folder.name,'Document-Folder')}-CURRENT-${today()}.zip`);
+      toast(failures.length?`Folder ZIP downloaded with ${failures.length} file warning${failures.length===1?'':'s'}. See README.txt.`:'Current folder ZIP downloaded.');
+    }catch(e){console.error('v2.11.74 folder ZIP',e);toast(e.message||'Folder ZIP failed.')}
+    finally{if(button){button.disabled=false;button.textContent=old}}
+  }
+
+  function addSheet(wb,name,columns,rows){
+    const ws=wb.addWorksheet(name.slice(0,31));
+    ws.columns=columns.map(c=>({header:c.header,key:c.key,width:c.width||20}));
+    rows.forEach(r=>ws.addRow(r));
+    ws.views=[{state:'frozen',ySplit:1}];
+    if(columns.length)ws.autoFilter={from:'A1',to:ws.getRow(1).getCell(columns.length).address};
+    const h=ws.getRow(1);h.font={bold:true};h.alignment={vertical:'middle',wrapText:true};h.height=24;
+    ws.eachRow((row,n)=>{row.alignment={vertical:'top',wrapText:true};if(n>1)row.eachCell(c=>{c.protection={locked:true}})});
+    return ws;
+  }
+  function addDynamicSheet(wb,name,rows){
+    const keys=[];
+    rows.forEach(r=>Object.keys(r||{}).forEach(k=>{if(!keys.includes(k))keys.push(k)}));
+    return addSheet(wb,name,keys.map(k=>({header:k,key:k,width:Math.min(45,Math.max(14,k.length+4))})),rows);
+  }
+
+  async function downloadHistory(folderId,button){
+    if(!canManage())return;
+    if(!window.ExcelJS)return toast('Excel library did not load. Refresh and try again.');
+    const old=button?.textContent||'History / audit report';
+    if(button){button.disabled=true;button.textContent='Building audit report…'}
+    try{
+      const c=await loadFolder(folderId,{history:true}),wb=new ExcelJS.Workbook();
+      wb.creator='Safety Tracker';wb.created=new Date();wb.title=`${c.folder.name} - History and Audit Report`;
+      wb.subject='Folder history, file versions, reviews, acknowledgements and training';
+
+      addSheet(wb,'Summary',[
+        {header:'Field',key:'field',width:34},{header:'Value',key:'value',width:80}
+      ],[
+        {field:'Folder',value:c.folder.name},
+        {field:'Description',value:c.folder.description||''},
+        {field:'Generated',value:nowText()},
+        {field:'Safety Tracker version',value:window.SAFETY_BUILD?.version||'2.11.74'},
+        {field:'Controlled document set',value:c.pack?'Yes':'No'},
+        {field:'Generic controlled documents',value:c.docs.length},
+        {field:'Document-set files',value:c.packItems.filter(x=>x.active!==false).length},
+        {field:'Purpose',value:'Separate audit history report. Current hard-copy files are downloaded using Download current folder ZIP.'}
+      ]);
+
+      addSheet(wb,'Current File Register',[
+        {header:'Source',key:'source',width:20},{header:'Reference',key:'reference',width:18},{header:'Title',key:'title',width:42},
+        {header:'Type',key:'type',width:24},{header:'Version',key:'version',width:12},{header:'Issue / created',key:'issue_date',width:16},
+        {header:'Review date',key:'review_date',width:16},{header:'File name',key:'file_name',width:40},{header:'Status',key:'status',width:30}
+      ],indexRows(c));
+
+      const genericVersions=c.docVersions.map(v=>{
+        const d=c.docs.find(x=>x.id===v.document_id)||{};
+        return {
+          source:'Controlled document',reference:d.reference||'',title:d.title||'',version:v.version_label||'',file_name:v.file_name||'',
+          status:v.status||'',approval_status:v.approval_status||'',issue_date:v.issue_date||'',review_date:v.review_date||'',
+          created_at:v.created_at||'',created_by:personName(v.created_by),approved_at:v.approved_at||v.approval_at||'',
+          approved_by:personName(v.approved_by||v.approval_by),approval_note:v.approval_note||'',notes:v.notes||''
+        };
+      });
+      const packVersions=c.packVersions.map(v=>{
+        const i=c.packItems.find(x=>x.id===v.item_id)||{};
+        return {
+          source:'Document-set file',reference:'',title:i.title||'',version:v.version_no||'',file_name:v.file_name||'',
+          status:`Pack revision ${v.pack_revision||''}`,approval_status:v.ack_requirement||'',issue_date:String(v.created_at||'').slice(0,10),
+          review_date:i.next_review_date||'',created_at:v.created_at||'',created_by:personName(v.created_by),approved_at:'',
+          approved_by:'',approval_note:v.change_reason||'',notes:[v.change_classification,v.incident_reference].filter(Boolean).join(' · ')
+        };
+      });
+      addSheet(wb,'File Version History',[
+        {header:'Source',key:'source',width:20},{header:'Reference',key:'reference',width:18},{header:'Title',key:'title',width:42},
+        {header:'Version',key:'version',width:12},{header:'File',key:'file_name',width:40},{header:'Status / revision',key:'status',width:20},
+        {header:'Approval / acknowledgement',key:'approval_status',width:24},{header:'Issue date',key:'issue_date',width:14},
+        {header:'Review date',key:'review_date',width:14},{header:'Created',key:'created_at',width:22},{header:'Created by',key:'created_by',width:26},
+        {header:'Approved',key:'approved_at',width:22},{header:'Approved by',key:'approved_by',width:26},{header:'Change / approval note',key:'approval_note',width:48},
+        {header:'Other detail',key:'notes',width:36}
+      ],[...genericVersions,...packVersions]);
+
+      const reviews=[
+        ...c.documentReviews.map(r=>{
+          const d=c.docs.find(x=>x.id===r.document_id)||{};
+          const v=c.docVersions.find(x=>x.id===r.document_version_id)||{};
+          return {source:'Controlled document',reference:d.reference||r.reference_snapshot||'',title:d.title||r.title_snapshot||'',version:v.version_label||r.version_snapshot||'',review_type:'Controlled review',outcome:r.outcome||'',reviewed_at:r.reviewed_at||r.created_at||'',reviewed_by:personName(r.reviewer_id)||r.signature_name||'',next_review:r.next_review_date||'',annual_satisfied:'',periodic_satisfied:'',comments:r.review_note||''};
+        }),
+        ...c.packReviews.map(r=>{
+          const i=c.packItems.find(x=>x.id===r.item_id)||{},v=c.packVersions.find(x=>x.id===r.item_version_id)||{};
+          return {source:'Document-set file',reference:'',title:i.title||'',version:v.version_no||'',review_type:String(r.review_kind||'').replaceAll('_',' '),outcome:String(r.outcome||'').replaceAll('_',' '),reviewed_at:r.completed_at||'',reviewed_by:personName(r.completed_by),next_review:r.next_periodic_review_date||'',annual_satisfied:r.annual_satisfied?'Yes':'No',periodic_satisfied:r.periodic_satisfied?'Yes':'No',comments:r.comments||r.review_reason||''};
+        })
+      ];
+      addSheet(wb,'Review History',[
+        {header:'Source',key:'source',width:20},{header:'Reference',key:'reference',width:18},{header:'Title',key:'title',width:42},
+        {header:'Version',key:'version',width:12},{header:'Review type',key:'review_type',width:20},{header:'Outcome',key:'outcome',width:24},
+        {header:'Reviewed',key:'reviewed_at',width:22},{header:'Reviewed by',key:'reviewed_by',width:26},{header:'Next review',key:'next_review',width:16},
+        {header:'Annual satisfied',key:'annual_satisfied',width:16},{header:'Periodic satisfied',key:'periodic_satisfied',width:18},{header:'Comments',key:'comments',width:55}
+      ],reviews);
+
+      const assignmentById=new Map(c.documentAssignments.map(x=>[x.id,x]));
+      const docSignRows=c.documentSignoffs.map(s=>{
+        const a=assignmentById.get(s.assignment_id),v=c.docVersions.find(x=>x.id===s.document_version_id)||{},d=c.docs.find(x=>x.id===v.document_id)||{};
+        return {person:personName(s.user_id),departments:departmentNames(s.user_id),reference:d.reference||s.reference_snapshot||'',document:d.title||s.title_snapshot||'',version:v.version_label||s.version_snapshot||'',assigned_at:a?.assigned_at||'',due_date:a?.due_date||'',acknowledged_at:s.signed_at||'',acknowledged_by:s.signature_name||personName(s.user_id),statement:s.statement_snapshot||''};
+      });
+      addSheet(wb,'Document Acknowledgements',[
+        {header:'Person',key:'person',width:28},{header:'Department(s)',key:'departments',width:28},{header:'Reference',key:'reference',width:18},
+        {header:'Document',key:'document',width:42},{header:'Version',key:'version',width:12},{header:'Assigned',key:'assigned_at',width:22},
+        {header:'Due',key:'due_date',width:16},{header:'Acknowledged',key:'acknowledged_at',width:22},{header:'Acknowledged by',key:'acknowledged_by',width:26},
+        {header:'Statement',key:'statement',width:60}
+      ],docSignRows);
+
+      const positionNames=uid=>{
+        const ids=c.userPositions.filter(x=>x.user_id===uid&&x.active!==false).map(x=>x.position_id);
+        return [...new Set(ids.map(id=>c.positions.find(p=>p.id===id)?.name).filter(Boolean))].join(', ');
+      };
+      const signByAssignment=new Map();
+      c.trainingSignoffs.forEach(s=>{const old=signByAssignment.get(s.training_assignment_id);if(!old||new Date(s.signed_at||0)>new Date(old.signed_at||0))signByAssignment.set(s.training_assignment_id,s)});
+      const trainRows=c.trainingAssignments.map(a=>{
+        const t=c.training.find(x=>x.id===a.training_session_id)||{},s=signByAssignment.get(a.id);
+        return {
+          reference:t.reference||'',training:t.name||'',domain:t.training_domain||'H&S',category:t.training_category||t.session_type||'',
+          method:a.delivery_method_override||t.delivery_method||'',person:personName(a.user_id),departments:departmentNames(a.user_id),positions:positionNames(a.user_id),
+          assigned_at:a.assigned_at||'',due_date:a.due_date||'',active:a.active===false?'No':'Yes',assignment_source:a.assignment_origin||'',
+          completed_at:s?.signed_at||'',acknowledged_by:s?.signature_name||'',instructor:s?.trainer_snapshot||t.trainer_name||'',
+          renewal:a.renewal_value&&a.renewal_unit?`${a.renewal_value} ${String(a.renewal_unit).toLowerCase()}`:''
+        };
+      });
+      addSheet(wb,'Linked Training History',[
+        {header:'Reference',key:'reference',width:18},{header:'Training',key:'training',width:42},{header:'Area',key:'domain',width:14},
+        {header:'Category / type',key:'category',width:24},{header:'Method',key:'method',width:18},{header:'Person',key:'person',width:28},
+        {header:'Department(s)',key:'departments',width:28},{header:'Position(s)',key:'positions',width:30},{header:'Assigned',key:'assigned_at',width:22},
+        {header:'Due',key:'due_date',width:16},{header:'Active',key:'active',width:10},{header:'Assignment source',key:'assignment_source',width:18},
+        {header:'Completed',key:'completed_at',width:22},{header:'Acknowledged by',key:'acknowledged_by',width:26},{header:'Instructor',key:'instructor',width:26},
+        {header:'Renewal',key:'renewal',width:18}
+      ],trainRows);
+
+      const acts=[...c.documentActivity,...c.trainingActivity].filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i).map(x=>({
+        date_time:x.occurred_at||'',person:x.user_name_snapshot||personName(x.user_id),email:x.user_email_snapshot||'',
+        action:x.action||'',context:x.source_context||'',reference:x.document_reference||'',document:x.document_title||'',
+        version:x.version_label||'',file:x.file_name||'',training:c.training.find(t=>t.id===x.training_session_id)?.name||'',
+        detail:x.metadata?JSON.stringify(x.metadata):''
+      }));
+      addSheet(wb,'Activity Audit',[
+        {header:'Date / time',key:'date_time',width:22},{header:'Person',key:'person',width:28},{header:'Email',key:'email',width:32},
+        {header:'Action',key:'action',width:22},{header:'Context',key:'context',width:24},{header:'Reference',key:'reference',width:18},
+        {header:'Document',key:'document',width:42},{header:'Version',key:'version',width:12},{header:'File',key:'file',width:36},
+        {header:'Training',key:'training',width:42},{header:'Detail',key:'detail',width:60}
+      ],acts);
+
+      if(c.packAudit.length)addDynamicSheet(wb,'Pack Audit',c.packAudit);
+      if(c.packSnapshots.length)addDynamicSheet(wb,'Pack Signoff Snapshots',c.packSnapshots);
+
+      for(const ws of wb.worksheets){
+        try{await ws.protect('SafetyTrackerReport',{autoFilter:true,selectLockedCells:true,selectUnlockedCells:true,formatCells:false,formatColumns:false,formatRows:false,insertRows:false,deleteRows:false,insertColumns:false,deleteColumns:false})}catch(_e){}
+      }
+
+      const bytes=await wb.xlsx.writeBuffer();
+      downloadBlob(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`${safeName(c.folder.name,'Document-Folder')}-HISTORY-AUDIT-${today()}.xlsx`);
+      toast('Folder History / Audit Report downloaded.');
+    }catch(e){console.error('v2.11.74 history report',e);toast(e.message||'History / Audit Report failed.')}
+    finally{if(button){button.disabled=false;button.textContent=old}}
+  }
+
+  function currentFolderId(){
+    return $('docFolderContentsV21119')?.querySelector?.('[data-v21119-edit-folder]')?.dataset?.v21119EditFolder||'';
+  }
+  function decorate(){
+    const root=$('docFolderContentsV21119');if(!root||!canManage())return;
+    const folderId=currentFolderId();if(!folderId)return;
+    let box=$('folderExportsV21174');
+    if(box&&box.dataset.folderId!==folderId){box.remove();box=null}
+    if(box)return;
+    box=document.createElement('div');box.id='folderExportsV21174';box.dataset.folderId=folderId;box.className='section-card folder-exports-v21174';
+    box.innerHTML=`<div class="row-between"><div><h4>Hard copy & audit history</h4><p class="muted">Download the current folder as a hard-copy/offline ZIP. When one file is updated later, replace only that downloaded file. The separate History / Audit Report keeps the change, review, acknowledgement and linked-training evidence.</p></div></div><div class="row action-bar"><button class="primary" type="button" data-v21174-folder-zip="${esc(folderId)}">Download current folder ZIP</button><button class="secondary" type="button" data-v21174-folder-history="${esc(folderId)}">History / audit report</button></div>`;
+    const summary=root.querySelector('#controlledSetSummaryV21165');
+    if(summary)summary.insertAdjacentElement('afterend',box);
+    else{
+      const head=root.querySelector('.row-between');
+      if(head)head.insertAdjacentElement('afterend',box);else root.prepend(box);
+    }
+  }
+  function install(){
+    window.addEventListener('click',e=>{
+      const z=e.target.closest?.('[data-v21174-folder-zip]');if(z){e.preventDefault();e.stopImmediatePropagation();downloadCurrentFolder(z.dataset.v21174FolderZip,z);return}
+      const h=e.target.closest?.('[data-v21174-folder-history]');if(h){e.preventDefault();e.stopImmediatePropagation();downloadHistory(h.dataset.v21174FolderHistory,h);return}
+      if(e.target.closest?.('[data-v21119-open-folder],[data-v21119-edit-folder],#mainNav button[data-view="documents"]'))setTimeout(decorate,180);
+    },true);
+    const root=$('docFolderWorkspaceV21119')||document.body;
+    if(typeof MutationObserver==='function'){observer=new MutationObserver(()=>setTimeout(decorate,40));observer.observe(root,{childList:true,subtree:true})}
+    window.addEventListener('pageshow',()=>setTimeout(decorate,220));
+    [160,450,900].forEach(ms=>setTimeout(decorate,ms));
+  }
+  function boot(){
+    api=window.SafetyTrackerV2;if(!api?.state||!api?.sb){setTimeout(boot,120);return}
+    state=api.state;sb=api.sb;if(!state.user){setTimeout(boot,180);return}
+    install();
+    window.SafetyFolderExportsV21174={decorate,downloadCurrentFolder,downloadHistory};
+  }
+  boot();
+})();
