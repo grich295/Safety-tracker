@@ -1,6 +1,6 @@
 {
-  "version": "2.11.70",
-  "build_id": "v21170-management-home-formatting-20260926",
+  "version": "2.11.71",
+  "build_id": "v21171-approval-save-reliability-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Preserves v2.11.69 Instructor/User editor fixes, v2.11.68 simplified Departments/Positions/Users setup hub, v2.11.67 Management navigation, v2.11.66 People/Department/Operational Overseer controls and v2.11.65 controlled document-set reviews. Fixes mobile Management setup tile formatting so the D/P/U icons no longer overlap Departments/Positions/Users titles. Makes the Management tab and all Management back controls deterministically clear detail/setup state and return directly to the Management home instead of relying on browser-history timing. No database change required."
+  "notes": "Cumulative Safety Tracker build. Preserves v2.11.70 Management navigation/formatting, v2.11.69 Instructor/User editor fixes, v2.11.68 simplified Departments/Positions/Users setup, v2.11.66 People/Department/Operational Overseer controls and v2.11.65 controlled document-set reviews. Repairs Save approval decision so Admin approval cannot be left disabled by the older responsibility decorator, handles the approval click deterministically, and shows approval validation/database feedback inside the modal so mobile users can see why an approval was not saved. No database change required."
 }

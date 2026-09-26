@@ -630,3 +630,170 @@
   }
   boot();
 })();
+
+/* Safety Tracker v2.11.71 CLEAN
+   Approval save reliability.
+   - Prevents the older responsibility decorator from leaving an Admin approval button disabled.
+   - Captures Save approval decision before older click handlers can interfere.
+   - Calls the existing controlled-document approval routine directly.
+   - Mirrors approval validation / database errors inside the open modal so mobile users can
+     actually see why an approval was not saved instead of a toast appearing behind the dialog.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_APPROVAL_SAVE_REPAIR_V21171)return;
+  window.__SAFETY_APPROVAL_SAVE_REPAIR_V21171=true;
+
+  let api=null,state=null,observer=null,repairQueued=false;
+  const $=id=>document.getElementById(id);
+  const actualAdmin=()=>{
+    const p=state?.profile;
+    return !!p && p.report_only!==true &&
+      String(p.role||'').toLowerCase()==='admin' &&
+      state?.uiMode!=='user';
+  };
+
+  function saveButton(){
+    return document.querySelector('#modalBody [data-save-version-approval]');
+  }
+  function scopeBlocked(){
+    const hint=$('responsibilityApprovalHintV21090');
+    return /^Scope required\./i.test(String(hint?.textContent||'').trim());
+  }
+  function feedback(message,type='danger'){
+    const body=$('modalBody');
+    if(!body)return;
+    let box=$('approvalSaveFeedbackV21171');
+    if(!box){
+      box=document.createElement('div');
+      box.id='approvalSaveFeedbackV21171';
+      const actions=[...body.querySelectorAll('.actions')].pop();
+      if(actions)actions.insertAdjacentElement('beforebegin',box);
+      else body.appendChild(box);
+    }
+    box.className=type==='success'?'success-note':'danger-note';
+    box.innerHTML=`<strong>${type==='success'?'Approval saved':'Approval not saved'}</strong><br>${String(message||'Please check the required approval fields above.')}`;
+    try{box.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(_e){}
+  }
+
+  function enforceAdminApproval(){
+    if(!actualAdmin())return;
+    const modal=$('modal'),button=saveButton();
+    if(!modal?.open||!button)return;
+    if(scopeBlocked()){
+      button.disabled=true;
+      button.title='Set the document scope/audience before approval.';
+      return;
+    }
+    button.disabled=false;
+    button.removeAttribute('disabled');
+    button.title='';
+    const hint=$('responsibilityApprovalHintV21090');
+    if(hint && !/Admin approval:/i.test(hint.textContent||'')){
+      hint.className='success-note';
+      hint.innerHTML='<strong>Admin approval:</strong> Any Admin may approve or review this controlled document. Assigned H&amp;S / Department responsibility is used for ownership, reminders and follow-up; it does not restrict Admin approval permission.';
+    }
+  }
+
+  function queueRepair(){
+    if(repairQueued)return;
+    repairQueued=true;
+    queueMicrotask(()=>{
+      repairQueued=false;
+      try{enforceAdminApproval()}catch(e){console.warn('Safety v2.11.71 approval button repair',e)}
+    });
+  }
+
+  async function handleSave(button){
+    if(button.dataset.v21171Saving==='1')return;
+    const versionId=button.dataset.saveVersionApproval;
+    const fn=window.saveVersionApproval;
+    if(typeof fn!=='function'){
+      feedback('The approval action is still loading. Close this window, reopen Review & approve, then try again.');
+      return;
+    }
+
+    button.dataset.v21171Saving='1';
+    const oldText=button.textContent;
+    button.disabled=true;
+    button.textContent='Saving approval…';
+    feedback('Saving the approval decision…','success');
+
+    let captured='';
+    const originalToast=window.toast;
+    const wrappedToast=function(message){
+      captured=String(message||'');
+      try{if(typeof originalToast==='function')originalToast(message)}catch(_e){}
+      const ok=/approved|accepted|updated|current|recorded/i.test(captured) &&
+        !/not |could not|failed|error|required|choose|tick|open the exact|no longer/i.test(captured);
+      feedback(captured,ok?'success':'danger');
+    };
+
+    try{
+      if(typeof originalToast==='function')window.toast=wrappedToast;
+      await Promise.resolve(fn(versionId));
+
+      // Successful approval closes the modal. If it is still open, surface a visible
+      // explanation even when an older validation path did not produce a toast.
+      await new Promise(resolve=>setTimeout(resolve,80));
+      if($('modal')?.open && saveButton()){
+        if(!captured){
+          feedback('The approval has not been saved. Check that the pending file has been opened, the confirmation box is ticked, and the training schedule/audience above is complete.');
+        }
+      }
+    }catch(e){
+      console.error('Safety v2.11.71 approval save',e);
+      feedback(e?.message||'The approval could not be saved. Please try again.');
+    }finally{
+      if(window.toast===wrappedToast)window.toast=originalToast;
+      const live=saveButton();
+      if(live){
+        live.dataset.v21171Saving='';
+        live.textContent=oldText||'Save approval decision';
+        enforceAdminApproval();
+        if(!actualAdmin())live.disabled=false;
+      }
+    }
+  }
+
+  function install(){
+    const body=$('modalBody');
+    if(body&&!observer){
+      observer=new MutationObserver(queueRepair);
+      observer.observe(body,{
+        childList:true,
+        subtree:true,
+        attributes:true,
+        attributeFilter:['disabled']
+      });
+    }
+
+    window.addEventListener('pointerdown',e=>{
+      if(e.target.closest?.('[data-save-version-approval]'))queueRepair();
+    },true);
+
+    window.addEventListener('click',e=>{
+      const button=e.target.closest?.('[data-save-version-approval]');
+      if(!button)return;
+      const fn=window.saveVersionApproval;
+      if(typeof fn!=='function')return; // let the core handler keep its normal fallback
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void handleSave(button);
+    },true);
+
+    window.addEventListener('pageshow',()=>setTimeout(queueRepair,120));
+    [80,220,500,900].forEach(ms=>setTimeout(queueRepair,ms));
+    window.SafetyApprovalSaveRepairV21171={repair:enforceAdminApproval};
+  }
+
+  function boot(){
+    api=window.SafetyTrackerV2;
+    if(!api?.state){setTimeout(boot,100);return}
+    state=api.state;
+    if(!state.user){setTimeout(boot,160);return}
+    install();
+  }
+  boot();
+})();
+
