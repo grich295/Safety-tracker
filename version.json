@@ -1,6 +1,6 @@
 {
-  "version": "2.11.66",
-  "build_id": "v21166-people-department-oversight-20260926",
+  "version": "2.11.67",
+  "build_id": "v21167-management-navigation-stability-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Preserves v2.11.65 controlled document-set annual/individual review controls and all prior pack/TBT/Manager features. Simplifies People & Access so Main Department is selected directly and is independent from Main Position, with optional additional Departments and Positions. Official HOD is tied to Main Department. Adds Operational Overseer as a separate multi-Department responsibility that does not replace the official HOD. Manager mode can work across all managed/overseen Departments or drill into one selected Department. New Safety users default to the Safety site from which they are created. Existing HOD/profile compatibility functions now use Main Department rather than deriving Department from Position. Database changes for v2.11.66 are already applied."
+  "notes": "Cumulative Safety Tracker build. Preserves v2.11.66 People/Department/Operational Overseer changes and v2.11.65 controlled document-set reviews. Repairs the Management tab as a single deterministic navigation hub: tapping Management always opens the Management tile home; Calendar, Reports & Evidence and Knowledge Checks can open their reportsView detail without bouncing back to the home; Safety Actions, Compliance, People and Admin retain a consistent return route; all Management back controls return to the Management home; Android/browser Back from Management detail returns to the Management home before leaving the section. Duplicate legacy Management back buttons are hidden. No database change required."
 }

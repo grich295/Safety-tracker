@@ -1714,3 +1714,266 @@
   }
   boot().catch(e=>console.warn('Safety Tracker v2.11.66 People/Department/Operational Overseer',e));
 })();
+/* Safety Tracker v2.11.67 CLEAN
+   Management navigation stability.
+   - Management tab always opens the Management tile home.
+   - Management detail tiles route explicitly without bouncing back to the tile home.
+   - Every "← Management" control returns to the tile home deterministically.
+   - Android/browser Back from Calendar / Reports / Knowledge returns to Management home first.
+   - Removes duplicate legacy Management back buttons from view.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_MANAGEMENT_NAV_V21167)return;
+  window.__SAFETY_MANAGEMENT_NAV_V21167=true;
+
+  let api=null,state=null,installed=false,bypassTop=false,detailSeq=0;
+  const $=id=>document.getElementById(id);
+  const manager=()=>{
+    const p=state?.profile;
+    if(!p||p.report_only===true)return false;
+    const r=String(p.role||'').toLowerCase();
+    return ['admin','manager'].includes(r) && !(r==='admin'&&(state?.offline||state?.uiMode==='user'));
+  };
+
+  function topButton(name){return document.querySelector(`#mainNav button[data-view="${name}"]`)}
+
+  function activateViewDom(name){
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active-view',v.id===name+'View'));
+    document.querySelectorAll('#mainNav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  }
+
+  function baseShow(name){
+    try{
+      if(typeof window.showView==='function'){
+        window.showView(name);
+        return true;
+      }
+    }catch(e){console.warn('v2.11.67 showView fallback',e)}
+    const b=topButton(name);
+    if(!b)return false;
+    bypassTop=true;
+    try{b.click()}finally{bypassTop=false}
+    return true;
+  }
+
+  function removeHomeClasses(){
+    const r=$('reportsView');
+    if(!r)return;
+    r.classList.remove('management-home-active-v21111','management-home-active-v21079');
+    r.dataset.managementV21167='detail';
+  }
+
+  function ensureBackButtons(){
+    if(!manager())return;
+    ['reports','compliance','people','admin'].forEach(name=>{
+      if(name==='admin'&&String(state?.profile?.role||'').toLowerCase()!=='admin')return;
+      const view=$(name+'View');if(!view)return;
+      let b=view.querySelector('.management-back-v21167');
+      if(!b){
+        b=document.createElement('button');
+        b.type='button';
+        b.className='secondary management-back-v21167';
+        b.dataset.managementHomeV21167='1';
+        b.textContent='← Management';
+        const h=view.querySelector('.page-heading');
+        if(h)h.insertAdjacentElement('afterend',b);else view.insertAdjacentElement('afterbegin',b);
+      }
+    });
+  }
+
+  function forceHome(){
+    if(!manager())return;
+    const r=$('reportsView');if(!r)return;
+    try{window.SafetyManagementStableV21111?.render?.()}catch(_e){}
+    activateViewDom('reports');
+    r.classList.remove('management-home-active-v21079');
+    r.classList.add('management-home-active-v21111');
+    r.dataset.managementV21167='home';
+    ensureBackButtons();
+    try{window.scrollTo({top:0,left:0,behavior:'auto'})}catch(_e){}
+  }
+
+  function scheduleHome(){
+    [0,30,100,240].forEach(ms=>setTimeout(forceHome,ms));
+  }
+
+  function openHome(){
+    if(!manager())return;
+    detailSeq++;
+    try{
+      if(history.state?.managementDetailV21167||history.state?.managementFromV21167){
+        history.back();
+        scheduleHome();
+        return;
+      }
+    }catch(_e){}
+    baseShow('reports');
+    scheduleHome();
+  }
+
+  function scrollTarget(selector,seq){
+    if(!selector)return;
+    let tries=0;
+    const tick=()=>{
+      if(seq!==detailSeq)return;
+      const el=document.querySelector(selector);
+      if(el){
+        try{el.scrollIntoView({behavior:'auto',block:'start'})}catch(_e){}
+        return;
+      }
+      if(++tries<15)setTimeout(tick,80);
+    };
+    setTimeout(tick,20);
+  }
+
+  function pushSameViewDetail(kind){
+    try{
+      const st=history.state||{};
+      if(st?.managementDetailV21167===kind)return;
+      history.pushState({...st,safetyTracker:true,view:'reports',modal:false,guard:false,managementDetailV21167:kind},'',location.href);
+    }catch(_e){}
+  }
+
+  function openReportsDetail(kind,selector){
+    if(!manager())return;
+    const seq=++detailSeq;
+    baseShow('reports');
+    [0,35,110,220].forEach(ms=>setTimeout(()=>{
+      if(seq!==detailSeq)return;
+      activateViewDom('reports');
+      removeHomeClasses();
+      ensureBackButtons();
+    },ms));
+    // Calendar / Reports / Knowledge all live inside reportsView. Give them their
+    // own history entry so the device Back button returns to Management home first.
+    setTimeout(()=>{if(seq===detailSeq)pushSameViewDetail(kind)},10);
+    scrollTarget(selector,seq);
+  }
+
+  function openOtherView(name,selector=null){
+    if(!manager())return;
+    const seq=++detailSeq;
+    baseShow(name);
+    setTimeout(()=>{
+      if(seq!==detailSeq)return;
+      try{
+        const st=history.state||{};
+        history.replaceState({...st,managementFromV21167:true},'',location.href);
+      }catch(_e){}
+    },10);
+    [0,40,120].forEach(ms=>setTimeout(()=>{
+      if(seq!==detailSeq)return;
+      activateViewDom(name);
+      ensureBackButtons();
+    },ms));
+    scrollTarget(selector,seq);
+  }
+
+  function route(action,key){
+    const a=String(action||'');
+    if(a.startsWith('view:')){
+      openOtherView(a.split(':')[1]);
+      return;
+    }
+    if(a==='management:actions'){
+      openOtherView('compliance','#unifiedSafetyActionsCardV21039');
+      return;
+    }
+    if(a==='management:calendar'){
+      openReportsDetail('calendar','#safetyCalendarCardV21043');
+      return;
+    }
+    if(a==='management:reports'){
+      openReportsDetail('reports','#reportsView .page-heading');
+      return;
+    }
+    if(a==='management:knowledge'){
+      openReportsDetail('knowledge','#knowledgeHubV21051');
+      return;
+    }
+    console.warn('Safety v2.11.67 unknown Management route',a,key||'');
+    try{api?.toast?.('That Management section could not be opened.')}catch(_e){}
+  }
+
+  function install(){
+    if(installed)return;installed=true;
+    ensureBackButtons();
+
+    // Window capture is intentional: this is the single authoritative Management
+    // router and therefore runs before older document-level Management handlers.
+    window.addEventListener('click',e=>{
+      const top=e.target.closest?.('#mainNav button[data-view="reports"]');
+      if(top&&manager()&&!bypassTop){
+        e.preventDefault();e.stopImmediatePropagation();
+        openHome();
+        return;
+      }
+
+      const back=e.target.closest?.(
+        '[data-management-home-v21167],.management-back-v21167,'+
+        '[data-management-stable-home],.management-back-v21111,'+
+        '[data-management-home-v21079],.management-back-v21079,'+
+        '[data-repair95-management-back]'
+      );
+      if(back&&manager()){
+        e.preventDefault();e.stopImmediatePropagation();
+        if(history.state?.managementDetailV21167||history.state?.managementFromV21167){
+          history.back();
+          setTimeout(forceHome,80);
+        }else openHome();
+        return;
+      }
+
+      const tile=e.target.closest?.('[data-management-stable-action],[data-management-tile-action]');
+      if(tile&&manager()){
+        e.preventDefault();e.stopImmediatePropagation();
+        const action=tile.dataset.managementStableAction||tile.dataset.managementTileAction||'';
+        const key=tile.dataset.managementStableKey||tile.dataset.managementTileKey||'';
+        route(action,key);
+        return;
+      }
+    },true);
+
+    window.addEventListener('popstate',()=>{
+      // Core navigation owns the actual history transition. Once it has restored
+      // reportsView, make reports=Management home for Manager/Admin accounts.
+      setTimeout(()=>{
+        if(!manager())return;
+        const st=history.state;
+        if(st?.view==='reports'&&!st?.managementDetailV21167)forceHome();
+      },0);
+      setTimeout(()=>{
+        if(!manager())return;
+        const st=history.state;
+        if(st?.view==='reports'&&!st?.managementDetailV21167)forceHome();
+      },100);
+    });
+
+    window.addEventListener('pageshow',()=>setTimeout(()=>{
+      ensureBackButtons();
+      const r=$('reportsView');
+      if(r?.classList.contains('active-view')&&!history.state?.managementDetailV21167)forceHome();
+    },180));
+
+    const style=document.createElement('style');
+    style.id='managementNavigationStylesV21167';
+    style.textContent=`
+      .management-back-v21079,.management-back-v21111,[data-repair95-management-back]{display:none!important}
+      .management-back-v21167{margin:0 0 14px}
+      #reportsView.management-home-active-v21111>.management-back-v21167{display:none!important}
+    `;
+    document.head.appendChild(style);
+
+    window.SafetyManagementNavigationV21167={home:openHome,route,repair:()=>{ensureBackButtons();forceHome()}};
+  }
+
+  function boot(){
+    api=window.SafetyTrackerV2;
+    if(!api?.state){setTimeout(boot,100);return}
+    state=api.state;
+    if(!state.user){setTimeout(boot,160);return}
+    install();
+  }
+  boot();
+})();
