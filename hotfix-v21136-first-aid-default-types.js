@@ -1279,3 +1279,811 @@
   }
   boot();
 })();
+
+/* Safety Tracker v2.11.73 CLEAN
+   Training Hub / General & Operational Training / Position audiences.
+   - Standardises Training audiences to Everyone / Departments / Positions / Groups / Specific people.
+   - Adds General / Operational Training alongside H&S Training without mixing General items into H&S compliance.
+   - Supports uploaded PDF training or version-controlled built-in training content.
+   - Built-in content is editable in-app; every material change creates an auditable content version.
+   - Supports Self-training and Instructor-led delivery.
+   - Adds a full Training Register Excel report covering H&S + General training.
+*/
+'use strict';
+(function(){
+  if(window.__SAFETY_TRAINING_HUB_V21173)return;
+  window.__SAFETY_TRAINING_HUB_V21173=true;
+
+  let api=null,state=null,sb=null;
+  let positions=[],userPositions=[],positionDepartments=[],groups=[],scopeDepartments=[];
+  let currentContent=new Map(),viewedKeys=new Set();
+  let rpcBase=null,observer=null;
+  let trainingMode='HS';
+
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
+  const today=()=>new Date().toISOString().slice(0,10);
+  const plusYear=()=>{const d=new Date();d.setFullYear(d.getFullYear()+1);return d.toISOString().slice(0,10)};
+  const isManager=()=>['admin','manager'].includes(String(state?.profile?.role||'').toLowerCase())&&state?.profile?.report_only!==true&&state?.uiMode!=='user';
+  const isAdmin=()=>String(state?.profile?.role||'').toLowerCase()==='admin'&&state?.profile?.report_only!==true&&state?.uiMode!=='user';
+  const personName=id=>(state?.people||[]).find(x=>x.id===id)?.display_name||(state?.people||[]).find(x=>x.id===id)?.email||'User';
+  const trainingDomain=t=>String(t?.training_domain||'H&S').toUpperCase()==='GENERAL'?'GENERAL':'H&S';
+  const isGeneral=t=>trainingDomain(t)==='GENERAL';
+  const safeName=n=>api?.safeFileName?api.safeFileName(n):String(n||'training.pdf').replace(/[^\w.\-]+/g,'-');
+  const toast=m=>{try{api?.toast?.(m)}catch(_e){console.log(m)}};
+
+  function openModal(title,html){
+    const m=$('modal'),h=$('modalTitle'),b=$('modalBody');if(!m||!b)return;
+    if(h)h.textContent=title;b.innerHTML=html;
+    try{if(!m.open)m.showModal()}catch(_e){m.setAttribute('open','')}
+  }
+  function closeModal(){try{$('modal')?.close()}catch(_e){$('modal')?.removeAttribute('open')}}
+
+  async function loadSupplemental(){
+    const [p,up,pd,g,scope,cv,act]=await Promise.all([
+      sb.from('safety_positions_v21069').select('*').eq('active',true).order('name'),
+      sb.from('safety_user_positions_v21069').select('*').eq('active',true),
+      sb.from('safety_position_departments_v21069').select('*'),
+      sb.from('safety_groups_v21155').select('*').eq('active',true).order('name'),
+      sb.rpc('my_manager_scope_departments_v21166'),
+      sb.from('training_content_versions_v21173').select('id,training_session_id,version_number,is_current,created_at').eq('is_current',true),
+      sb.from('training_content_activity_v21173').select('training_assignment_id,content_version_id,user_id,occurred_at').eq('user_id',state.user.id)
+    ]);
+    positions=p.error?[]:(p.data||[]);
+    userPositions=up.error?[]:(up.data||[]);
+    positionDepartments=pd.error?[]:(pd.data||[]);
+    groups=g.error?[]:(g.data||[]);
+    scopeDepartments=scope.error?[]:(scope.data||[]);
+    currentContent.clear();
+    for(const x of (cv.error?[]:(cv.data||[])))currentContent.set(x.training_session_id,x);
+    viewedKeys.clear();
+    for(const x of (act.error?[]:(act.data||[])))viewedKeys.add(`${x.training_assignment_id}|${x.content_version_id}`);
+  }
+
+  function scopedPositions(){
+    if(isAdmin())return positions;
+    const ids=new Set((scopeDepartments||[]).map(x=>x.department_id));
+    if(!ids.size)return positions;
+    return positions.filter(p=>{
+      const deps=positionDepartments.filter(x=>x.position_id===p.id).map(x=>x.department_id);
+      return !deps.length||deps.some(d=>ids.has(d));
+    });
+  }
+  function positionHolders(positionId){
+    const ids=userPositions.filter(x=>x.position_id===positionId&&x.active!==false).map(x=>x.user_id);
+    return [...new Set(ids)];
+  }
+
+  function selectedPositionIds(){
+    return [...document.querySelectorAll('#modalBody .audience-position-choice-v21173:checked')].map(x=>x.value);
+  }
+  function selectedGroupIds(){
+    return [...document.querySelectorAll('#modalBody .audience-group-choice-v21155:checked')].map(x=>x.value);
+  }
+
+  function audienceContext(){
+    const modal=$('modalBody');if(!modal)return null;let b;
+    if((b=modal.querySelector('[data-save-doc-audience]')))return {kind:'DOCUMENT',id:b.dataset.saveDocAudience};
+    if((b=modal.querySelector('[data-save-training-audience]')))return {kind:'TRAINING',id:b.dataset.saveTrainingAudience};
+    if((b=modal.querySelector('[data-confirm-training-approval]')))return {kind:'TRAINING',id:b.dataset.confirmTrainingApproval};
+    if((b=modal.querySelector('[data-save-awareness-assignments]')))return {kind:'AWARENESS',id:b.dataset.saveAwarenessAssignments};
+    if((b=modal.querySelector('[data-save-version-approval]'))){
+      const v=(state.versions||[]).find(x=>x.id===b.dataset.saveVersionApproval);
+      return v?{kind:'DOCUMENT',id:v.document_id}:null;
+    }
+    if(modal.querySelector('[data-create-document]'))return {kind:'NEW_DOCUMENT',id:null};
+    return null;
+  }
+  async function selectedPositionsForContext(ctx){
+    if(!ctx||!ctx.id)return [];
+    let table,key;
+    if(ctx.kind==='DOCUMENT'){table='document_training_audiences';key='document_id'}
+    else if(ctx.kind==='TRAINING'){table='training_session_audiences';key='training_session_id'}
+    else if(ctx.kind==='AWARENESS'){table='awareness_item_audiences';key='awareness_item_id'}
+    else return [];
+    const r=await sb.from(table).select('position_id,target_type').eq(key,ctx.id).eq('target_type','POSITION');
+    return r.error?[]:(r.data||[]).map(x=>x.position_id).filter(Boolean);
+  }
+  async function decorateAudienceSections(){
+    if(!isManager())return;
+    const modal=$('modalBody');if(!modal)return;
+    const sections=[...modal.querySelectorAll('[id$="AudienceSection"]')];
+    if(!sections.length)return;
+    const ctx=audienceContext();
+    const selected=new Set(await selectedPositionsForContext(ctx));
+    for(const section of sections){
+      if(section.dataset.positionsV21173==='1')continue;
+      section.dataset.positionsV21173='1';
+      const grid=section.querySelector('.audience-grid');
+      if(!grid)continue;
+      const box=document.createElement('div');
+      box.className='positions-audience-v21173';
+      box.innerHTML=`<h5>Positions</h5><div class="checkbox-list">${scopedPositions().map(p=>{
+        const n=positionHolders(p.id).length;
+        return `<label class="check-row"><input type="checkbox" class="audience-position-choice-v21173" value="${esc(p.id)}" ${selected.has(p.id)?'checked':''}><span>${esc(p.name)} <span class="muted">· ${n} current holder${n===1?'':'s'}</span></span></label>`;
+      }).join('')||'<span class="muted">No active positions.</span>'}</div>`;
+      const people=grid.lastElementChild;
+      if(people)grid.insertBefore(box,people);else grid.appendChild(box);
+      const intro=section.querySelector('p.muted');
+      if(intro&&/Choose/i.test(intro.textContent||''))intro.textContent='Choose Everyone, Departments, Positions, Groups and/or specific people. Future users matching a Department, Position or Group are assigned automatically.';
+      const everyone=section.querySelector('input[id$="AssignEveryone"]');
+      const sync=()=>box.querySelectorAll('input').forEach(x=>x.disabled=!!everyone?.checked);
+      section.addEventListener('change',sync);sync();
+    }
+  }
+
+  function installRpcBridge(){
+    if(sb.__positionsAudienceV21173)return;
+    sb.__positionsAudienceV21173=true;
+    rpcBase=sb.rpc.bind(sb);
+    sb.rpc=function(name,args={},options){
+      const pos=selectedPositionIds(),groupsNow=selectedGroupIds();
+      if(['set_document_training_audience_v230','set_document_training_audience_v21155'].includes(name)){
+        return rpcBase('set_document_training_audience_v21173',{
+          p_document_id:args.p_document_id,
+          p_everyone:!!args.p_everyone,
+          p_department_ids:args.p_department_ids||[],
+          p_position_ids:pos,
+          p_user_ids:args.p_user_ids||[],
+          p_group_ids:groupsNow,
+          p_due_days:args.p_due_days
+        },options);
+      }
+      if(['set_training_session_audience_v239','set_training_session_audience_v21155'].includes(name)){
+        return rpcBase('set_training_session_audience_v21173',{
+          p_training_session_id:args.p_training_session_id,
+          p_everyone:!!args.p_everyone,
+          p_department_ids:args.p_department_ids||[],
+          p_position_ids:pos,
+          p_user_ids:args.p_user_ids||[],
+          p_group_ids:groupsNow,
+          p_due_days:args.p_due_days
+        },options);
+      }
+      if(['set_awareness_item_audience_v239','set_awareness_item_audience_v21155'].includes(name)){
+        return rpcBase('set_awareness_item_audience_v21173',{
+          p_awareness_item_id:args.p_awareness_item_id,
+          p_everyone:!!args.p_everyone,
+          p_department_ids:args.p_department_ids||[],
+          p_position_ids:pos,
+          p_user_ids:args.p_user_ids||[],
+          p_group_ids:groupsNow
+        },options);
+      }
+      if(['decide_document_version_with_training_schedule_ack_v281','decide_document_version_with_training_schedule_ack_v21155'].includes(name)){
+        return rpcBase('decide_document_version_with_training_schedule_ack_v21173',{
+          p_document_version_id:args.p_document_version_id,
+          p_decision:args.p_decision,
+          p_context:args.p_context,
+          p_note:args.p_note,
+          p_everyone:!!args.p_everyone,
+          p_department_ids:args.p_department_ids||[],
+          p_position_ids:pos,
+          p_user_ids:args.p_user_ids||[],
+          p_group_ids:groupsNow,
+          p_due_days:args.p_due_days,
+          p_delivery_method:args.p_delivery_method,
+          p_renewal_value:args.p_renewal_value,
+          p_renewal_unit:args.p_renewal_unit
+        },options);
+      }
+      return rpcBase(name,args,options);
+    };
+    if(typeof window.audienceSelectionValid==='function'&&!window.__positionsAudienceValidationV21173){
+      window.__positionsAudienceValidationV21173=true;
+      const base=window.audienceSelectionValid;
+      window.audienceSelectionValid=function(a){
+        return base(a)||selectedPositionIds().length>0||selectedGroupIds().length>0;
+      };
+    }
+  }
+
+  function scheduleHtml(prefix,value=null,unit=null,mode=null){
+    const key=value&&unit?`${Number(value)}|${unit}`:'';
+    const known=['3|MONTHS','6|MONTHS','12|MONTHS','24|MONTHS'];
+    const preset=known.includes(key)?key:(key?'CUSTOM':(mode==='ONE_OFF'?'ONE_OFF':'12|MONTHS'));
+    return `<label>Repeat schedule<select id="${prefix}Schedule"><option value="ONE_OFF" ${preset==='ONE_OFF'?'selected':''}>One-off</option><option value="3|MONTHS" ${preset==='3|MONTHS'?'selected':''}>Every 3 months</option><option value="6|MONTHS" ${preset==='6|MONTHS'?'selected':''}>Every 6 months</option><option value="12|MONTHS" ${preset==='12|MONTHS'?'selected':''}>Every 12 months</option><option value="24|MONTHS" ${preset==='24|MONTHS'?'selected':''}>Every 24 months</option><option value="CUSTOM" ${preset==='CUSTOM'?'selected':''}>Custom…</option></select></label><div id="${prefix}Custom" class="full" ${preset==='CUSTOM'?'':'hidden'}><div class="form-grid"><label>Every<input id="${prefix}Value" type="number" min="1" value="${preset==='CUSTOM'?esc(value||1):''}"></label><label>Unit<select id="${prefix}Unit"><option value="DAYS" ${unit==='DAYS'?'selected':''}>Days</option><option value="MONTHS" ${unit!=='DAYS'&&unit!=='YEARS'?'selected':''}>Months</option><option value="YEARS" ${unit==='YEARS'?'selected':''}>Years</option></select></label></div></div>`;
+  }
+  function readSchedule(prefix){
+    const p=$(`${prefix}Schedule`)?.value||'12|MONTHS';
+    if(p==='ONE_OFF')return {value:null,unit:null,mode:'ONE_OFF'};
+    if(p==='CUSTOM')return {value:Math.max(1,Number($(`${prefix}Value`)?.value)||1),unit:$(`${prefix}Unit`)?.value||'MONTHS',mode:'RECURRING'};
+    const [v,u]=p.split('|');return {value:Number(v),unit:u,mode:'RECURRING'};
+  }
+  function wireSchedule(prefix){
+    $(`${prefix}Schedule`)?.addEventListener('change',()=>{$(`${prefix}Custom`).hidden=$(`${prefix}Schedule`).value!=='CUSTOM'});
+  }
+
+  function customAudienceHtml(prefix,rows=[]){
+    const every=rows.some(x=>x.target_type==='EVERYONE');
+    const deps=new Set(rows.filter(x=>x.target_type==='DEPARTMENT').map(x=>x.department_id));
+    const poss=new Set(rows.filter(x=>x.target_type==='POSITION').map(x=>x.position_id));
+    const grps=new Set(rows.filter(x=>x.target_type==='GROUP').map(x=>x.group_id));
+    const ppl=new Set(rows.filter(x=>x.target_type==='PERSON').map(x=>x.user_id));
+    return `<div id="${prefix}Audience" class="section-card v21173-audience">
+      <h4>Who needs this training?</h4>
+      <p class="muted">Assignments stay live when Department, Position or Group membership changes.</p>
+      <label class="check-row audience-everyone"><input id="${prefix}Everyone" type="checkbox" ${every?'checked':''}> <strong>Everyone</strong> — all current and future active users</label>
+      <div class="form-grid"><label>Completion due after assignment<input id="${prefix}DueDays" type="number" min="1" max="365" value="${Number(rows.find(x=>x.due_days)?.due_days||14)}"><span class="muted">days</span></label></div>
+      <div class="v21173-audience-grid">
+        <details><summary>Departments</summary><div class="checkbox-list">${(state.departments||[]).filter(x=>x.active!==false).map(d=>`<label class="check-row"><input type="checkbox" class="${prefix}-dep" value="${esc(d.id)}" ${deps.has(d.id)?'checked':''}>${esc(d.name)}</label>`).join('')}</div></details>
+        <details><summary>Positions</summary><div class="checkbox-list">${scopedPositions().map(p=>`<label class="check-row"><input type="checkbox" class="${prefix}-pos" value="${esc(p.id)}" ${poss.has(p.id)?'checked':''}>${esc(p.name)}</label>`).join('')}</div></details>
+        <details><summary>Groups</summary><div class="checkbox-list">${groups.map(g=>`<label class="check-row"><input type="checkbox" class="${prefix}-grp" value="${esc(g.id)}" ${grps.has(g.id)?'checked':''}>${esc(g.name)}</label>`).join('')||'<span class="muted">No groups configured.</span>'}</div></details>
+        <details><summary>Specific people</summary><div class="checkbox-list">${(state.people||[]).filter(x=>x.active!==false&&x.report_only!==true).map(p=>`<label class="check-row"><input type="checkbox" class="${prefix}-usr" value="${esc(p.id)}" ${ppl.has(p.id)?'checked':''}>${esc(p.display_name||p.email)}</label>`).join('')}</div></details>
+      </div>
+      <div id="${prefix}Summary" class="hint-box"></div>
+    </div>`;
+  }
+  function readCustomAudience(prefix){
+    return {
+      everyone:!!$(`${prefix}Everyone`)?.checked,
+      departments:[...document.querySelectorAll(`.${prefix}-dep:checked`)].map(x=>x.value),
+      positions:[...document.querySelectorAll(`.${prefix}-pos:checked`)].map(x=>x.value),
+      groups:[...document.querySelectorAll(`.${prefix}-grp:checked`)].map(x=>x.value),
+      users:[...document.querySelectorAll(`.${prefix}-usr:checked`)].map(x=>x.value),
+      dueDays:Math.max(1,Math.min(365,Number($(`${prefix}DueDays`)?.value||14)))
+    };
+  }
+  function wireCustomAudience(prefix){
+    const root=$(`${prefix}Audience`);if(!root)return;
+    const update=()=>{
+      const a=readCustomAudience(prefix);
+      root.querySelectorAll(`.${prefix}-dep,.${prefix}-pos,.${prefix}-grp,.${prefix}-usr`).forEach(x=>x.disabled=a.everyone);
+      const ids=new Set();
+      if(a.everyone)(state.people||[]).filter(x=>x.active!==false&&x.report_only!==true).forEach(x=>ids.add(x.id));
+      else{
+        for(const u of a.users)ids.add(u);
+        for(const p of a.positions)positionHolders(p).forEach(u=>ids.add(u));
+        for(const d of a.departments)(state.userDepartments||[]).filter(x=>x.department_id===d).forEach(x=>ids.add(x.user_id));
+      }
+      const box=$(`${prefix}Summary`);
+      if(box)box.innerHTML=ids.size?`<strong>${ids.size}+ current user${ids.size===1?'':'s'} matched.</strong> Group membership is also resolved automatically.`:'<strong>No audience selected.</strong>';
+    };
+    root.addEventListener('change',update);update();
+  }
+
+  function updateCreateMode(){
+    const mode=$('v21173ContentMode')?.value||'BUILT_IN';
+    const upload=$('v21173UploadWrap'),built=$('v21173BuiltInWrap');
+    if(upload)upload.hidden=mode!=='UPLOAD';
+    if(built)built.hidden=mode!=='BUILT_IN';
+    const domain=$('v21173Domain')?.value||'H&S';
+    if($('v21173TypeWrap'))$('v21173TypeWrap').hidden=domain==='GENERAL';
+    if($('v21173CategoryWrap'))$('v21173CategoryWrap').hidden=domain!=='GENERAL';
+  }
+
+  function openCreateTraining(){
+    if(!isManager())return;
+    const defaultDomain=trainingMode==='GENERAL'?'GENERAL':'H&S';
+    openModal('Create training',`
+      <div class="hint-box"><strong>Two ways to build training:</strong> upload a PDF, or create the training in Safety Tracker. Built-in training is easier to amend because each edit creates a dated content version and keeps the previous text in history.</div>
+      <div class="form-grid">
+        <label>Training area<select id="v21173Domain"><option value="H&S" ${defaultDomain==='H&S'?'selected':''}>H&S Training</option><option value="GENERAL" ${defaultDomain==='GENERAL'?'selected':''}>General / Operational Training</option></select></label>
+        <label id="v21173TypeWrap">H&S type<select id="v21173Type"><option value="INDUCTION">Induction</option><option value="REFRESHER">Refresher</option><option value="AD_HOC">Ad-hoc training</option><option value="OTHER" selected>Other H&S training</option></select></label>
+        <label id="v21173CategoryWrap" ${defaultDomain==='GENERAL'?'':'hidden'}>Category<input id="v21173Category" placeholder="e.g. Front Office, Brand Standards, Customer Service"></label>
+        <label>Training name<input id="v21173Name" placeholder="Training title"></label>
+        <label>Reference <span class="muted">optional</span><input id="v21173Ref" placeholder="e.g. GEN-001"></label>
+        <label>Delivery method<select id="v21173Delivery"><option value="SELF_TRAINING">Self-training</option><option value="INSTRUCTOR_LED">Instructor-led</option></select></label>
+        <label>Training material<select id="v21173ContentMode"><option value="BUILT_IN">Create in Safety Tracker</option><option value="UPLOAD">Upload PDF training</option></select></label>
+        <label>Review date<input id="v21173Review" type="date" value="${plusYear()}"></label>
+        ${scheduleHtml('v21173Create',12,'MONTHS','RECURRING')}
+        <label class="full">Description / instructions<textarea id="v21173Desc" rows="3" placeholder="Short description, purpose or instructor notes."></textarea></label>
+      </div>
+      <div id="v21173BuiltInWrap" class="section-card">
+        <h4>Built-in training content</h4>
+        <p class="muted">Paste or type the training below. This becomes version 1. Future edits create version 2, 3, etc., with the old version retained.</p>
+        <textarea id="v21173Content" class="v21173-content-editor" rows="16" placeholder="Paste the training content here…"></textarea>
+      </div>
+      <div id="v21173UploadWrap" class="section-card" hidden>
+        <h4>Uploaded training material</h4>
+        <input id="v21173Files" type="file" accept="application/pdf,.pdf" multiple>
+        <p class="muted">Self-training requires at least one PDF that the employee can open before completing the training. Instructor-led training may also use uploaded supporting PDFs.</p>
+      </div>
+      ${customAudienceHtml('v21173CreateAud')}
+      <div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21173-save-new-training>Create & assign training</button></div>`);
+    wireSchedule('v21173Create');wireCustomAudience('v21173CreateAud');
+    $('v21173Domain')?.addEventListener('change',updateCreateMode);
+    $('v21173ContentMode')?.addEventListener('change',updateCreateMode);
+    updateCreateMode();
+  }
+
+  async function saveNewTraining(btn){
+    if(!isManager())return;
+    const domain=$('v21173Domain')?.value||'H&S';
+    const contentMode=$('v21173ContentMode')?.value||'BUILT_IN';
+    const delivery=$('v21173Delivery')?.value||'SELF_TRAINING';
+    const name=clean($('v21173Name')?.value),reference=clean($('v21173Ref')?.value).toUpperCase();
+    const category=clean($('v21173Category')?.value),desc=clean($('v21173Desc')?.value);
+    const type=domain==='GENERAL'?'OTHER':($('v21173Type')?.value||'OTHER');
+    const schedule=readSchedule('v21173Create'),aud=readCustomAudience('v21173CreateAud');
+    const files=[...($('v21173Files')?.files||[])];
+    const body=String($('v21173Content')?.value||'').trim();
+    if(!name)return toast('Training name is required.');
+    if(!aud.everyone&&!aud.departments.length&&!aud.positions.length&&!aud.groups.length&&!aud.users.length)return toast('Choose Everyone, a Department, a Position, a Group, or a specific person.');
+    if(contentMode==='BUILT_IN'&&!body)return toast('Paste or type the built-in training content.');
+    if(contentMode==='UPLOAD'&&delivery==='SELF_TRAINING'&&!files.length)return toast('Self-training needs at least one PDF.');
+    btn.disabled=true;const old=btn.textContent;btn.textContent='Creating…';
+    let trainingId=null;
+    try{
+      const ins=await sb.from('training_sessions').insert({
+        name,session_type:type,description:desc||null,delivery_method:delivery,
+        review_date:$('v21173Review')?.value||plusYear(),renewal_value:schedule.value,renewal_unit:schedule.unit,
+        schedule_mode:schedule.mode,status:'ACTIVE',created_by:state.user.id,reference:reference||null,
+        source_kind:domain==='GENERAL'?'GENERAL_TRAINING':type,source_document_id:null,source_document_version_id:null,
+        auto_managed:false,review_required:false,review_reason:null,training_domain:domain,
+        training_category:domain==='GENERAL'?(category||'General / Operational'):null,content_mode:contentMode,content_revision:0
+      }).select().single();
+      if(ins.error)throw ins.error;
+      trainingId=ins.data.id;
+
+      if(contentMode==='BUILT_IN'){
+        const vr=await sb.rpc('save_training_content_version_v21173',{
+          p_training_session_id:trainingId,p_content_body:body,p_change_summary:'Initial training content'
+        });
+        if(vr.error)throw vr.error;
+      }else{
+        for(const f of files){
+          const path=`training/${trainingId}/${crypto.randomUUID()}-${safeName(f.name)}`;
+          const up=await sb.storage.from('safety-files').upload(path,f,{contentType:f.type||'application/pdf'});
+          if(up.error)throw up.error;
+          const fr=await sb.from('training_files').insert({
+            training_session_id:trainingId,file_name:f.name,storage_path:path,uploaded_by:state.user.id,
+            content_text_sha256:f.type==='application/pdf'&&api.hashPdf?await api.hashPdf(f):null
+          });
+          if(fr.error)throw fr.error;
+        }
+      }
+      const ar=await sb.rpc('set_training_session_audience_v21173',{
+        p_training_session_id:trainingId,p_everyone:aud.everyone,p_department_ids:aud.departments,
+        p_position_ids:aud.positions,p_user_ids:aud.users,p_group_ids:aud.groups,p_due_days:aud.dueDays
+      });
+      if(ar.error)throw ar.error;
+      closeModal();await api.refresh(domain==='GENERAL'?'General / Operational training created and assigned.':'H&S training created and assigned.');
+      await loadSupplemental();enhanceAll();
+    }catch(e){
+      console.error('v2.11.73 create training',e);
+      if(trainingId)try{await sb.from('training_sessions').delete().eq('id',trainingId)}catch(_e){}
+      toast(e?.message||'Training could not be created.');
+      btn.disabled=false;btn.textContent=old;
+    }
+  }
+
+  async function openEnhancedEdit(trainingId){
+    const t=(state.training||[]).find(x=>x.id===trainingId);if(!t)return;
+    const hist=t.content_mode==='BUILT_IN'?await sb.rpc('training_content_history_v21173',{p_training_session_id:t.id}):{data:[]};
+    const rows=hist.error?[]:(hist.data||[]);
+    const current=rows.find(x=>x.is_current)||rows[0]||null;
+    const files=(state.trainingFiles||[]).filter(x=>x.training_session_id===t.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    openModal('Edit training',`
+      <div class="form-grid">
+        <label>Training area<select id="v21173EditDomain"><option value="H&S" ${trainingDomain(t)==='H&S'?'selected':''}>H&S Training</option><option value="GENERAL" ${isGeneral(t)?'selected':''}>General / Operational Training</option></select></label>
+        <label>Category<input id="v21173EditCategory" value="${esc(t.training_category||'')}" placeholder="Category"></label>
+        <label class="full">Training name<input id="v21173EditName" value="${esc(t.name||'')}"></label>
+        <label>Delivery method<select id="v21173EditDelivery"><option value="SELF_TRAINING" ${t.delivery_method==='SELF_TRAINING'?'selected':''}>Self-training</option><option value="INSTRUCTOR_LED" ${t.delivery_method==='INSTRUCTOR_LED'?'selected':''}>Instructor-led</option></select></label>
+        <label>Review date<input id="v21173EditReview" type="date" value="${esc(t.review_date||'')}"></label>
+        ${scheduleHtml('v21173Edit',t.renewal_value,t.renewal_unit,t.schedule_mode)}
+        <label class="full">Description / instructions<textarea id="v21173EditDesc" rows="3">${esc(t.description||'')}</textarea></label>
+      </div>
+      ${t.content_mode==='BUILT_IN'?`<div class="section-card"><div class="row-between"><div><h4>Built-in content · v${Number(current?.version_number||t.content_revision||1)}</h4><p class="muted">Changing the text creates a new version; the previous version is retained.</p></div></div><textarea id="v21173EditContent" class="v21173-content-editor" rows="16">${esc(current?.content_body||'')}</textarea><label>Change summary <span class="muted">required when text changes</span><input id="v21173ChangeSummary" placeholder="What changed and why?"></label></div>
+      <details class="section-card"><summary><strong>Content version history (${rows.length})</strong></summary><div class="v21173-version-history">${rows.map(v=>`<details><summary>v${v.version_number}${v.is_current?' · current':''} · ${new Date(v.created_at).toLocaleString('en-GB')}</summary><div class="muted">${esc(v.change_summary||'No change summary recorded')}</div><pre>${esc(v.content_body)}</pre></details>`).join('')}</div></details>`:
+      `<div class="section-card"><h4>Uploaded material</h4><p class="muted">${files.length?files.map(f=>`${esc(f.file_name)} · ${new Date(f.created_at).toLocaleDateString('en-GB')}`).join('<br>'):'No uploaded file found.'}</p><label>Add new / replacement PDF<input id="v21173EditFiles" type="file" accept="application/pdf,.pdf" multiple></label><p class="muted">New files become the latest training material; earlier files remain retained in the training record.</p></div>`}
+      <div class="actions"><button class="ghost" type="button" data-close-modal>Cancel</button><button class="primary" type="button" data-v21173-save-training-edit="${esc(t.id)}">Save changes</button></div>`);
+    wireSchedule('v21173Edit');
+    if(t.content_mode==='BUILT_IN'&&current)$('v21173EditContent').dataset.original=current.content_body||'';
+  }
+
+  async function saveEnhancedEdit(trainingId,btn){
+    const t=(state.training||[]).find(x=>x.id===trainingId);if(!t)return;
+    const schedule=readSchedule('v21173Edit'),name=clean($('v21173EditName')?.value);
+    if(!name)return toast('Training name is required.');
+    btn.disabled=true;const old=btn.textContent;btn.textContent='Saving…';
+    try{
+      const domain=$('v21173EditDomain')?.value||trainingDomain(t);
+      const up=await sb.from('training_sessions').update({
+        name,training_domain:domain,training_category:domain==='GENERAL'?(clean($('v21173EditCategory')?.value)||'General / Operational'):null,
+        delivery_method:$('v21173EditDelivery')?.value||t.delivery_method,
+        review_date:$('v21173EditReview')?.value||null,renewal_value:schedule.value,renewal_unit:schedule.unit,
+        schedule_mode:schedule.mode,description:clean($('v21173EditDesc')?.value)||null
+      }).eq('id',trainingId);
+      if(up.error)throw up.error;
+
+      if(t.content_mode==='BUILT_IN'){
+        const body=String($('v21173EditContent')?.value||'').trim(),orig=$('v21173EditContent')?.dataset.original||'';
+        if(body!==orig){
+          const summary=clean($('v21173ChangeSummary')?.value);
+          if(!summary)throw new Error('Add a short change summary before saving the new content version.');
+          const vr=await sb.rpc('save_training_content_version_v21173',{
+            p_training_session_id:trainingId,p_content_body:body,p_change_summary:summary
+          });
+          if(vr.error)throw vr.error;
+        }
+      }else{
+        for(const f of [...($('v21173EditFiles')?.files||[])]){
+          const path=`training/${trainingId}/${crypto.randomUUID()}-${safeName(f.name)}`;
+          const upf=await sb.storage.from('safety-files').upload(path,f,{contentType:f.type||'application/pdf'});if(upf.error)throw upf.error;
+          const fr=await sb.from('training_files').insert({training_session_id:trainingId,file_name:f.name,storage_path:path,uploaded_by:state.user.id,content_text_sha256:f.type==='application/pdf'&&api.hashPdf?await api.hashPdf(f):null});if(fr.error)throw fr.error;
+        }
+      }
+      closeModal();await api.refresh('Training updated. Built-in content history has been retained.');
+      await loadSupplemental();enhanceAll();
+    }catch(e){toast(e?.message||'Training could not be saved.');btn.disabled=false;btn.textContent=old}
+  }
+
+  async function openBuiltInContent(trainingId,assignmentId=null){
+    const t=(state.training||[]).find(x=>x.id===trainingId);if(!t)return;
+    const r=await sb.rpc('training_content_history_v21173',{p_training_session_id:trainingId});
+    if(r.error)return toast(r.error.message);
+    const rows=r.data||[],v=rows.find(x=>x.is_current)||rows[0];
+    if(!v)return toast('Built-in training content is missing.');
+    if(assignmentId){
+      const a=(state.trainingAssignments||[]).find(x=>x.id===assignmentId);
+      if(a?.user_id===state.user.id){
+        const m=await sb.rpc('mark_training_content_viewed_v21173',{p_assignment_id:assignmentId});
+        if(!m.error)viewedKeys.add(`${assignmentId}|${v.id}`);
+      }
+    }
+    currentContent.set(trainingId,{id:v.id,training_session_id:trainingId,version_number:v.version_number,is_current:true,created_at:v.created_at});
+    openModal(`${t.name} · v${v.version_number}`,`<div class="hint-box"><strong>${isGeneral(t)?'General / Operational Training':'H&S Training'}</strong> · ${esc(t.delivery_method==='INSTRUCTOR_LED'?'Instructor-led':'Self-training')}${t.training_category?` · ${esc(t.training_category)}`:''}</div><article class="v21173-training-reader">${esc(v.content_body)}</article><div class="muted">Content version ${v.version_number} · issued ${new Date(v.created_at).toLocaleString('en-GB')}</div><div class="actions"><button class="primary" type="button" data-close-modal>Done</button></div>`);
+    setTimeout(enhanceAssignmentActions,80);
+  }
+
+  function assignmentViewed(a,t){
+    const v=currentContent.get(t.id);if(!v)return false;
+    return viewedKeys.has(`${a.id}|${v.id}`);
+  }
+  function effectiveMethod(a,t){
+    try{return window.effectiveTrainingMethod?window.effectiveTrainingMethod(t,a):(a.delivery_method_override||t.delivery_method||'SELF_TRAINING')}catch(_e){return a.delivery_method_override||t.delivery_method||'SELF_TRAINING'}
+  }
+  function enhanceAssignmentActions(){
+    for(const sign of document.querySelectorAll('[data-sign-training]')){
+      const aid=sign.dataset.signTraining,a=(state.trainingAssignments||[]).find(x=>x.id===aid),t=(state.training||[]).find(x=>x.id===a?.training_session_id);
+      if(!a||!t||t.content_mode!=='BUILT_IN')continue;
+      const card=sign.closest('.item-card')||sign.parentElement;
+      if(card&&!card.querySelector(`[data-v21173-open-content="${CSS.escape(t.id)}|${CSS.escape(a.id)}"]`)){
+        const b=document.createElement('button');b.type='button';b.className='secondary';b.dataset.v21173OpenContent=`${t.id}|${a.id}`;b.textContent=assignmentViewed(a,t)?'Training content opened ✓':'Open training content';sign.insertAdjacentElement('beforebegin',b);
+      }
+      if(effectiveMethod(a,t)==='SELF_TRAINING'&&!assignmentViewed(a,t)){
+        sign.disabled=true;sign.title='Open the current built-in training content first.';
+      }else{
+        sign.disabled=false;sign.title='';
+      }
+    }
+    for(const view of document.querySelectorAll('#trainingList [data-view-training]')){
+      const tid=view.dataset.viewTraining,t=(state.training||[]).find(x=>x.id===tid);
+      if(!t||t.content_mode!=='BUILT_IN')continue;
+      const bar=view.parentElement;
+      if(bar&&!bar.querySelector(`[data-v21173-open-content="${CSS.escape(t.id)}|"]`)){
+        const b=document.createElement('button');b.type='button';b.className='secondary';b.dataset.v21173OpenContent=`${t.id}|`;b.textContent='Open content';bar.insertBefore(b,view);
+      }
+    }
+  }
+
+  function decorateTrainingHub(){
+    const view=$('trainingView');if(!view)return;
+    const heading=view.querySelector('.page-heading');if(!heading)return;
+    const h2=heading.querySelector('h2'),p=heading.querySelector('p.muted'),newBtn=$('newTrainingBtn');
+    if(h2)h2.textContent=isManager()?'Training':'My Training';
+    if(p)p.textContent=isManager()?'H&S and General / Operational training in one controlled training hub.':'Your assigned standalone H&S and General / Operational training.';
+    if(newBtn)newBtn.textContent='Create training';
+    let hub=$('trainingHubV21173');
+    if(!hub){
+      hub=document.createElement('div');hub.id='trainingHubV21173';hub.className='section-card v21173-training-hub';
+      heading.insertAdjacentElement('afterend',hub);
+    }
+    hub.innerHTML=`<div class="v21173-hub-grid">
+      <button type="button" class="${trainingMode==='HS'?'primary':'secondary'}" data-v21173-training-mode="HS"><strong>H&S Training</strong><small>Safety-related standalone training</small></button>
+      <button type="button" class="${trainingMode==='GENERAL'?'primary':'secondary'}" data-v21173-training-mode="GENERAL"><strong>General / Operational</strong><small>Hotel, service, systems and role training</small></button>
+      ${isManager()?`<button type="button" class="secondary" data-v21173-training-nav="instructor"><strong>Instructor</strong><small>Attendance and instructor-led completion</small></button><button type="button" class="secondary" data-v21173-training-nav="reports"><strong>Training Reports</strong><small>Full current and historical reporting</small></button>`:''}
+    </div>`;
+  }
+
+  function trainingByCard(card){
+    const b=card.querySelector('[data-view-training]');return b?(state.training||[]).find(x=>x.id===b.dataset.viewTraining):null;
+  }
+  function filterTrainingCards(){
+    const list=$('trainingList');if(!list)return;
+    let visible=0;
+    for(const card of list.querySelectorAll('.item-card')){
+      const t=trainingByCard(card);if(!t)continue;
+      const show=trainingMode==='GENERAL'?isGeneral(t):!isGeneral(t);
+      card.hidden=!show;if(show)visible++;
+      if(show&&!card.querySelector('.v21173-domain-badge')){
+        const meta=card.querySelector('.meta');if(meta){const s=document.createElement('span');s.className='badge v21173-domain-badge';s.textContent=isGeneral(t)?'General / Operational':'H&S';meta.prepend(s)}
+      }
+    }
+    if(!visible&&list.querySelectorAll('.item-card').length){
+      let e=$('v21173NoTraining');if(!e){e=document.createElement('div');e.id='v21173NoTraining';e.className='empty';list.appendChild(e)}e.textContent=trainingMode==='GENERAL'?'No General / Operational training matches this filter.':'No standalone H&S training matches this filter.';
+    }else $('v21173NoTraining')?.remove();
+
+    const stats=$('trainingStats');
+    if(stats&&isManager()){
+      const courses=(state.training||[]).filter(t=>!t.auto_managed&&String(t.session_type)!=='TOOLBOX_TALK'&&t.status!=='ARCHIVED'&&(trainingMode==='GENERAL'?isGeneral(t):!isGeneral(t)));
+      const assigns=(state.trainingAssignments||[]).filter(a=>a.active!==false&&courses.some(t=>t.id===a.training_session_id));
+      const statusRows=assigns.map(a=>{const t=courses.find(x=>x.id===a.training_session_id);let s=null;try{s=window.assignmentStatus?.(a,t)}catch(_e){}return {a,t,s}});
+      const overdue=statusRows.filter(x=>x.s?.code==='OVERDUE').length;
+      const outstanding=statusRows.filter(x=>x.s&&x.s.code!=='COMPLETED'&&x.s.code!=='OVERDUE').length;
+      const complete=statusRows.filter(x=>x.s?.code==='COMPLETED').length;
+      stats.innerHTML=[
+        ['Courses',courses.length,'neutral'],['Complete',complete,'green'],['Outstanding',outstanding,outstanding?'amber':'green'],['Overdue',overdue,overdue?'red':'green']
+      ].map(([l,n,tr])=>`<div class="stat traffic-${tr}"><span class="traffic-dot"></span><strong>${n}</strong><span>${l}</span></div>`).join('');
+    }
+  }
+
+  function keepGeneralOutOfHsTraining(){
+    const list=$('hsTrainingList');if(!list)return;
+    for(const card of list.querySelectorAll('.item-card')){
+      const b=card.querySelector('[data-view-training]'),t=b?(state.training||[]).find(x=>x.id===b.dataset.viewTraining):null;
+      if(t&&isGeneral(t))card.remove();
+    }
+  }
+
+  function installComplianceSeparation(){
+    if(typeof window.complianceRows==='function'&&!window.__hsComplianceSeparatedV21173){
+      window.__hsComplianceSeparatedV21173=true;
+      const base=window.complianceRows;
+      window.complianceRows=function(){return base().filter(x=>!isGeneral(x.t))};
+    }
+    if(typeof window.reportTrainingRows==='function'&&!window.__hsReportTrainingSeparatedV21173){
+      window.__hsReportTrainingSeparatedV21173=true;
+      const base=window.reportTrainingRows;
+      window.reportTrainingRows=function(){return base().filter(x=>!isGeneral(x.t))};
+    }
+    if(typeof window.monthlyReportData==='function'&&!window.__hsMonthlySeparatedV21173){
+      window.__hsMonthlySeparatedV21173=true;
+      const base=window.monthlyReportData;
+      window.monthlyReportData=function(value){
+        const d=base(value);
+        const keep=x=>{
+          const tid=x?.training_session_id||x?.t?.id||x?.training?.id||x?.a?.training_session_id||
+            (x?.training_assignment_id?(state.trainingAssignments||[]).find(a=>a.id===x.training_assignment_id)?.training_session_id:null);
+          const t=(state.training||[]).find(z=>z.id===tid);return !t||!isGeneral(t);
+        };
+        for(const k of ['completions','overdue','awaitingInstructor','outstanding','newAssignments','exceptions','retrainingTriggered']){
+          if(Array.isArray(d[k]))d[k]=d[k].filter(keep);
+        }
+        return d;
+      };
+      if(api)api.monthlyReportData=window.monthlyReportData;
+    }
+  }
+
+  async function groupMembershipMap(){
+    const out=new Map();
+    await Promise.all(groups.map(async g=>{
+      const r=await sb.rpc('group_resolved_users_v21155',{p_group_id:g.id});
+      if(r.error)return;
+      for(const u of (r.data||[])){
+        const id=u.user_id||u.id;if(!id)continue;
+        if(!out.has(id))out.set(id,[]);
+        out.get(id).push(g.name);
+      }
+    }));
+    return out;
+  }
+  function userDepartmentsText(uid){
+    const ids=(state.userDepartments||[]).filter(x=>x.user_id===uid).map(x=>x.department_id);
+    return [...new Set(ids.map(id=>(state.departments||[]).find(d=>d.id===id)?.name).filter(Boolean))].join(', ');
+  }
+  function userPositionsText(uid){
+    const ids=userPositions.filter(x=>x.user_id===uid&&x.active!==false).map(x=>x.position_id);
+    return [...new Set(ids.map(id=>positions.find(p=>p.id===id)?.name).filter(Boolean))].join(', ');
+  }
+  function renewalText(t,a){
+    const n=Number(a?.renewal_value||t?.renewal_value||0),u=String(a?.renewal_unit||t?.renewal_unit||'').toLowerCase();
+    return n&&u?`${n} ${u}${n===1?'':'s'}`:(t?.schedule_mode==='ONE_OFF'?'One-off':'');
+  }
+  function materialText(t){
+    if(t.content_mode==='BUILT_IN')return `Built-in content v${Number(t.content_revision||currentContent.get(t.id)?.version_number||1)}`;
+    const files=(state.trainingFiles||[]).filter(f=>f.training_session_id===t.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    if(files.length)return files.map(f=>f.file_name).join('; ');
+    if(t.source_document_id){const d=(state.documents||[]).find(x=>x.id===t.source_document_id);return `Controlled document: ${d?.reference||d?.title||'source'}`}
+    return '';
+  }
+
+  async function downloadFullTrainingRegister(btn){
+    if(!isManager())return toast('Manager or Admin access required.');
+    if(!window.ExcelJS)return toast('Excel library did not load. Refresh and try again.');
+    btn.disabled=true;const old=btn.textContent;btn.textContent='Creating full register…';
+    try{
+      const [gm,sitesR,siteAccessR,historyR]=await Promise.all([
+        groupMembershipMap(),
+        sb.from('organisation_sites_v21137').select('id,name').eq('active',true),
+        sb.from('app_site_access_v21137').select('user_id,site_id,enabled,module_key').eq('module_key','safety').eq('enabled',true),
+        sb.from('training_content_versions_v21173').select('*').order('created_at',{ascending:false})
+      ]);
+      const sites=sitesR.error?[]:(sitesR.data||[]),access=siteAccessR.error?[]:(siteAccessR.data||[]),history=historyR.error?[]:(historyR.data||[]);
+      const siteText=uid=>[...new Set(access.filter(x=>x.user_id===uid).map(x=>sites.find(s=>s.id===x.site_id)?.name).filter(Boolean))].join(', ');
+      const wb=new ExcelJS.Workbook();wb.creator='Safety Tracker';wb.created=new Date();wb.title='Full Training Register';
+      const style=ws=>{
+        ws.views=[{state:'frozen',ySplit:1}];ws.autoFilter={from:'A1',to:`${ws.getRow(1).getCell(ws.columnCount).address.replace(/\d+/,'')}1`};
+        ws.getRow(1).font={bold:true};ws.getRow(1).alignment={vertical:'middle'};ws.eachRow(r=>r.alignment={vertical:'top',wrapText:true});
+      };
+      const summary=wb.addWorksheet('Summary');
+      summary.addRows([
+        ['Generated',new Date().toLocaleString('en-GB')],
+        ['H&S active assignments',(state.trainingAssignments||[]).filter(a=>a.active!==false&&!isGeneral((state.training||[]).find(t=>t.id===a.training_session_id))).length],
+        ['General / Operational active assignments',(state.trainingAssignments||[]).filter(a=>a.active!==false&&isGeneral((state.training||[]).find(t=>t.id===a.training_session_id))).length],
+        ['Built-in courses',(state.training||[]).filter(t=>t.status!=='ARCHIVED'&&t.content_mode==='BUILT_IN').length],
+        ['Uploaded courses',(state.training||[]).filter(t=>t.status!=='ARCHIVED'&&t.content_mode!=='BUILT_IN').length]
+      ]);
+      summary.getColumn(1).width=38;summary.getColumn(2).width=30;summary.getColumn(1).font={bold:true};
+
+      const current=wb.addWorksheet('Current Assignments');
+      current.columns=[
+        ['Site','site',24],['Person','person',28],['Departments','departments',28],['Positions','positions',28],['Groups','groups',30],
+        ['Area','domain',20],['Category','category',22],['Reference','reference',16],['Training','training',40],['Method','method',18],
+        ['Assigned','assigned',20],['Due','due',16],['Status','status',20],['Completed','completed',20],['Instructor','instructor',24],
+        ['Renewal','renewal',18],['Evidence / material','material',42],['Assignment source','origin',18]
+      ].map(([header,key,width])=>({header,key,width}));
+      for(const a of (state.trainingAssignments||[]).filter(x=>x.active!==false)){
+        const t=(state.training||[]).find(x=>x.id===a.training_session_id);if(!t)continue;
+        let st={code:'',label:'',due:a.due_date,method:a.delivery_method_override||t.delivery_method};try{st=window.assignmentStatus?.(a,t)||st}catch(_e){}
+        const sign=(state.trainingSignoffs||[]).filter(s=>s.training_assignment_id===a.id).sort((x,y)=>new Date(y.signed_at)-new Date(x.signed_at))[0];
+        current.addRow({
+          site:siteText(a.user_id),person:personName(a.user_id),departments:userDepartmentsText(a.user_id),positions:userPositionsText(a.user_id),groups:(gm.get(a.user_id)||[]).join(', '),
+          domain:isGeneral(t)?'General / Operational':'H&S',category:t.training_category||'',reference:t.reference||'',training:t.name||'',
+          method:String(st.method||t.delivery_method||'').replaceAll('_',' '),assigned:a.assigned_at?new Date(a.assigned_at):null,due:st.due?new Date(String(st.due).length===10?st.due+'T00:00:00':st.due):null,
+          status:st.label||st.code||'',completed:sign?.signed_at?new Date(sign.signed_at):null,instructor:sign?.trainer_snapshot||t.trainer_name||'',
+          renewal:renewalText(t,a),material:materialText(t),origin:a.assignment_origin||'MANUAL'
+        });
+      }
+      current.getColumn('assigned').numFmt='dd/mm/yyyy hh:mm';current.getColumn('due').numFmt='dd/mm/yyyy';current.getColumn('completed').numFmt='dd/mm/yyyy hh:mm';style(current);
+
+      const hist=wb.addWorksheet('Completion History');
+      hist.columns=[
+        ['Completed','completed',20],['Site','site',24],['Person','person',28],['Departments','departments',28],['Positions','positions',28],['Groups','groups',30],
+        ['Area','domain',20],['Category','category',22],['Reference','reference',16],['Training','training',40],['Method','method',18],
+        ['Instructor','instructor',24],['Acknowledged by','ack',24],['Material','material',42]
+      ].map(([header,key,width])=>({header,key,width}));
+      for(const s of [...(state.trainingSignoffs||[])].sort((a,b)=>new Date(b.signed_at)-new Date(a.signed_at))){
+        const a=(state.trainingAssignments||[]).find(x=>x.id===s.training_assignment_id),t=(state.training||[]).find(x=>x.id===(s.training_session_id||a?.training_session_id)),uid=s.user_id||a?.user_id;if(!t||!uid)continue;
+        hist.addRow({completed:s.signed_at?new Date(s.signed_at):null,site:siteText(uid),person:personName(uid),departments:userDepartmentsText(uid),positions:userPositionsText(uid),groups:(gm.get(uid)||[]).join(', '),domain:isGeneral(t)?'General / Operational':'H&S',category:t.training_category||'',reference:t.reference||'',training:s.training_name_snapshot||t.name||'',method:String(a?.delivery_method_override||t.delivery_method||'').replaceAll('_',' '),instructor:s.trainer_snapshot||t.trainer_name||'',ack:s.signature_name||personName(uid),material:materialText(t)});
+      }
+      hist.getColumn('completed').numFmt='dd/mm/yyyy hh:mm';style(hist);
+
+      const cat=wb.addWorksheet('Course Register');
+      cat.columns=[
+        ['Area','domain',20],['Category','category',22],['Reference','reference',16],['Training','training',42],['Method','method',18],['Source','source',20],
+        ['Content version','version',16],['Review date','review',16],['Schedule','schedule',18],['Status','status',14],['Active assignments','assigned',18]
+      ].map(([header,key,width])=>({header,key,width}));
+      for(const t of [...(state.training||[])].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))){
+        cat.addRow({domain:isGeneral(t)?'General / Operational':'H&S',category:t.training_category||'',reference:t.reference||'',training:t.name||'',method:String(t.delivery_method||'').replaceAll('_',' '),source:t.content_mode==='BUILT_IN'?'Built-in':t.source_document_id?'Controlled document':'Uploaded file',version:t.content_mode==='BUILT_IN'?`v${Number(t.content_revision||1)}`:(t.source_document_version_id||''),review:t.review_date?new Date(t.review_date+'T00:00:00'):null,schedule:renewalText(t,null),status:t.status||'',assigned:(state.trainingAssignments||[]).filter(a=>a.training_session_id===t.id&&a.active!==false).length});
+      }
+      cat.getColumn('review').numFmt='dd/mm/yyyy';style(cat);
+
+      const changes=wb.addWorksheet('Built-in Change History');
+      changes.columns=[
+        ['Training','training',42],['Area','domain',20],['Content version','version',16],['Change summary','summary',52],['Changed by','by',28],['Changed at','at',20]
+      ].map(([header,key,width])=>({header,key,width}));
+      for(const v of history){
+        const t=(state.training||[]).find(x=>x.id===v.training_session_id);if(!t)continue;
+        changes.addRow({training:t.name||'',domain:isGeneral(t)?'General / Operational':'H&S',version:`v${v.version_number}`,summary:v.change_summary||'',by:personName(v.created_by),at:v.created_at?new Date(v.created_at):null});
+      }
+      changes.getColumn('at').numFmt='dd/mm/yyyy hh:mm';style(changes);
+
+      const bytes=await wb.xlsx.writeBuffer();
+      const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`Safety-Tracker-Full-Training-Register-${today()}.xlsx`;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},30000);
+      toast('Full Training Register downloaded.');
+    }catch(e){console.error('v2.11.73 training report',e);toast(e?.message||'Training report failed.')}finally{btn.disabled=false;btn.textContent=old}
+  }
+
+  function decorateReports(){
+    const grid=document.querySelector('#reportsView .button-grid.report-manager-content');if(!grid||grid.querySelector('[data-v21173-full-training-report]'))return;
+    const b=document.createElement('button');b.type='button';b.className='primary';b.dataset.v21173FullTrainingReport='1';b.textContent='Full Training Register (Excel)';grid.appendChild(b);
+  }
+
+  function enhanceAll(){
+    decorateTrainingHub();filterTrainingCards();keepGeneralOutOfHsTraining();decorateReports();enhanceAssignmentActions();
+    if($('modal')?.open)setTimeout(decorateAudienceSections,0);
+  }
+
+  function installEvents(){
+    window.addEventListener('click',e=>{
+      const create=e.target.closest?.('#newTrainingBtn');
+      if(create&&isManager()){e.preventDefault();e.stopImmediatePropagation();openCreateTraining();return}
+
+      const saveNew=e.target.closest?.('[data-v21173-save-new-training]');
+      if(saveNew){e.preventDefault();e.stopImmediatePropagation();void saveNewTraining(saveNew);return}
+
+      const edit=e.target.closest?.('[data-edit-training]');
+      if(edit){
+        const t=(state.training||[]).find(x=>x.id===edit.dataset.editTraining);
+        if(t&&(t.content_mode==='BUILT_IN'||isGeneral(t))){
+          e.preventDefault();e.stopImmediatePropagation();void openEnhancedEdit(t.id);return;
+        }
+      }
+      const saveEdit=e.target.closest?.('[data-v21173-save-training-edit]');
+      if(saveEdit){e.preventDefault();e.stopImmediatePropagation();void saveEnhancedEdit(saveEdit.dataset.v21173SaveTrainingEdit,saveEdit);return}
+
+      const content=e.target.closest?.('[data-v21173-open-content]');
+      if(content){
+        e.preventDefault();e.stopImmediatePropagation();
+        const [tid,aid]=String(content.dataset.v21173OpenContent||'').split('|');void openBuiltInContent(tid,aid||null);return;
+      }
+
+      const sign=e.target.closest?.('[data-sign-training]');
+      if(sign){
+        const aid=sign.dataset.signTraining,a=(state.trainingAssignments||[]).find(x=>x.id===aid),t=(state.training||[]).find(x=>x.id===a?.training_session_id);
+        if(a&&t&&t.content_mode==='BUILT_IN'&&effectiveMethod(a,t)==='SELF_TRAINING'&&!assignmentViewed(a,t)){
+          e.preventDefault();e.stopImmediatePropagation();void openBuiltInContent(t.id,a.id);return;
+        }
+      }
+
+      const mode=e.target.closest?.('[data-v21173-training-mode]');
+      if(mode){
+        e.preventDefault();e.stopImmediatePropagation();trainingMode=mode.dataset.v21173TrainingMode==='GENERAL'?'GENERAL':'HS';
+        try{localStorage.setItem('safetyTrainingModeV21173',trainingMode)}catch(_e){}
+        decorateTrainingHub();filterTrainingCards();return;
+      }
+      const nav=e.target.closest?.('[data-v21173-training-nav]');
+      if(nav){
+        e.preventDefault();e.stopImmediatePropagation();
+        const view=nav.dataset.v21173TrainingNav==='reports'?'reports':'instructor';
+        document.querySelector(`#mainNav button[data-view="${view}"]`)?.click();return;
+      }
+      const report=e.target.closest?.('[data-v21173-full-training-report]');
+      if(report){e.preventDefault();e.stopImmediatePropagation();void downloadFullTrainingRegister(report);return}
+
+      const navBtn=e.target.closest?.('#mainNav button[data-view]');
+      if(navBtn)setTimeout(enhanceAll,120);
+    },true);
+
+    const body=$('modalBody');
+    if(body&&typeof MutationObserver==='function'){
+      new MutationObserver(()=>{if($('modal')?.open)setTimeout(decorateAudienceSections,0)}).observe(body,{childList:true,subtree:true});
+    }
+    const app=$('appView')||document.body;
+    if(app&&typeof MutationObserver==='function'&&!observer){
+      let pending=false;
+      observer=new MutationObserver(()=>{
+        if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;enhanceAll()});
+      });
+      observer.observe(app,{childList:true,subtree:true});
+    }
+    window.addEventListener('pageshow',()=>setTimeout(enhanceAll,180));
+  }
+
+  function installStyles(){
+    if($('trainingHubStylesV21173'))return;
+    const s=document.createElement('style');s.id='trainingHubStylesV21173';s.textContent=`
+      .v21173-hub-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+      .v21173-hub-grid button{min-height:92px;text-align:left;padding:14px}
+      .v21173-hub-grid button strong,.v21173-hub-grid button small{display:block}
+      .v21173-hub-grid button small{margin-top:6px;opacity:.8;line-height:1.35}
+      .v21173-audience-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+      .v21173-audience-grid details{border:1px solid var(--border,#475569);border-radius:10px;overflow:hidden}
+      .v21173-audience-grid summary{padding:10px 12px;font-weight:700;cursor:pointer}
+      .v21173-audience-grid .checkbox-list{border-top:1px solid var(--border,#475569);max-height:220px;overflow:auto}
+      .v21173-content-editor{width:100%;min-height:320px;white-space:pre-wrap}
+      .v21173-training-reader{white-space:pre-wrap;line-height:1.65;font-size:1rem;padding:14px 2px}
+      .v21173-version-history details{border-top:1px solid var(--border,#475569);padding:8px 0}
+      .v21173-version-history pre{white-space:pre-wrap;max-height:300px;overflow:auto;font:inherit;background:rgba(255,255,255,.03);padding:10px;border-radius:8px}
+      .positions-audience-v21173 .checkbox-list{max-height:220px;overflow:auto}
+      @media(max-width:760px){
+        .v21173-hub-grid{grid-template-columns:1fr 1fr}
+        .v21173-audience-grid{grid-template-columns:1fr}
+        .v21173-hub-grid button{min-height:84px}
+        .v21173-content-editor{min-height:380px}
+      }
+    `;document.head.appendChild(s);
+  }
+
+  async function boot(){
+    api=window.SafetyTrackerV2;
+    if(!api?.state||!api?.sb){setTimeout(boot,120);return}
+    state=api.state;sb=api.sb;
+    if(!state.user){setTimeout(boot,160);return}
+    try{trainingMode=localStorage.getItem('safetyTrainingModeV21173')==='GENERAL'?'GENERAL':'HS'}catch(_e){}
+    installStyles();
+    await loadSupplemental();
+    installRpcBridge();
+    installComplianceSeparation();
+    installEvents();
+    [100,350,850].forEach(ms=>setTimeout(enhanceAll,ms));
+    window.SafetyTrainingHubV21173={reload:async()=>{await loadSupplemental();enhanceAll()},create:openCreateTraining,report:downloadFullTrainingRegister};
+  }
+  boot().catch(e=>console.warn('Safety Tracker v2.11.73 Training Hub',e));
+})();
+

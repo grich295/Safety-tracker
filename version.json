@@ -1,6 +1,6 @@
 {
-  "version": "2.11.72",
-  "build_id": "v21172-document-set-responsibility-modal-tbt-20260926",
+  "version": "2.11.73",
+  "build_id": "v21173-training-hub-general-positions-20260926",
   "clean": true,
-  "notes": "Cumulative Safety Tracker build. Preserves v2.11.71 approval reliability and all prior v2.11.65-v2.11.70 features. Fixes modal validation/warning messages being hidden behind dialogs and clarifies that Group TBT settings apply only to optional automatic refresher scheduling, not normal TBT assignment. Rebuilds the controlled document-set folder editor into clear mobile sections. Overall annual-review responsibility and default file-review responsibility can now be assigned using the normal targets: Everyone, Departments, Positions, Groups or specific people. Keeps acknowledgement audience separate from review responsibility and retains advanced annual/periodic rules in a collapsed Advanced section. Database support for flexible responsibility targets is included and already applied."
+  "notes": "Cumulative Safety Tracker build. Adds a Training Hub with separate H&S and General / Operational Training. General training can use uploaded PDFs or built-in copy/paste content; built-in content is version controlled with change summaries and history. Supports self-training and instructor-led delivery. Standardises Training and Safety Awareness audience options to Everyone, Departments, Positions, Groups and specific people, with live position-based assignment. Adds a Full Training Register Excel report with site, person, department, position, group, domain, category, assignment, due/completion, instructor, renewal, evidence/material and built-in content change history. General / Operational training is kept out of H&S compliance and H&S monthly reporting. Database migration already applied."
 }
